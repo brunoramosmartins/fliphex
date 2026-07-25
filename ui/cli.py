@@ -22,7 +22,7 @@ from agents.heuristic_agent import HeuristicAgent
 from agents.random_agent import RandomAgent
 from fliphex.board import OFF_BOARD, Board
 from fliphex.moves import Move, apply_move, legal_moves
-from fliphex.notation import decode_move, encode_move
+from fliphex.notation import decode_move
 from fliphex.piece import DIRECTION_NAMES, N_SLOTS
 from fliphex.rules import winner
 from fliphex.state import TILES, Colour, GameState, other, tiles_in
@@ -112,20 +112,24 @@ def arrow_targets(
 
 
 def explain_move(board: Board, before: GameState, move: Move) -> str:
-    """Return a one-line account of a move and every flip it causes."""
+    """Return a one-line account of a move and every flip it causes.
+
+    Flips are toggles (adr-007): an arrow at an own tile is a self-flip that
+    hands it to the opponent.
+    """
     mover = before.to_move
+    opponent = other(mover)
     parts = []
     for name, target, colour in arrow_targets(board, before, move):
+        cell = board.cell_name(target) if target != OFF_BOARD else None
         if target == OFF_BOARD:
             parts.append(f"{name}→edge")
         elif colour == Colour.EMPTY:
-            parts.append(f"{name}→{board.cell_name(target)} empty")
-        elif colour == mover:
-            parts.append(f"{name}→{board.cell_name(target)} own")
-        else:
-            parts.append(
-                f"{name}→{board.cell_name(target)} {colour.name}→{mover.name} FLIP"
-            )
+            parts.append(f"{name}→{cell} empty")
+        elif colour == opponent:
+            parts.append(f"{name}→{cell} {colour.name}→{mover.name} FLIP")
+        else:  # own tile — self-flip
+            parts.append(f"{name}→{cell} {colour.name}→{opponent.name} self-FLIP!")
     arrows = "; ".join(parts) if parts else "no arrows"
     return (
         f"{mover.name} plays {TILES[move.tile].archetype} at "
@@ -133,11 +137,17 @@ def explain_move(board: Board, before: GameState, move: Move) -> str:
     )
 
 
-def _flip_count(board: Board, state: GameState, move: Move) -> int:
-    opponent = other(state.to_move)
-    return sum(
-        colour == opponent for _, _, colour in arrow_targets(board, state, move)
-    )
+def _net_flips(board: Board, state: GameState, move: Move) -> int:
+    """Net colour swing for the side to move (opponent flips minus self-flips)."""
+    mover = state.to_move
+    opponent = other(mover)
+    net = 0
+    for _, _, colour in arrow_targets(board, state, move):
+        if colour == opponent:
+            net += 1
+        elif colour == mover:
+            net -= 1
+    return net
 
 
 # -- human input ---------------------------------------------------------------
@@ -206,8 +216,8 @@ def _choose_rotation(
     print(f"  rotations for {TILES[tile].archetype} at {board.cell_name(cell)}:")
     for r in rotations:
         preview = explain_move(board, state, Move(cell, tile, r))
-        flips = _flip_count(board, state, Move(cell, tile, r))
-        print(f"    {r}: flips {flips}  |  {preview.split('|', 1)[1].strip()}")
+        net = _net_flips(board, state, Move(cell, tile, r))
+        print(f"    {r}: net {net:+d}  |  {preview.split('|', 1)[1].strip()}")
     while True:
         raw = input("  rotation (or 'back') > ").strip()
         if raw.lower() in {"back", "b", ""}:
