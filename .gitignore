@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+*.egg-info/
+dist/
+build/
+
+# Local-only project direction — not published to the remote
+roadmap-fliphex-v1.md
+
+# Claude Code config — local only, never published
+.claude/
+
+# Example source artifact (USP poster) — local only
+FLIPHEX.pdf
+
+# Large artifacts — tracked selectively, see docs/engineering.md
+data/models/*.pt
+data/selfplay/
+results/*.jsonl
+figures/*.png
+!figures/.gitkeep
