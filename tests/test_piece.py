@@ -14,7 +14,6 @@ from fliphex.piece import (
     FULL_MASK,
     JOKER,
     N_SLOTS,
-    Piece,
     mask_to_slots,
     rotate_mask,
     slots_to_mask,
