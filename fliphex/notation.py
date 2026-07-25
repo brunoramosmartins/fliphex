@@ -70,8 +70,7 @@ def encode_state(state: GameState) -> str:
     """
     colours = "".join(_COLOUR_CHAR[c] for c in state.colours)
     return (
-        f"{colours} {_COLOUR_CHAR[state.to_move]} "
-        f"{state.hands[0]:x} {state.hands[1]:x}"
+        f"{colours} {_COLOUR_CHAR[state.to_move]} {state.hands[0]:x} {state.hands[1]:x}"
     )
 
 
