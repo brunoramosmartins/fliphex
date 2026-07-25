@@ -107,20 +107,22 @@ The tile is placed **mover's colour face up**. Then the flip rule fires.
 This is the whole game, so it is stated twice: once in prose, once in code.
 
 > When a tile is placed, look at each of its arrows. If an arrow points at an
-> adjacent cell that is **occupied**, the tile in that cell is flipped to the
-> colour of the player who just moved. Arrows pointing off the board, or at
-> empty cells, do nothing.
+> adjacent cell that is **occupied**, the tile in that cell is **turned over**,
+> inverting its colour. The tiles are two-sided, so turning one over always
+> swaps purple ⇄ green, whoever it currently belongs to. Arrows pointing off the
+> board, or at empty cells, do nothing.
 
 ```python
 def apply_move(state, cell, tile, rotation):
     mover = state.to_move
     state.board[cell] = Placed(tile, rotation, colour=mover)
 
-    for slot in tile.arrow_slots:                  # e.g. (0, 1, 3)
-        direction = (slot + rotation) % 6          # clockwise from North
-        target = ADJACENCY[cell][direction]        # None if off-board
+    for slot in tile.arrow_slots:  # e.g. (0, 1, 3)
+        direction = (slot + rotation) % 6  # clockwise from North
+        target = ADJACENCY[cell][direction]  # None if off-board
         if target is not None and state.board[target] is not None:
-            state.board[target].colour = mover     # flip; do NOT recurse
+            state.board[target].colour = opposite(state.board[target].colour)
+            # turn over; do NOT recurse
 
     state.hands[mover].remove(tile)
     state.to_move = opponent(mover)
@@ -134,9 +136,12 @@ implementation could plausibly go wrong:
   [adr-006](adr/adr-006-no-chain-reaction.md).
 - **A flip is unconditional.** There is no bracketing or line-capture as in
   Reversi. Adjacency plus an arrow is sufficient.
-- **Already-your-colour tiles are still "flipped"** — the operation is an
-  assignment, not a toggle. Pointing an arrow at your own tile is legal and is
-  a no-op.
+- **A flip is a toggle, not an assignment** ([adr-007](adr/adr-007-flip-toggles-colour.md)).
+  Turning a tile over inverts its colour regardless of who placed the arrow, so
+  an arrow at an opponent's tile wins it, but **an arrow at one of your own
+  tiles hands it to the opponent.** Aiming arrows at your own pieces is legal
+  and self-damaging — the poster's advice that you may deliberately place where
+  nothing will be flipped follows from this.
 - **A tile's arrows fire exactly once, on the ply it is placed.** From then on
   it is inert for the rest of the game. Its stored rotation is bookkeeping for
   notation and replay, nothing more. This is what makes the flip rule cheap and
