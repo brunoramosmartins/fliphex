@@ -9,6 +9,22 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-07-25 — Phase 1 opened
+
+Phase 0 shipped (tag `v0.1-foundation`, clean linear history). Gate check for
+Phase 1 passed with no carry-overs — all 16 Phase 0 deliverables present.
+
+Scope decision: keep the roadmap, `.claude/` config, and `FLIPHEX.pdf` local
+only (gitignored, purged from remote history via force-push). The remote is the
+public artifact; the project direction and tooling are not part of it.
+
+No open technique decision enters Phase 1 — the six ADRs already fix the engine
+design — so no `literature-scout` dispatch here. Literature grounding (and any
+ADR rebuttal) is deferred to Phase 2, as recorded in the roadmap's Phase 1
+`lit-note` note.
+
+---
+
 ## 2026-07-23 — Phase 0
 
 ### The physical artifact outranks the written rules
