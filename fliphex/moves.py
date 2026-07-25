@@ -3,12 +3,14 @@
 A move is a ``(cell, tile, rotation)`` triple: place ``tile`` from the mover's
 hand on an empty ``cell`` at ``rotation``, then fire its arrows once.
 
-The flip rule (docs/rules-canonical.md §4, adr-006): every arrow of the placed
-tile that points at an *occupied* neighbour flips that neighbour to the mover's
-colour. Flips are unconditional (no bracketing), never chain (depth exactly 1),
-and setting a cell already the mover's colour is a harmless no-op. A placed
-tile's arrows fire on this ply and never again — which is why the state need not
-remember them (adr-003).
+The flip rule (docs/rules-canonical.md §4, adr-006, adr-007): every arrow of the
+placed tile that points at an *occupied* neighbour **turns that neighbour over**,
+inverting its colour. Because the tiles are two-sided, an arrow at an opponent's
+tile wins it, but an arrow at your own tile hands it to the opponent — the flip
+depends only on the target's current colour, not on who placed. Flips are
+unconditional (no bracketing), never chain (depth exactly 1), and fire once, on
+the ply the tile is placed — which is why the state need not remember them
+(adr-003).
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ from typing import NamedTuple
 
 from fliphex.board import OFF_BOARD, Board
 from fliphex.piece import N_SLOTS
-from fliphex.state import TILES, Colour, GameState, tiles_in
+from fliphex.state import TILES, Colour, GameState, other, tiles_in
 
 
 class Move(NamedTuple):
@@ -64,6 +66,6 @@ def apply_move(board: Board, state: GameState, move: Move) -> GameState:
             continue
         target = board.neighbour(cell, direction)
         if target != OFF_BOARD and new.colours[target] != Colour.EMPTY:
-            new = new.with_colour(target, mover)
+            new = new.with_colour(target, other(new.colours[target]))
 
     return new.without_tile(mover, tile).with_history(cell, tile, rotation).switched()

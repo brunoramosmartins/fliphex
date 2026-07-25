@@ -80,14 +80,26 @@ def test_flip_does_not_chain():
     assert s.colours[_cid("C2")] == Colour.PURPLE  # NOT chained
 
 
-def test_same_colour_target_is_noop():
+def test_arrow_at_own_tile_is_a_self_flip():
+    # Toggle rule (adr-007): purple's arrow at its own tile hands it to green.
     board = Board()
     s = GameState.initial()
     s = s.with_colour(_cid("C2"), Colour.PURPLE)  # neighbour already purple
-    # Purple plays P1(N) on C3 -> arrow at C2 (already purple): no change.
+    # Purple plays P1(N) on C3 -> arrow at C2 (own) turns it over to GREEN.
+    s = apply_move(board, s, Move(_cid("C3"), P1, 0))
+    assert s.colours[_cid("C2")] == Colour.GREEN  # self-flip, not a no-op
+    assert s.colours[_cid("C3")] == Colour.PURPLE  # the placed tile
+    assert s.score() == (1, 1)
+
+
+def test_flip_is_a_toggle_independent_of_mover():
+    # An arrow inverts the target's colour regardless of who places it.
+    board = Board()
+    s = GameState.initial()
+    s = s.with_colour(_cid("C2"), Colour.GREEN)
+    # Purple plays P1(N) on C3 -> C2 (green) turns over to purple.
     s = apply_move(board, s, Move(_cid("C3"), P1, 0))
     assert s.colours[_cid("C2")] == Colour.PURPLE
-    assert s.score() == (2, 0)
 
 
 def test_off_board_arrows_do_nothing():

@@ -9,6 +9,33 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-07-25 — Play-testing caught a wrong core rule: flip is a toggle
+
+Building the hotseat CLI before training any agent paid off on day one. Playing
+a two-human game, the co-designer noticed the 6-arrow tile placed among his own
+pieces changed nothing, and questioned whether an arrow should flip a same-colour
+tile.
+
+Investigation confirmed the engine did exactly what Phase 0's `rules-canonical.md`
+§4 told it to: a flip was an **assignment** to the placing player's colour, so
+aiming at your own tile was a no-op. That was my error. The tiles are two-sided;
+the poster says the pointed tile is *"virada (flipada)"* — **turned over** —
+which inverts its colour unconditionally. An arrow at your own tile therefore
+hands it to the opponent.
+
+Fixed as a **toggle** (adr-007): one line in `apply_move`, plus the rulebook,
+`engineering.md`, the greedy heuristic (now maximises net swing = opponent flips
+minus self-flips, or it would damage itself), and the flip tests. Nothing
+structural moved — toggle only changes colours, so adr-003's representation and
+the state-space bound are untouched.
+
+The lesson is the whole reason the CLI came before the solver and the network: a
+subtly wrong core rule would have been learned faithfully by every agent and
+silently poisoned every hypothesis verdict. "Play the game by hand first" earned
+its place in the plan.
+
+---
+
 ## 2026-07-25 — Phase 1 opened
 
 Phase 0 shipped (tag `v0.1-foundation`, clean linear history). Gate check for

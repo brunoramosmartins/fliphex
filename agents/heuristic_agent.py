@@ -11,26 +11,33 @@ from fliphex.piece import N_SLOTS
 from fliphex.state import TILES, GameState, other
 
 
-def flips_gained(board: Board, state: GameState, move: Move) -> int:
-    """Return how many opponent cells ``move`` would flip.
+def net_flips(board: Board, state: GameState, move: Move) -> int:
+    """Return the net colour swing ``move`` produces for the side to move.
 
-    Counts arrow-hit neighbours currently the opponent's colour. Own-colour and
-    empty neighbours are not flips (the score swing comes only from opponents).
+    Flips are toggles (adr-007): an arrow at an opponent tile wins it (+1) but an
+    arrow at one of the mover's own tiles hands it over (-1). Empty and off-board
+    arrows count 0. A rational greedy maximises this net, not the raw flip count,
+    so it does not damage itself.
     """
-    opponent = other(state.to_move)
+    mover = state.to_move
+    opponent = other(mover)
     rotated = TILES[move.tile].rotated(move.rotation)
-    count = 0
+    net = 0
     for direction in range(N_SLOTS):
         if not rotated >> direction & 1:
             continue
         target = board.neighbour(move.cell, direction)
-        if target != OFF_BOARD and state.colours[target] == opponent:
-            count += 1
-    return count
+        if target == OFF_BOARD:
+            continue
+        if state.colours[target] == opponent:
+            net += 1
+        elif state.colours[target] == mover:
+            net -= 1
+    return net
 
 
 class HeuristicAgent(Agent):
-    """Plays the move flipping the most opponent pieces this ply; ties random."""
+    """Plays the move with the largest net colour swing this ply; ties random."""
 
     name = "heuristic"
 
@@ -40,6 +47,6 @@ class HeuristicAgent(Agent):
 
     def select(self, board: Board, state: GameState) -> Move:
         moves = legal_moves(board, state)
-        best = max(flips_gained(board, state, m) for m in moves)
-        top = [m for m in moves if flips_gained(board, state, m) == best]
+        best = max(net_flips(board, state, m) for m in moves)
+        top = [m for m in moves if net_flips(board, state, m) == best]
         return self._rng.choice(top)

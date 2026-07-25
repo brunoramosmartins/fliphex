@@ -1,10 +1,11 @@
 """Tests for the baseline agents, including the >=60% heuristic exit criterion."""
 
 from agents.base import Agent
-from agents.heuristic_agent import HeuristicAgent, flips_gained
+from agents.heuristic_agent import HeuristicAgent, net_flips
 from agents.random_agent import RandomAgent
 from fliphex.board import Board
-from fliphex.moves import apply_move, legal_moves
+from fliphex.moves import Move, apply_move, legal_moves
+from fliphex.piece import ARCHETYPES
 from fliphex.rules import is_terminal, winner
 from fliphex.state import Colour, GameState
 
@@ -45,11 +46,26 @@ def test_heuristic_picks_a_max_flip_move():
     s = GameState.initial(first=Colour.PURPLE)
     s = s.with_colour(c("C2"), Colour.GREEN).with_colour(c("C4"), Colour.GREEN)
 
-    best = max(flips_gained(board, s, m) for m in legal_moves(board, s))
-    assert best == 2  # only the N+S piece on C3 hits both
+    best = max(net_flips(board, s, m) for m in legal_moves(board, s))
+    assert best == 2  # only the N+S piece on C3 hits both greens
 
     chosen = HeuristicAgent(seed=0).select(board, s)
-    assert flips_gained(board, s, chosen) == best
+    assert net_flips(board, s, chosen) == best
+
+
+def test_heuristic_avoids_self_flip():
+    # One own tile on the board, no opponents: every flip is a self-flip (-1),
+    # so the best net is 0 and the heuristic must not damage itself (adr-007).
+    board = Board()
+    s = GameState.initial(first=Colour.PURPLE)
+    s = s.with_colour(board.cell_id("C2"), Colour.PURPLE)
+
+    # Playing P1(N) on C3 would toggle its own C2 -> net -1.
+    self_flip = Move(board.cell_id("C3"), list(ARCHETYPES).index("P1"), 0)
+    assert net_flips(board, s, self_flip) == -1
+
+    chosen = HeuristicAgent(seed=0).select(board, s)
+    assert net_flips(board, s, chosen) == 0  # picks a harmless move, not the -1
 
 
 def test_heuristic_beats_random_at_least_60_percent():

@@ -54,8 +54,9 @@ Required coverage:
 - **Rotation** — slot `i` at rotation `k` maps to direction `(i+k) mod 6`;
   orbit sizes match `piece-archetypes.md` (notably `P6` has 1 and `P3-tri` has
   2, so the move generator must deduplicate).
-- **Flip logic** — flips are unconditional, one deep, and never chain;
-  same-colour targets are a no-op; arrows off the board do nothing.
+- **Flip logic** — flips are unconditional toggles (adr-007), one deep, and
+  never chain; an arrow at your own tile is a self-flip to the opponent; arrows
+  off the board or at empty cells do nothing.
 - **Invariants I1–I6** from `rules-canonical.md`, asserted after every ply of a
   random game.
 - **Joker** — no arrows, Player 1 only, flippable once placed, counted by
