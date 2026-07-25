@@ -1,0 +1,35 @@
+[project]
+name = "fliphex"
+version = "0.1.0"
+description = "Computational analysis and self-play learning of FLIPHEX, an original hexagonal board game"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [{ name = "Bruno Ramos Martins" }]
+dependencies = ["numpy>=1.26", "scipy>=1.11"]
+
+[project.optional-dependencies]
+az = ["torch>=2.2"]
+ui = ["pygame>=2.5"]
+figures = ["matplotlib>=3.8", "seaborn>=0.13"]
+dev = ["pytest>=8.0", "ruff>=0.4"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+# Discovered rather than listed, because the packages land phase by phase
+# (fliphex in Phase 1, solver in Phase 3, az in Phase 4, complexity in Phase 6).
+include = ["fliphex*", "solver*", "az*", "complexity*", "agents*", "stats*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

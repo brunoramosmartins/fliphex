@@ -1,0 +1,8 @@
+numpy>=1.26
+scipy>=1.11
+torch>=2.2
+matplotlib>=3.8
+seaborn>=0.13
+pygame>=2.5
+pytest>=8.0
+ruff>=0.4
