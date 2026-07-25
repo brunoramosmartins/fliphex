@@ -9,6 +9,25 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-07-25 — Phase 1 closing: scope calls
+
+Engine, both baseline agents, and the full test suite are done, and the flip
+rule was validated by hand-play (see the toggle entry below). Two closing
+decisions:
+
+- **CI landed now** (`.github/workflows/ci.yml`): ruff, pytest, and a
+  generated-docs-clean check. Worth having before the Phase 2 study work so the
+  branch stays honest.
+- **The `01_rules_and_geometry` notebook (#12) is deferred to Phase 7.** The
+  hotseat CLI already gives interactive visual inspection of geometry and the
+  flip rule, so the notebook's value now is presentational, not correctness. It
+  travels with the UI/portfolio work.
+- The "1000 random games" exit criterion is covered by
+  `scripts/smoke_selfplay.py` (run once: 1000 games, all invariants held, ~11s)
+  rather than a slow pytest case, keeping the suite fast.
+
+---
+
 ## 2026-07-25 — Play-testing caught a wrong core rule: flip is a toggle
 
 Building the hotseat CLI before training any agent paid off on day one. Playing
