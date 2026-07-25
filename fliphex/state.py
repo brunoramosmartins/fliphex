@@ -43,6 +43,9 @@ TILES: tuple[Piece, ...] = (*DECK, JOKER)
 #: Index of the joker in :data:`TILES` (and in a hand bitmask).
 JOKER_INDEX: int = len(DECK)
 
+#: Archetype name -> tile index, matching :data:`TILES` order.
+TILE_INDEX: dict[str, int] = {piece.archetype: i for i, piece in enumerate(TILES)}
+
 #: Hand bitmask for a player who holds every archetype but not the joker.
 _DECK_MASK: int = (1 << len(DECK)) - 1
 
@@ -148,6 +151,30 @@ class GameState:
             z ^= _tables(n_cells)[2]
 
         return cls(n_cells, colours, (hands[0], hands[1]), first, (), z)
+
+    @classmethod
+    def build(
+        cls,
+        colours: tuple[Colour, ...],
+        hands: tuple[int, int],
+        to_move: Colour,
+    ) -> GameState:
+        """Return a state with these parts and a freshly computed Zobrist hash.
+
+        History is empty. Used to reconstruct a position from notation; the
+        resulting hash equals that of any state reached by play with the same
+        colouring, hands, and turn.
+        """
+        n_cells = len(colours)
+        z = 0
+        for cell, colour in enumerate(colours):
+            z ^= _cell_hash(n_cells, cell, colour)
+        for player in PLAYERS:
+            for tile in tiles_in(hands[player - 1]):
+                z ^= _tile_hash(n_cells, player, tile)
+        if to_move == Colour.GREEN:
+            z ^= _tables(n_cells)[2]
+        return cls(n_cells, tuple(colours), hands, to_move, (), z)
 
     # -- primitive transitions (used by moves.py) -----------------------------
 
