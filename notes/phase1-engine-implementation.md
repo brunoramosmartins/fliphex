@@ -72,4 +72,25 @@ engine matches. **House rule: create tests, do not run them — the author runs
 
 ## Lessons Learned
 
+A tested engine and a legible way to *see* the game are not optional
+scaffolding — they are what let me trust everything built on top of them. The
+highest-leverage thing I did this phase was, before writing any search or
+learning code, to sit down and play the game by hand against myself, knowing the
+outcome I expected, and check that the engine reproduced it move by move. That
+turned rule validation from an abstract worry into something concrete I could
+verify. The lesson generalises: for a project whose whole value rests on the
+correctness of one small core, invest early in the tools that make that core
+observable.
+
 ## Failed Attempts
+
+My Phase 0 flip rule was wrong, and only hand-play revealed it. I had modelled a
+flip as *assigning* the placing player's colour, so an arrow pointed at your own
+tile did nothing. But the physical tiles are two-sided: a flip *turns the tile
+over*, inverting its colour, so it can even cost you your own pieces. I found
+this in Phase 1 by playing, not by testing — my tests faithfully checked the
+wrong rule, which is exactly why tests alone were not enough. Catching it here,
+before any solver run or network training, spared the project from learning a
+corrupted game and burning compute on meaningless simulations. It is the
+concrete reason "play the game before training anything" earned a place in the
+plan.

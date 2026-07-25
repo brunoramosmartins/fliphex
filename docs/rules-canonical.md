@@ -117,9 +117,9 @@ def apply_move(state, cell, tile, rotation):
     mover = state.to_move
     state.board[cell] = Placed(tile, rotation, colour=mover)
 
-    for slot in tile.arrow_slots:                  # e.g. (0, 1, 3)
-        direction = (slot + rotation) % 6          # clockwise from North
-        target = ADJACENCY[cell][direction]        # None if off-board
+    for slot in tile.arrow_slots:  # e.g. (0, 1, 3)
+        direction = (slot + rotation) % 6  # clockwise from North
+        target = ADJACENCY[cell][direction]  # None if off-board
         if target is not None and state.board[target] is not None:
             state.board[target].colour = opposite(state.board[target].colour)
             # turn over; do NOT recurse
