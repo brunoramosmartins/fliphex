@@ -118,7 +118,9 @@ to set up a later swing) and **4×4 is the strategically meaningful exact solve*
 carrying the H1/H2 verdicts. Recorded in the
 [adr-004 Phase 2 amendment](adr/adr-004-solver-approach.md). The reduced-deck
 choice that makes 4×4 tractable is pinned in
-[adr-009](adr/adr-009-reduced-deck-policy.md) (Proposed).
+[adr-009](adr/adr-009-reduced-deck-policy.md) (Accepted: keep `P6` + `P3-y`,
+fill by ascending arrow count; reduced boards are a purely computational
+device).
 
 ## Verdicts
 

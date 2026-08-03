@@ -1,10 +1,8 @@
 # ADR-009 — Reduced-deck policy for small board variants
 
-**Status:** Proposed
-**Date:** 2026-07-31
+**Status:** Accepted
+**Date:** 2026-07-31 (ratified 2026-07-31)
 **Deciders:** Bruno Ramos Martins
-**Needs:** author ratification; ideally a check against the physical game (see
-OPEN-3).
 
 ## Context
 
@@ -92,15 +90,21 @@ seat confound).
   Reasonable, but does not guarantee `P6`/`P3-y` on the smallest boards, which
   are the two tiles the study most wants present.
 
-## Open question
+## OPEN-3 — RESOLVED (2026-07-31): reduced boards are a purely computational device
 
-**OPEN-3.** Is a reduced FLIPHEX board something the physical game supports at
-all, or is it a purely **computational device**? If purely computational, then
-faithfulness is judged against the shipped 5×5, not a physical artifact, and this
-ADR is entirely a modeling decision. If the physical set implies a natural
-reduced deck (e.g. a printed 3×3 teaching variant), that should override the
-default here. To be checked with the game's author before Phase 3 locks the
-solver's variant list.
+The game's author confirms that reduced FLIPHEX boards have **no physical
+counterpart** — they exist only as a computational instrument for exact solving.
+Consequences:
+
+- **Faithfulness is judged against the shipped 5×5**, not against any physical
+  artifact. This ADR is therefore entirely a modeling decision, and the default
+  above stands without needing to match a printed variant.
+- There is no external constraint on the reduced deck, so the `P6` + `P3-y`
+  anchor and the ascending-arrow fill are free to optimise for *what the study
+  wants to observe* (max-flip dynamics and the chiral/mirror question) rather
+  than for physical fidelity.
+- Any reduced-board result must be reported as evidence *about the 5×5 design*,
+  carrying its board size and deck explicitly — never as a game in its own right.
 
 ## Related
 

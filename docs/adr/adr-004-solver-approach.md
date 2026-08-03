@@ -161,7 +161,9 @@ hand.
 still undefined — *which* tiles a reduced board draws. That choice swings the
 4×4 bound by ~3 orders of magnitude (table above) and decides whether a reduced
 solve is a faithful shrink of FLIPHEX. Pinned in
-[adr-009](adr-009-reduced-deck-policy.md) (Proposed).
+[adr-009](adr-009-reduced-deck-policy.md) (Accepted): keep `P6` + `P3-y`, fill by
+ascending arrow count; reduced boards are a purely computational device
+(OPEN-3 resolved), so faithfulness is judged against the shipped 5×5.
 
 ## Related
 
