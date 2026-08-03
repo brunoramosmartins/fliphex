@@ -695,17 +695,23 @@ Neither extension is relevant to FLIPHEX. According to ADR-001, FLIPHEX is a det
 **Refined write-up.**
 
 Correct and appropriately brief — the scope boundary holds exactly as adr-001
-draws it. One thing the skim surfaces that is worth parking rather than
-discarding: FLIPHEX has a completely natural §6.6 variant, namely **concealed
-hands**. The physical game is played with hands visible, but hiding them turns
-the state into a belief state over the opponent's remaining tiles, and — unusually
-— the belief is *exactly* computable, since the deck is a known 13-tile set and
-every placement removes one publicly. That makes it a rare partially-observable
-game with a tractable, finite, exactly-updatable belief state.
+draws it, and it holds more tightly than it first appears.
 
-It is firmly out of scope for this project (adr-001, and H6 is already the stretch
-slot). Log it in `notes/open-ideas.md` as a variant with a genuinely interesting
-formal property, and leave it there.
+It is worth recording *why* the obvious candidate variant fails, so nobody
+proposes it again later. Concealing each player's hand looks like it would turn
+FLIPHEX into a §6.6 belief-state game. It does not. The deck is a fixed, known
+13-tile set and every placement is public, so the opponent's remaining hand is
+always recoverable by subtraction: `hand = deck − tiles they have played`. The
+belief state is a point mass at every ply, which means there is no belief to
+maintain and no information to be gained by probing. Hiding the hand changes the
+bookkeeping burden on a human player and changes nothing about the game tree —
+it stays a perfect-information game, and `ACTIONS`/`RESULT` are untouched.
+
+Making the hidden information real would require the tiles a player holds to be
+*drawn*, not dealt in full — e.g. a random `k`-tile hand refilled from a shared
+pool. That introduces chance nodes, so it is excluded by adr-001 on the
+stochastic side as well as the observability side. Both of R&N's extensions stay
+out of scope, and there is no near-miss variant worth parking.
 
 ---
 
