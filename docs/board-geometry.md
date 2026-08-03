@@ -118,20 +118,25 @@ direction `d` if and only if `Y` neighbours `X` in direction `d + 3`.
   is a candidate move-ordering signal for the Phase 3 solver.
 - The two degree-2 cells are `A1` and `E1`, the poorest cells on the board.
 
-### The board is not centrally symmetric — and that matters
+### The board has a single mirror symmetry — and that matters
 
 Columns A, C, E carry cells at vertical offsets 0..4 while B and D sit at
-0.5..4.5. Those two sets of columns have different vertical centres (2 and
-2.5), so no rotation or reflection maps the cell set onto itself: the board's
-symmetry group is **trivial**. The shape "leans". Concretely `C1` has degree 3
-while `C5` has degree 5, and `A1`/`E1` (degree 2) have no degree-2 partners
-under any candidate symmetry.
+0.5..4.5. Those two column groups have different vertical centres (2 and 2.5),
+so no symmetry can *mix* them — that rules out 90° rotation, a top-bottom
+mirror, and 180° rotation. But one symmetry survives *within* the groups: a
+**left-right mirror across column C** (`A`↔`E`, `B`↔`D`, `C` fixed; and
+`NE`↔`NW`, `SE`↔`SW`). The board's automorphism group is therefore **Z/2**, not
+trivial. Consistently, `A1` and `E1` — the two degree-2 cells — are each other's
+mirror image, and `C1`/`C5` lie on the axis and are fixed. Verified by
+`scripts/check_symmetry.py`; recorded in `docs/adr/adr-008-board-mirror-symmetry.md`.
 
-This is a real asymmetry in the physical artifact, not a modelling artifact,
-and it is directly relevant to **H1 (first-player advantage)**: on a board with
-no symmetry group, there is no strategy-stealing or pairing argument available,
-so H1 has to be settled computationally. Worth stating explicitly in the
-writeup — it is part of why the game is interesting.
+The mirror is a symmetry of the geometry and the flip rule; whether the *game*
+inherits it hinges on the chiral `P3-y` tile (`OPEN-2`). If it does, self-play
+gains a 2× data augmentation and transposition keys can be mirror-canonicalised.
+For **H1 (first-player advantage)** the mirror changes nothing: it preserves the
+player to move, so it is not a colour swap and gives no strategy-stealing or
+pairing argument. H1 must still be settled computationally — the conclusion the
+Phase 0 note reached, though its "no symmetry" premise was wrong.
 
 > **OPEN-1.** Confirm against the physical board that all five columns really
 > hold five cells and that no cell is missing from a corner. The poster
