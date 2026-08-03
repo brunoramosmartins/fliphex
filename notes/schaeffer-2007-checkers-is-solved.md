@@ -43,8 +43,9 @@ detail and is worth a skim if §2's account leaves the retrograde algorithm fuzz
   is likely to create one.
 
 **Legend.** Prompts marked 🔄 need synthesis with another source — answer them in
-[phase2-synthesis.md](notes/phase2-synthesis.md) (**S1**: what "solved" buys;
-**S4**: exact solving vs learned play), not here.
+[phase2-synthesis.md](notes/phase2-synthesis.md) (**S4**: exact solving vs
+learned play; **S5**: what "solved" buys; **S6**: may Axis 2 feed Axis 1?), not
+here.
 
 **Reading material** (extracted via `paper-study`, gitignored under
 `notes/sources/`).
@@ -511,7 +512,15 @@ extension if the paper track activates" — does this paper reopen that decision
 
 **My take.**
 
-_(você escreve, em primeira pessoa)_
+The forward-search component is divided into two distinct responsibilities. The proof-tree manager determines which positions require proof and allocates computational effort across the evolving proof tree. Individual solvers are then responsible for proving the game-theoretic value of specific positions assigned by the manager. This separation allows global proof construction to remain independent of the algorithms used to solve individual subproblems.
+
+The paper emphasizes that the proof tree is substantially smaller than the complete search tree because not every branch must be explored to the same extent. At positions where the side to move seeks to establish a win, every opponent response must be addressed to ensure that no refutation exists. Conversely, for each opponent move, it is sufficient to identify a single continuation that preserves the desired game-theoretic value. Consequently, the proof records only the evidence required to establish the theorem rather than every possible continuation of play.
+
+This resembles the minimal-tree analysis of Knuth and Moore discussed by Russell and Norvig, but the two concepts are not identical. The minimal tree is a theoretical lower bound on the amount of search required by alpha-beta under perfect move ordering. It characterizes search complexity independently of any particular proof representation. The proof tree, by contrast, is the explicit mathematical object certifying the result. Although both exploit the asymmetry between existential ("there exists a winning move") and universal ("every opponent move must be answered") reasoning, the proof tree serves as a correctness certificate rather than merely a complexity bound.
+
+The architecture also relates naturally to Proof-Number Search (PNS). Like PNS, the proof-tree manager attempts to direct computational effort toward unresolved parts of the proof rather than expanding the game tree uniformly. However, the paper does not describe the manager as implementing PNS, nor does it rely on proof and disproof numbers as its central mechanism.
+
+For ADR-004, this paper provides additional motivation to reconsider the earlier decision to postpone proof-oriented search methods. The central role of explicit proof construction suggests that proof-directed search deserves architectural consideration. Nevertheless, the paper alone does not justify replacing alpha-beta with PNS. Instead, it supports viewing proof-oriented search as a potentially valuable extension whose benefits should be evaluated separately from the core meet-in-the-middle architecture.
 
 **Refined write-up.**
 
@@ -527,15 +536,13 @@ it a single undifferentiated enumeration pass?
 
 **My take.**
 
-The forward-search component is divided into two distinct responsibilities. The proof-tree manager determines which positions require proof and allocates computational effort across the evolving proof tree. Individual solvers are then responsible for proving the game-theoretic value of specific positions assigned by the manager. This separation allows global proof construction to remain independent of the algorithms used to solve individual subproblems.
+The paper separates proof construction from proof execution. While individual solvers establish the game-theoretic values of selected positions, the proof-tree manager is responsible for deciding where computational effort should be invested. This introduces a scheduling problem: computational resources should be directed toward the unresolved parts of the proof rather than being distributed uniformly.
 
-The paper emphasizes that the proof tree is substantially smaller than the complete search tree because not every branch must be explored to the same extent. At positions where the side to move seeks to establish a win, every opponent response must be addressed to ensure that no refutation exists. Conversely, for each opponent move, it is sufficient to identify a single continuation that preserves the desired game-theoretic value. Consequently, the proof records only the evidence required to establish the theorem rather than every possible continuation of play.
+The paper notes that the proof-tree manager may spend unnecessary effort searching for an alternative proof even though a sufficient proof already exists elsewhere in the tree. This is not a correctness issue but an efficiency issue. Because the manager does not initially know which branch will ultimately provide the shortest or easiest proof, some computational effort is inevitably spent exploring branches whose results later become unnecessary.
 
-This resembles the minimal-tree analysis of Knuth and Moore discussed by Russell and Norvig, but the two concepts are not identical. The minimal tree is a theoretical lower bound on the amount of search required by alpha-beta under perfect move ordering. It characterizes search complexity independently of any particular proof representation. The proof tree, by contrast, is the explicit mathematical object certifying the result. Although both exploit the asymmetry between existential ("there exists a winning move") and universal ("every opponent move must be answered") reasoning, the proof tree serves as a correctness certificate rather than merely a complexity bound.
+The underlying challenge is therefore one of scheduling rather than search. The objective is not simply to prove positions, but to allocate computation so that the overall proof is completed with minimal total work. Better scheduling reduces duplicated effort and concentrates resources on branches that are most likely to contribute directly to the final proof.
 
-The architecture also relates naturally to Proof-Number Search (PNS). Like PNS, the proof-tree manager attempts to direct computational effort toward unresolved parts of the proof rather than expanding the game tree uniformly. However, the paper does not describe the manager as implementing PNS, nor does it rely on proof and disproof numbers as its central mechanism.
-
-For ADR-004, this paper provides additional motivation to reconsider the earlier decision to postpone proof-oriented search methods. The central role of explicit proof construction suggests that proof-directed search deserves architectural consideration. Nevertheless, the paper alone does not justify replacing alpha-beta with PNS. Instead, it supports viewing proof-oriented search as a potentially valuable extension whose benefits should be evaluated separately from the core meet-in-the-middle architecture.
+For FLIPHEX, the situation depends on the solver architecture. A pure retrograde enumeration for the complete 4×4 state space has essentially no analogous scheduling problem: every reachable position must eventually be processed exactly once, making the computation largely a uniform enumeration task. However, if the 4×4 solver adopts the same meet-in-the-middle architecture proposed in ADR-004, the forward-search component inherits an analogous scheduling problem. Whenever multiple proof frontiers are available, the solver must decide which positions to expand first, and poor choices may waste computation proving branches that ultimately play no role in establishing the value of the initial position.
 
 **Refined write-up.**
 
@@ -864,7 +871,7 @@ Revised one-liners:
 **Prompt.** The Conclusion reflects on the scientific significance — note the
 framing (AI + parallel computing, the bioinformatics transfer, the DEEP BLUE
 comparison). What do the authors claim solving a game *buys*, beyond the game?
-This is synthesis **S1** — put the cross-source argument there (Allis's "which
+This is synthesis **S5** — put the cross-source argument there (Allis's "which
 games will survive", R&N §6.7's four limitations, and this) and here only record
 the one-line answer for FLIPHEX: what does an exact 4×4 verdict buy the project
 that a strong learned agent does not?

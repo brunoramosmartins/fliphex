@@ -43,8 +43,8 @@ for 6.5/6.6 unless something jumps out.
 - `exercises/` — the alpha-beta move-ordering and TT derivations land here.
 
 **Legend.** Prompts marked 🔄 need synthesis with another source — answer them in
-[phase2-synthesis.md](notes/phase2-synthesis.md) (esp. **S4**: exact solving vs
-learned play), not here.
+[phase2-synthesis.md](notes/phase2-synthesis.md) (esp. **S1**: UCT vs PUCT, and
+**S4**: exact solving vs learned play), not here.
 
 **Reading material** (extracted via `paper-study`, gitignored under
 `notes/sources/`).
@@ -620,7 +620,7 @@ rewards in [0, 1]; treat it as a starting point to tune, not a number to copy.
 **Prompt.** R&N's MCTS uses *random* (or lightly-guided) playouts and UCB1.
 AlphaZero (Silver 2018, your note) replaces playouts with a **learned value
 head** and UCB1 with **PUCT** (prior P(a) from the policy head, no rollouts).
-List the exact substitutions. This is the crux of **synthesis S4** — answer the
+List the exact substitutions. This is the crux of **synthesis S1** — answer the
 comparison in [phase2-synthesis.md](notes/phase2-synthesis.md), and here only
 note the one-line mapping. Which of FLIPHEX's Axis-2 design choices (adr-005) are
 already visible, in embryo, in R&N's generic MCTS?
