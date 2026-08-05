@@ -9,6 +9,111 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-08-05 — The 4×4 was never a FLIPHEX board
+
+A pre-run red-team of `EXP-001`/`EXP-002` — deliberately before either ran —
+found that the exact-solve target Phase 2 had just promoted is not a variant of
+this game.
+
+**16 is even, so draws are possible, and there is no tie-break.** `rules-canonical.md`
+derives the impossibility of draws entirely from 25 being odd; `adr-010` V2
+asserts the invariant totally and even says any `N` used must be odd;
+`fliphex/rules.py` raises on a tied terminal. And `C(16,8) = 12,870` of the
+4×4's 65,536 terminal configurations are 8–8 ties, about 20%. Phase 2 shipped
+that contradiction inside itself: `adr-009` set `a = 8` on a 16-cell board while
+`adr-010` was being written two documents away requiring odd `N`. Nobody
+introduced the bug; it existed in the gap between two ADRs written the same week.
+
+**Worse, the 4×4 deletes the mechanism H1 names.** The rules say the joker is the
+25th tile and 25 is odd, so *the joker is what gives P1 the extra ply*. With
+8 + 8 and no joker, P1 has no extra ply and **P2 places the last tile** — on the
+fullest board, where flip power is maximal. So H1 could not lose there: "P1 wins"
+reads as support, "P2 wins" gets dismissed as a parity artefact. An experiment
+that cannot fail is not an experiment.
+
+**A correction to the red-team, which was worth making.** It predicted the
+4-column board had no symmetry at all. `scripts/check_symmetry.py 4 4` says
+`|Aut| = 2` — but the automorphism is a **180° rotation**, not a reflection, the
+exact opposite of the 5×5. Rotations map a tile's arrow pattern to another
+rotation of the same tile, so the chiral `P3-y` cannot break one. `adr-009` keeps
+`P3-y` in every reduced deck to "keep the mirror question alive"; on the 4×4 that
+reason is void, for a different reason than the one proposed.
+
+**The fix is better than the thing it replaces.** `adr-011` (Accepted the same day): reduced
+boards must be odd, and the hands mirror the shipped game — P2 draws `a`
+archetypes, P1 draws the same `a` **plus the joker**. Then `(a+1) + a = N`, both
+hands exhaust exactly, P1 moves last, and P1's extra tile *is* the joker. That is
+the 5×5's own structure at smaller scale. The 5×3 (15 cells) becomes the primary
+target: same Z/2 mirror as the 5×5 (A↔E, B↔D, C fixed), `P3-y` breaks it again,
+and 1.75 × 10¹⁰ against the 4×4's 9.3 × 10¹⁰ — cheaper *and* faithful.
+
+It also fixes H2, which I had registered without a second arm. The contrast is no
+longer "joker present/absent" — on an odd board you cannot remove the joker
+without leaving the board unfillable. It is **what P1's extra tile is**: the
+zero-arrow joker, or the next archetype. Both arms have `a+1` and `a` tiles, so
+the two state spaces are *exactly the same size*. That isolates the joker's
+strategic content from the structural extra ply, which is the distinction the
+rules draw and which the old design confounded.
+
+**And a number that was right all along.** `adr-004` and `adr-010` both quote
+7.1 × 10⁵ for the reduced 3×3 — reproducible only with hands 5 + 4, which
+`adr-009`'s "identical decks, `a = ⌈N/2⌉`" rule does not produce (it gives 5 + 5
+and 1.47 × 10⁶). The documented figures had always assumed the rule adr-011 now
+writes down. The rule was wrong, not the numbers.
+
+**Two errors of mine in the registered entries**, both caught before running:
+EXP-001's terminal layer read 512, which is `2⁹` and only correct if the hands
+are exhausted — the full-deck 3×3 terminal is **326,177,280**, and a solver that
+dropped the hand dimension there would pass V0 against my wrong number. And I
+gated both entries on adr-010 V1 without noticing V1 is not decidable as written:
+the closed-form bound counts configurations, so a *correct* reachable-closure
+enumerator disagrees with it by exactly 2× at layer 1. "V1 must pass" had no
+truth value.
+
+---
+
+## 2026-08-05 — Maybe there should be no endgame database
+
+A literature scout on the endgame storage format came back arguing the format is
+the wrong question.
+
+**Othello.** Takizawa (2023) weakly solved Othello 8×8 with forward alpha-beta
+and transposition tables, resolving positions at 36 empty squares and referencing
+them from shallower search — and **materialised no endgame database**, having
+judged a strong solution intractable. Othello is FLIPHEX's structural twin:
+diverging, fixed termination, cells only fill, `k` empty ≡ ply `N − k`, hump
+profile. It is the only game with that shape that has been solved, and it did not
+use the artefact I was about to spend Phase 3 designing. It was not on the Phase 2
+reading list; it should have been.
+
+The arithmetic agrees. `k ≤ 5` is ~1.2 × 10¹⁵ positions, ~150 TB at one bit, and
+each extra `k` costs 8–15×. Meanwhile the subtree below a `k = 5` node is order
+10⁵–10⁷ nodes. A tablebase pays by amortising probes; here the search that would
+probe it may be cheaper than decompressing a block.
+
+**Three techniques that do not transfer, and I would have imported all three.**
+(1) Predecessor-driven propagation with successor counters exists because chess
+and checkers slices contain *cycles*; FLIPHEX layers form a DAG, one sweep
+suffices — and `adr-003` discards tile identity, so un-placing is not even
+locally invertible. Pull, not push. (2) The don't-care trick works because
+"broken" is an O(1) *local* predicate in chess; FLIPHEX unreachability is
+**global**, needing a path from ply 0. (3) Folding the mirror saves 50% against
+8–15× per `k` — less than half a ply of depth, at a cost on every probe.
+
+`adr-012` (Accepted the same day) therefore decides *not to decide*: three cheap measurements
+(EXP-003 subtree cost, EXP-004 real compressibility, EXP-005 don't-care yield)
+choose between building, not building, and a symbolic representation. One thing
+it does fix now because it cannot be retrofitted: **V1's reachability count is
+taken before any don't-care filling**, or the distinction between "unreachable"
+and "computed" is destroyed.
+
+The risk I am accepting, recorded so it is not discovered later: if the crossover
+turns out to be beyond any reachable `k`, Axis 1 ships no endgame database, and
+H3 loses the "5×5 endgame layers" member of its comparison set — the member the
+Phase 2 amendment added specifically to stop H3 resting on toy boards.
+
+---
+
 ## 2026-08-05 — Phase 3 opened
 
 **Gate.** Phase 2's deliverables are all present: the four lit-notes and the

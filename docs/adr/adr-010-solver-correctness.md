@@ -159,6 +159,68 @@ than a bare verdict.
   `docs/rules-canonical.md` misdescribes FLIPHEX, every check here passes and the
   answer is still wrong. `OPEN-1` is the live instance.
 
+## Amendment — Phase 3 (2026-08-05)
+
+**V1 was not decidable as written.** The mechanism was specified as both a gate
+that can fail *and* a measurement of an unknown quantity — the reachability gap.
+Those are incompatible. The closed-form formula counts **configurations
+consistent with the invariants**; a correct enumerator of the **reachable
+closure** disagrees with it, and not by a small residual. At layer `t = 1` the
+formula gives `C(N,1) · 2¹ · C(d₁,1) · C(d₂,0) = 2 · N · d₁` — 234 on the 3×3
+with the full deck — while the reachable count is `N · d₁ = 117`, because the
+`2^t` factor counts colourings that the mover's own colour forbids. **Exactly
+2× at layer 1**, and an unknown factor at every layer above. Under the original
+wording a correct run was indistinguishable from a failed V1, and the only way
+to resolve it would have been to inspect the gap and decide — the precise
+anti-pattern pre-registration exists to prevent.
+
+**V1 is now exact per-layer equality against the configuration space.** Per
+[adr-012](adr-012-endgame-database-storage.md) decision 4 the solver's index is
+a mixed-radix rank over exactly the four factors of the formula, so a stratified
+sweep enumerates the configuration space, not the reachable closure. V1 is
+therefore a genuine `perft`:
+
+> For every layer `t`, the enumerator's count must **equal** `C(N,t) · 2^t ·
+> C(d₁,⌈t/2⌉) · C(d₂,⌊t/2⌋)`. Any inequality, in either direction, voids the
+> run. There is no tolerance and no judgement call.
+
+**The reachability measurement is no longer V1's job.** It is a separate
+quantity, measured by `EXP-005` on the 5×3 as the fraction of the bound with no
+legal predecessor. The two must not be conflated again: V1 answers "did the
+enumerator lose or duplicate a configuration", `EXP-005` answers "how much of the
+configuration space is real". A single number cannot do both.
+
+**Ordering constraint that cannot be retrofitted.** The reachability count is
+taken **before** any don't-care filling (adr-012 decision 6). Filling destroys
+the distinction between *unreachable* and *computed*.
+
+**The 4×4 is withdrawn from V0 and V4 ([adr-011](adr-011-reduced-variant-parity.md),
+Accepted 2026-08-05).** Both were stated on a 16-cell board. 16 is even, so V2's
+premise — the no-draw theorem — is false there, which this ADR's own V2 text
+already forbade (*"any `N` used must be odd for the same reason"*). The
+contradiction sat between two ADRs written the same week and was caught by a
+pre-run red-team rather than by a run.
+
+- **V0's worked example** becomes **32,768 = 2¹⁵ on the 5×3** (hands 8 + 7,
+  exactly exhausted) alongside 2²⁵ = 3.36 × 10⁷ on the 5×5. The 3×3 fixture is
+  **512** at the adr-011 reduced deck (hands 5 + 4) — but **326,177,280** at the
+  *full* deck, where the hands are never exhausted and the terminal layer keeps
+  its hand dimension. A solver that dropped that dimension would produce 512 and
+  pass V0 against the wrong number, which is exactly the class of bug V0 exists
+  to catch.
+- **V4 is re-designated to the 5×3.** Its sample size **and seed** are recorded
+  in `experiments/registry.md` before the run; the Seed column may not read `—`
+  for a sampled check.
+- **V4 is supplemented by a principal-variation audit.** V4 bounds the *rate* of
+  errors in a database; it does not target the **root value**, which is the only
+  number the experiment reports. A defect affecting 10⁻⁶ of entries passes a
+  10⁴-sample V4 with probability ~0.99 and can still flip the root if it lies on
+  the propagation path. The audit re-derives, by direct forward search, every
+  position on the optimal PV from the root plus the root value under each
+  distinct first move.
+
+No 4×4 result may be cited under this ADR.
+
 ## Alternatives considered
 
 **Trust a single clean run.** The default, and the position the ADR exists to
