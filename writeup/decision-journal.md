@@ -9,6 +9,95 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-08-05 — Phase 3 opened
+
+**Gate.** Phase 2's deliverables are all present: the four lit-notes and the
+synthesis, `research.md` with H1–H6 locked under the `v0.3-hypotheses` tag, and
+the TIL #1 draft. One item is short of the roadmap's wording.
+
+**Carry-over: the exercise answers stay open, with no phase owner.** `ex01` and
+`ex02` exist as problem sets; the answers are empty. The roadmap's task says
+"complete `ex02`". Deliberately *not* carried into Phase 3 as a task and
+deliberately not dropped either — Phase 3 will produce `ex03`, and making three
+open sets compete for the same hours is how all three stay open. What the lock
+actually needed from `ex02` was the corrected state-space bound, and
+`scripts/layer_profile.py` supplies that independently, so nothing downstream is
+waiting on them.
+
+**Divergence from the roadmap.** Phase 2 ran on `phase-2/solver-reframe`, not the
+planned `phase-2/study-and-hypotheses`, and the PR title followed the branch. The
+phase turned into a solver-scoping phase somewhere around the Allis note. Not
+patched in place — it is a `/project-roadmap revise` item.
+
+**Scope call: verification is a first-class deliverable, not a test file.**
+adr-010's V0–V6 got its own issue rather than riding along inside the solve
+issues. The reason is the failure mode: a 4×4 solve emits one verdict out of
+~10¹¹ states, and a wrong one looks exactly like a right one. If verification is
+a subtask of "solve the 4×4", it gets done by whoever is trying to finish the
+4×4, which is the wrong incentive.
+
+**Open decision, ADR-shaped.** The endgame database storage format. adr-004
+commits to retrograde analysis but says nothing about indexing, compression, or
+how mirror folding interacts with the two. `k ≤ 5` on the 5×5 is 1.2 × 10¹⁵
+positions in the bound; the gap between that and reachability (adr-010 V1) is
+what decides whether this is feasible at all. Flagged now so it is decided before
+code, not around it.
+
+---
+
+## 2026-08-05 — Phase 2 closing: four corrections and a numeric erratum
+
+*Written the same day as the merge, after the fact.* Writing the refined
+write-ups for `notes/phase2-synthesis.md` turned into an audit, and four things
+that were already in the repo turned out to be wrong.
+
+**The state counts were computed with both hands at 13.** Player 1 holds 13
+tiles (12-tile deck + joker); Player 2 holds **12**. Three documents had used
+13/13. Corrected: 3×3 full deck 3.1 × 10⁹ → **2.3 × 10⁹**; 4×4 full deck
+8.3 × 10¹³ → **4.8 × 10¹³**. The reduced-deck 9.3 × 10¹⁰ and the headline
+5×5 4.9 × 10¹⁷ were right. Found by writing `scripts/layer_profile.py` and
+running it — not by re-reading. The 2026-07-31 entry above still carries the old
+figures; it is left as written, because this journal records what was live at the
+time.
+
+**The same error had inflated the mirror argument.** I had reasoned that one
+player could finish holding an unplayed `P3-y`, giving P(the mirror is never a
+valid game symmetry) = 1/13 ≈ 7.7%. Every tile reaches the board, so that case
+does not exist. E[fraction of plies where the mirror is valid] 0.29 → **0.31**,
+effective augmentation 1.29× → **1.31×**, P(never valid) = **0**. The conclusion
+— no clean 2× augmentation for Axis 2 — did not move, but it was resting partly
+on a case that cannot occur.
+
+**`k ≤ 3` was mislabelled.** 9.0 × 10¹² is the *exactly*-k=3 layer; the
+cumulative slice is 9.4 × 10¹². The R&N note had it right and the Schaeffer note
+and S3 conflated them.
+
+**I had the proof-number-search argument backwards.** adr-004 said FLIPHEX has no
+sudden-death goal, therefore PN-search offers no edge. That inference is wrong:
+PN-search exploits tree *shape*, and Schaeffer used Df-pn on checkers, which has
+no sudden-death goal either. What actually parks PN-search here is that FLIPHEX
+enumeration has no scheduling problem to solve. Corrected in the amendment rather
+than quietly rewritten.
+
+**Two circularity traps, closed with one rule.** Axis 2 must not gate checkpoint
+selection on Axis 1's solved values, and Axis 1's proof-producing runs must not
+be seeded by Axis 2. Both are instances of: *neither axis may be used to select
+or terminate the other along the dimension on which they are later compared*
+(adr-004 R1/R2/R3, adr-005 amendment). H3 is the hypothesis that would have been
+silently destroyed.
+
+**adr-010 exists because a wrong answer will not crash.** Six mechanisms, V0–V6,
+and — drafted before any result exists — the strongest sentence a single
+implementation run once is entitled to write. It ends: "It has not been
+independently reimplemented."
+
+**What the phase actually was.** Planned as a study week. It became a scoping
+phase: 4×4 promoted over 3×3, the problem reclassified as storage-bound rather
+than search-bound, and the verification apparatus specified before the thing it
+verifies.
+
+---
+
 ## 2026-07-31 — Allis reframes the solver: 4×4 is the real target, not 3×3
 
 Filling in the Allis lit-note surfaced four questions from the co-designer, and
