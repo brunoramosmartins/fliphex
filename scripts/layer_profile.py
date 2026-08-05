@@ -37,12 +37,7 @@ from math import comb
 
 def layer(n_cells: int, d1: int, d2: int, t: int) -> int:
     """Number of configurations with exactly ``t`` cells filled."""
-    return (
-        comb(n_cells, t)
-        * 2**t
-        * comb(d1, (t + 1) // 2)
-        * comb(d2, t // 2)
-    )
+    return comb(n_cells, t) * 2**t * comb(d1, (t + 1) // 2) * comb(d2, t // 2)
 
 
 def profile(n_cells: int, d1: int, d2: int) -> list[int]:
@@ -69,21 +64,24 @@ def report(n_cells: int, d1: int, d2: int, endgame: int) -> None:
         print("  !! hands cannot fill the board -- check the deck sizes")
     print()
 
-    print(f"  {'t':>3} {'ply':>4} {'k empty':>8} {'configurations':>12} "
-          f"{'% total':>8}  profile")
+    print(
+        f"  {'t':>3} {'ply':>4} {'k empty':>8} {'configurations':>12} "
+        f"{'% total':>8}  profile"
+    )
     print("  " + "-" * 62)
     widest = counts[peak]
     for t, c in enumerate(counts):
         share = 100 * c / total
         bar = "#" * round(40 * c / widest)
         mark = "  <== peak" if t == peak else ""
-        print(f"  {t:>3} {t:>4} {n_cells - t:>8} {sci(c)} {share:>7.2f}%  "
-              f"{bar}{mark}")
+        print(f"  {t:>3} {t:>4} {n_cells - t:>8} {sci(c)} {share:>7.2f}%  {bar}{mark}")
 
     print()
     print(f"  total ................ {total:.4g}")
-    print(f"  peak layer ........... t = {peak} ({counts[peak]:.4g}, "
-          f"{100 * counts[peak] / total:.1f}% of all states)")
+    print(
+        f"  peak layer ........... t = {peak} ({counts[peak]:.4g}, "
+        f"{100 * counts[peak] / total:.1f}% of all states)"
+    )
     print(f"  terminal layer t = {n_cells} .. {counts[-1]:,}")
     print("      (all cells filled, both hands exhausted -- decided by counting")
     print("       cells, so it is verifiable in closed form: adr-010 V0)")

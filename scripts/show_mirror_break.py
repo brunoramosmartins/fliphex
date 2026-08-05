@@ -171,10 +171,12 @@ def show_case(
 
     print("\nSTEP 1 — a position, and its mirror. These two ARE mirror images of")
     print("         each other; nothing is wrong yet.\n")
-    print(side_by_side(
-        render(board, before.colours, {}, "position  s"),
-        render(board, m_before.colours, {}, "mirrored position  M(s)"),
-    ))
+    print(
+        side_by_side(
+            render(board, before.colours, {}, "position  s"),
+            render(board, m_before.colours, {}, "mirrored position  M(s)"),
+        )
+    )
 
     after = apply_move(board, before, Move(cell, tile, rotation))
     flipped = [
@@ -183,14 +185,22 @@ def show_case(
     print(f"\nSTEP 2 — purple plays {archetype} on {cell_name} (rotation {rotation}).")
     print(f"         Arrows {fmt(pattern)} fire once: {_hits(board, cell, pattern)}")
     print(f"         Flipped: {', '.join(board.cell_name(c) for c in flipped)}\n")
-    print("\n".join(render(
-        board, after.colours,
-        {cell: "*", **{c: "!" for c in flipped}}, "after the move",
-    )))
+    print(
+        "\n".join(
+            render(
+                board,
+                after.colours,
+                {cell: "*", **{c: "!" for c in flipped}},
+                "after the move",
+            )
+        )
+    )
 
     print("\nSTEP 3 — for the mirror to keep in step, purple must now play the")
-    print(f"         mirrored move: on {board.cell_name(m_cell)} with arrows "
-          f"{fmt(m_pattern)}")
+    print(
+        f"         mirrored move: on {board.cell_name(m_cell)} with arrows "
+        f"{fmt(m_pattern)}"
+    )
     print(f"         (which would hit {_hits(board, m_cell, m_pattern)}).")
     print(f"\n         Is that move available? Every rotation of {archetype}:")
     for r in TILES[tile].distinct_rotations():
@@ -210,19 +220,33 @@ def show_case(
 
     m_tile, m_rot = found
     m_after = apply_move(board, m_before, Move(m_cell, m_tile, m_rot))
-    m_flipped = [c for c in board.cells if m_before.colours[c] != m_after.colours[c]
-                 and c != m_cell]
+    m_flipped = [
+        c
+        for c in board.cells
+        if m_before.colours[c] != m_after.colours[c] and c != m_cell
+    ]
     same = TILES[m_tile].archetype == archetype
-    note = ("same archetype, rotated" if same and m_rot != rotation
-            else "same archetype, same rotation — mirror-invariant" if same
-            else f"a different archetype, {TILES[m_tile].archetype}")
-    print(f"\n         >> YES: rotation {m_rot} ({note}). Purple plays it on "
-          f"{board.cell_name(m_cell)}.\n")
-    print("\n".join(render(
-        board, m_after.colours,
-        {m_cell: "*", **{c: "!" for c in m_flipped}},
-        "mirrored board after the mirrored move",
-    )))
+    note = (
+        "same archetype, rotated"
+        if same and m_rot != rotation
+        else "same archetype, same rotation — mirror-invariant"
+        if same
+        else f"a different archetype, {TILES[m_tile].archetype}"
+    )
+    print(
+        f"\n         >> YES: rotation {m_rot} ({note}). Purple plays it on "
+        f"{board.cell_name(m_cell)}.\n"
+    )
+    print(
+        "\n".join(
+            render(
+                board,
+                m_after.colours,
+                {m_cell: "*", **{c: "!" for c in m_flipped}},
+                "mirrored board after the mirrored move",
+            )
+        )
+    )
     assert mirror_state(after, pi).colours == m_after.colours
     print("\n         >> And this equals M(result of STEP 2), checked exactly.")
     print("            Both the position and the move mirror. Symmetry holds.")
@@ -255,15 +279,14 @@ def show_inertness(board: Board) -> None:
     back = next(d for d in range(6) if board.neighbour(reply_cell, d) == cell)
     reply_tile = TILE_INDEX["P1"]
     reply_rot = next(
-        r for r in TILES[reply_tile].distinct_rotations()
+        r
+        for r in TILES[reply_tile].distinct_rotations()
         if TILES[reply_tile].rotated(r) == 1 << back
     )
     final = apply_move(board, after, Move(reply_cell, reply_tile, reply_rot))
 
     changed = [
-        board.cell_name(c)
-        for c in board.cells
-        if after.colours[c] != final.colours[c]
+        board.cell_name(c) for c in board.cells if after.colours[c] != final.colours[c]
     ]
     print("  NOTE: the two boards below are NOT a mirror pair — they are the SAME")
     print("        board, one ply apart. Only one tile is ever played per cell.\n")
@@ -271,7 +294,9 @@ def show_inertness(board: Board) -> None:
         board, after.colours, {cell: "*"}, "ply n   — purple has just played B2"
     )
     right = render(
-        board, final.colours, {reply_cell: "*", cell: "!"},
+        board,
+        final.colours,
+        {reply_cell: "*", cell: "!"},
         f"ply n+1 — green plays B3, arrow {DIRECTION_NAMES[back]} flips B2",
     )
     print(side_by_side(left, right))
@@ -294,9 +319,9 @@ def main() -> int:
     print("Columns B and D are drawn half a row lower — the board's real geometry.")
     print("(pipe the output somewhere? pass --color to keep the colours)")
 
-    show_case(board, pi, rho, "P3-y", 0, "B2")      # the break
-    show_case(board, pi, rho, "P2-adj", 0, "B2")    # control: achiral, mirrors fine
-    show_case(board, pi, rho, "P3-tri", 0, "B2")    # control: mirror-invariant
+    show_case(board, pi, rho, "P3-y", 0, "B2")  # the break
+    show_case(board, pi, rho, "P2-adj", 0, "B2")  # control: achiral, mirrors fine
+    show_case(board, pi, rho, "P3-tri", 0, "B2")  # control: mirror-invariant
     show_inertness(board)
 
     print("\n" + "=" * 78)

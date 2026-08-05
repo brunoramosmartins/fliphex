@@ -176,17 +176,23 @@ def part_b(board: Board, pi: tuple[int, ...], rho: dict[int, int]) -> None:
     print(f"   moves whose mirror is NOT legal ....... {len(without)}")
     all_chiral = all(m.tile == chiral_idx for m in without)
     print(f"   ... all of them play {CHIRAL}? ......... {all_chiral}")
-    print(f"   = 25 cells x {len(orbit(chiral_idx))} rotations ............... "
-          f"{board.n_cells * len(orbit(chiral_idx))}")
+    print(
+        f"   = 25 cells x {len(orbit(chiral_idx))} rotations ............... "
+        f"{board.n_cells * len(orbit(chiral_idx))}"
+    )
     assert all(m.tile == chiral_idx for m in without)
     assert len(without) == board.n_cells * len(orbit(chiral_idx))
 
     bad = without[0]
     pattern = TILES[bad.tile].rotated(bad.rotation)
-    print(f"\n   witness: play {CHIRAL} on cell {board.cell_name(bad.cell)} at "
-          f"rotation {bad.rotation}, arrows {fmt(pattern)}")
-    print(f"            its mirror needs arrows {fmt(mirror_mask(pattern, rho))} "
-          f"on cell {board.cell_name(pi[bad.cell])}")
+    print(
+        f"\n   witness: play {CHIRAL} on cell {board.cell_name(bad.cell)} at "
+        f"rotation {bad.rotation}, arrows {fmt(pattern)}"
+    )
+    print(
+        f"            its mirror needs arrows {fmt(mirror_mask(pattern, rho))} "
+        f"on cell {board.cell_name(pi[bad.cell])}"
+    )
     print("            no tile in the deck presents that pattern at any rotation.")
 
 

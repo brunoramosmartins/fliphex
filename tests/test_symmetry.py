@@ -14,9 +14,7 @@ def _automorphisms(board: Board):
     """Return ``(all_autos, non_identity)`` where non_identity is [(rho, pi)]."""
     autos = board_automorphisms(board)
     non_identity = [
-        (rho, pi)
-        for _name, rho, pi in autos
-        if any(pi[c] != c for c in board.cells)
+        (rho, pi) for _name, rho, pi in autos if any(pi[c] != c for c in board.cells)
     ]
     return autos, non_identity
 
