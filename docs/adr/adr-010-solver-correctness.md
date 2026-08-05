@@ -80,7 +80,7 @@ This is asserted at every write, not sampled: it is the cheapest possible check
 and it is total.
 
 **V3 — two independent methods must agree on the full 3×3.** The 3×3 variant
-(3.1 × 10⁹ full deck, 7.1 × 10⁵ reduced) is solved twice, by **fundamentally
+(2.3 × 10⁹ full deck, 7.1 × 10⁵ reduced) is solved twice, by **fundamentally
 different** methods — forward alpha-beta with no database, and retrograde
 enumeration — and the game-theoretic value of every position must match. This is
 the FLIPHEX analogue of Schaeffer's architectural redundancy, whose real form is

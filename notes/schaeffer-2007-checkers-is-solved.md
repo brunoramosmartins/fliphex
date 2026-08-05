@@ -337,7 +337,7 @@ corresponding endgame region occupies one of the widest parts") should come out.
 **Now the factual error, which runs the other way.** You wrote that the FLIPHEX
 figures "remain below the size of the ten-piece endgame databases reported for
 checkers." Check the exponents. The paper: *"a database of 3.9 × 10¹³ positions"*
-— so k≤3 (9.0 × 10¹²) is about **a quarter** of checkers', k≤4 (1.5 × 10¹⁴) is
+— so k≤3 (9.4 × 10¹²) is about **a quarter** of checkers', k≤4 (1.5 × 10¹⁴) is
 **~4× larger**, and k≤5 (1.2 × 10¹⁵) is **~30× larger**. Only k≤3 is comfortably
 below. That inverts your "not unprecedented" conclusion for the `k ≤ 5` target
 that adr-004 currently commits to.
@@ -409,7 +409,7 @@ Re-run the FLIPHEX numbers at that ratio, alongside the 2-bit figure you used:
 | target | positions | @ 2 bits | @ 154 pos/byte |
 |---|--:|--:|--:|
 | 4×4 full solve | 9.3 × 10¹⁰ | 23 GB | **0.6 GB** |
-| 5×5 endgame k≤3 | 9.0 × 10¹² | 2.3 TB | **61 GB** |
+| 5×5 endgame k≤3 | 9.4 × 10¹² | 2.4 TB | **61 GB** |
 | 5×5 endgame k≤4 | 1.5 × 10¹⁴ | 37 TB | **~1 TB** |
 | 5×5 endgame k≤5 | 1.2 × 10¹⁵ | 300 TB | **~7.8 TB** |
 

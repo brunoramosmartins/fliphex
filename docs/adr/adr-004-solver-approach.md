@@ -130,9 +130,17 @@ Computing the reachable bound (the adr-003 formula) across board sizes:
 
 | Board | cells | full 13-deck | reduced deck |
 |---|--:|--:|--:|
-| 3×3 | 9 | 3.1 × 10⁹ | 7.1 × 10⁵ |
-| 4×4 | 16 | 8.3 × 10¹³ | 9.3 × 10¹⁰ |
+| 3×3 | 9 | 2.3 × 10⁹ | 7.1 × 10⁵ |
+| 4×4 | 16 | 4.8 × 10¹³ | 9.3 × 10¹⁰ |
 | 5×5 (shipped) | 25 | — | 4.9 × 10¹⁷ |
+
+> **Erratum (2026-08-05).** The two full-deck figures originally read 3.1 × 10⁹
+> and 8.3 × 10¹³. Both were computed with *both* hands at 13 tiles; the rules give
+> Player 1 thirteen (deck + joker) and Player 2 twelve
+> ([rules-canonical.md](../rules-canonical.md) §2), which is the convention the
+> 5×5 row already used. Recomputed with 13/12 by `scripts/layer_profile.py`. The
+> reduced-deck column is unaffected — adr-009 gives both players an identical
+> deck — so no conclusion below changes.
 
 The full-enumeration frontier sits at **N ≈ 13–15** (≈10¹²–10¹³). This sharpens
 part 1 of the Decision ("solve 3×3, attempt 4×4"):
@@ -143,7 +151,7 @@ part 1 of the Decision ("solve 3×3, attempt 4×4"):
   claimed to reveal 5×5 strategy, and the writeup must not imply otherwise.
 - **4×4 is promoted from "attempt" to the primary exact-solve target for
   strategic claims.** 16 cells give room for spatial/tempo tactics, and
-  8.3 × 10¹³ (full deck) — or 9.3 × 10¹⁰ with a reduced deck, ~3 orders of
+  4.8 × 10¹³ (full deck) — or 9.3 × 10¹⁰ with a reduced deck, ~3 orders of
   magnitude cheaper — is within reach of retrograde analysis on modern storage.
   3×3 stays the fast calibration solve; 4×4 carries the H1/H2 exact verdicts.
 

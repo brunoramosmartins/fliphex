@@ -109,8 +109,8 @@ full-enumeration frontier at **N ≈ 13–15 cells**:
 
 | Board | cells | reachable bound (full deck) |
 |---|--:|--:|
-| 3×3 | 9 | 3.1 × 10⁹ |
-| 4×4 | 16 | 8.3 × 10¹³ (9.3 × 10¹⁰ reduced deck) |
+| 3×3 | 9 | 2.3 × 10⁹ |
+| 4×4 | 16 | 4.8 × 10¹³ (9.3 × 10¹⁰ reduced deck) |
 | 5×5 | 25 | 4.9 × 10¹⁷ |
 
 So 3×3 is a *correctness fixture* (too cramped for tactics like deferring a flip

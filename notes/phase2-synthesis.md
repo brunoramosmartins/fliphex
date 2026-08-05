@@ -337,7 +337,7 @@ So the honest generalisation is: *symmetries broken by consumable state help
 exact endgame methods and not learners*, and that covers both games.
 
 **But deflate the "~2× to Axis 1" in the prompt** — it is real and it is small.
-The k-layer bounds are k ≤ 3: 9.0×10¹², k ≤ 4: 1.5×10¹⁴, k ≤ 5: 1.2×10¹⁵, i.e.
+The k-layer bounds are k ≤ 3: 9.4×10¹², k ≤ 4: 1.5×10¹⁴, k ≤ 5: 1.2×10¹⁵, i.e.
 each extra empty cell costs ~8–17×. A 2× fold buys `log 2 / log 8 ≈` **one third
 of one k level**. Worth taking, never worth designing around.
 
@@ -477,7 +477,7 @@ clause would rest on a single variant (4×4 reduced), n = 1. That is not enough 
 carry a hypothesis, and the fix is available now:
 
 - adr-009's reduced-deck policy is precisely what generates a *family* of
-  comparison points — 3×3 full deck (3.1 × 10⁹, the correctness fixture), 4×4
+  comparison points — 3×3 full deck (2.3 × 10⁹, the correctness fixture), 4×4
   reduced, and 4×4 under alternative reduced decks.
 - More importantly, the **endgame layers of the shipped 5×5** are solvable from
   the terminal end (k ≤ 4 at 1.5 × 10¹⁴ is a storage question, not a search one)

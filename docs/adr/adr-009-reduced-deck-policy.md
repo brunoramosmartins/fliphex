@@ -13,7 +13,7 @@ board draws. That gap is load-bearing:
 
 - **It decides solvability.** The Phase 2 complexity sweep shows the reduced-deck
   size swings the state-space bound by ~3 orders of magnitude — for 4×4,
-  8.3 × 10¹³ with the full 13-piece deck versus 9.3 × 10¹⁰ with a minimal deck.
+  4.8 × 10¹³ with the full deck versus 9.3 × 10¹⁰ with a minimal deck.
   One is borderline; the other is comfortably enumerable.
 - **It decides meaning.** A badly chosen reduced deck makes the *exact solve*
   validate a game that is not a faithful shrink of FLIPHEX. Since the exact
@@ -81,7 +81,7 @@ seat confound).
 
 - **Full 13-deck, unused pieces.** Most faithful to "same deck, smaller board",
   and needs no selection rule — but ~3 orders of magnitude more expensive
-  (4×4 → 8.3 × 10¹³, borderline) and it lets the player choose among tiles that
+  (4×4 → 4.8 × 10¹³, borderline) and it lets the player choose among tiles that
   will never fit, which is arguably *less* faithful to the tempo of a small game.
 - **Random subset per seed.** Tests robustness to deck composition, but muddies
   interpretation of any single solve. Better as a *stretch* robustness check on
