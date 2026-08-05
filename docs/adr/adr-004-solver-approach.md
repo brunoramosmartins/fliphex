@@ -78,9 +78,11 @@ adr-003 — 50 random words, O(1) incremental update per flip.
 
 **Neutral**
 
-- No board symmetries to canonicalise with (the board's symmetry group is
-  trivial, per adr-002), so the TT gets no free symmetry folding. Expected, but
-  it means TT hit rates will be lower than a Reversi solver's.
+- ~~No board symmetries to canonicalise with (the board's symmetry group is
+  trivial, per adr-002), so the TT gets no free symmetry folding.~~
+  **Superseded** — see the Phase 2 amendment below and
+  [adr-008](adr-008-board-mirror-symmetry.md): the board has a Z/2 mirror, and
+  it is usable for TT folding *in the endgame databases*.
 
 ## Alternatives considered
 
@@ -101,8 +103,203 @@ tractable, honest version of the same idea.
 with no strong non-learned opponent on the real game, and H3 becomes untestable
 where it matters most. Rejected.
 
+## Amendment — Phase 2 (2026-07-31): Allis 1994 grounding + intermediate-board frontier
+
+Reading Allis (1994) *Searching for Solutions* produced three refinements. None
+overturns the decision; two sharpen it and one corrects a stale premise.
+
+**1. Allis's taxonomy confirms alpha-beta + retrograde over proof-number
+search.** FLIPHEX classifies as **diverging** (a tile is *added* each ply) and
+**fixed-termination** (ends at ply 25 by board-fill, with no sudden-death
+pattern) — the Othello profile. Allis: endgame databases are creatable for
+*converging* games and "generally unfeasible for diverging" ones; and fixed
+termination "renders solving the game in similar fashion to the solution of
+qubic and go-moku impossible." Two consequences for this ADR:
+
+- Proof-number search (the alternative parked under *Alternatives considered*)
+  shines on **sudden-death** goal-proving — proving a forced threat sequence, as
+  in qubic and go-moku. FLIPHEX has no such goal to prove, so pn-search loses its
+  structural edge here. The reading therefore *strengthens* the original
+  alpha-beta + TT choice rather than reopening it.
+- The diverging nature is exactly *why* the retrograde databases must stay
+  shallow: the position count grows fast as you recede from the full board.
+  The `k ≤ 5` target is now justified, not merely assumed.
+
+**2. There is a solvable-and-rich intermediate board — the 4×4 (16 cells).**
+Computing the reachable bound (the adr-003 formula) across board sizes:
+
+| Board | cells | full 13-deck | reduced deck |
+|---|--:|--:|--:|
+| 3×3 | 9 | 2.3 × 10⁹ | 7.1 × 10⁵ |
+| 4×4 | 16 | 4.8 × 10¹³ | 9.3 × 10¹⁰ |
+| 5×5 (shipped) | 25 | — | 4.9 × 10¹⁷ |
+
+> **Erratum (2026-08-05).** The two full-deck figures originally read 3.1 × 10⁹
+> and 8.3 × 10¹³. Both were computed with *both* hands at 13 tiles; the rules give
+> Player 1 thirteen (deck + joker) and Player 2 twelve
+> ([rules-canonical.md](../rules-canonical.md) §2), which is the convention the
+> 5×5 row already used. Recomputed with 13/12 by `scripts/layer_profile.py`. The
+> reduced-deck column is unaffected — adr-009 gives both players an identical
+> deck — so no conclusion below changes.
+
+The full-enumeration frontier sits at **N ≈ 13–15** (≈10¹²–10¹³). This sharpens
+part 1 of the Decision ("solve 3×3, attempt 4×4"):
+
+- **3×3 is a correctness fixture, not a strategy microcosm.** At 9 cells it is
+  too cramped for tactics like deferring a flip to set up a larger later swing.
+  It validates the engine, the search, and the H3 cross-check — it is *not*
+  claimed to reveal 5×5 strategy, and the writeup must not imply otherwise.
+- **4×4 is promoted from "attempt" to the primary exact-solve target for
+  strategic claims.** 16 cells give room for spatial/tempo tactics, and
+  4.8 × 10¹³ (full deck) — or 9.3 × 10¹⁰ with a reduced deck, ~3 orders of
+  magnitude cheaper — is within reach of retrograde analysis on modern storage.
+  3×3 stays the fast calibration solve; 4×4 carries the H1/H2 exact verdicts.
+
+**3. Symmetry correction (supersedes the struck "Neutral" bullet).** The claim
+that the board's symmetry group is trivial is wrong — [adr-008](adr-008-board-mirror-symmetry.md)
+established a Z/2 left-right mirror. The mirror is a *game-level partial*
+symmetry: it holds only once **both** chiral `P3-y` tiles are placed and inert.
+That condition is met **precisely in the endgame** — exactly where the
+retrograde databases live. So the endgame DBs (and the TT within them) **can**
+fold mirror-image positions ~2×, a saving this ADR originally assumed
+unavailable. Full-game alpha-beta still gets no folding while a `P3-y` is in a
+hand.
+
+**Open item forwarded.** "Proportionally smaller decks" (Decision, part 1) is
+still undefined — *which* tiles a reduced board draws. That choice swings the
+4×4 bound by ~3 orders of magnitude (table above) and decides whether a reduced
+solve is a faithful shrink of FLIPHEX. Pinned in
+[adr-009](adr-009-reduced-deck-policy.md) (Accepted): keep `P6` + `P3-y`, fill by
+ascending arrow count; reduced boards are a purely computational device
+(OPEN-3 resolved), so faithfulness is judged against the shipped 5×5.
+
+## Amendment — Phase 2 (2026-08-05): the two complexity axes, and what that changes
+
+Reading Schaeffer (2007) and R&N Ch.6 against Allis produced six refinements.
+The decision stands; two of its *justifications* were wrong, and one of the
+Alternatives is reopened in a narrower form.
+
+**1. The 5×5 infeasibility argument in Context is stated on the wrong axis.**
+"~4.9 × 10¹⁷ reachable states, far too many to enumerate, so the full 5×5 game is
+not weakly solvable" does not follow. Checkers has **5 × 10²⁰** states — about
+1000× more — and *was* weakly solved in 2007. State-space and game-tree
+complexity are independent axes (Allis §6.1), and a weak solution is bounded by
+the second, not the first. The correct statement:
+
+| | binds on | number | rational method |
+|---|---|--:|---|
+| FLIPHEX 5×5 | game-tree complexity | ~10⁶¹, and ~10³⁰·⁵ even at the Knuth–Moore minimal tree `b^⌈d/2⌉ + b^⌊d/2⌋ − 1` | none — out of reach |
+| FLIPHEX 4×4 (adr-009 deck) | state count | 9.3 × 10¹⁰ states, against a tree of ~10³³ | **enumerate, do not search** |
+
+What makes checkers tractable is not a small state space but **convergence**:
+captures are irreversible, so play funnels into a small endgame family that
+retrograde analysis closes once, and the forward proof only has to *reach* it.
+FLIPHEX has no analogue. The layer profile is a **hump** — it peaks at `t = 15`
+filled cells (1.09 × 10¹⁷, 22 % of all states) and collapses to 3.36 × 10⁷ at
+`t = 25` — and because `k` empty cells is rigidly equivalent to ply `25 − k`,
+there is no *early* convergence to exploit: playing well cannot reach the narrow
+region sooner. That, not the state count, is why the 5×5 is not solvable here.
+
+**2. The move-ordering consequence must be split in two.** The Negative bullet
+"move ordering quality drives everything" is true of one part of the Decision and
+false of another:
+
+- **Decision part 2 (depth-limited 5×5 alpha-beta):** unchanged. Ordering is
+  where nearly all the speed lives (R&N §6.2.4), and iterative deepening survives
+  precisely as the ordering engine.
+- **Decision part 1 (the 4×4 exact solve):** ordering is **irrelevant**. The 4×4
+  tree is ~10²² times larger than the 4×4 state table, so perfect ordering still
+  leaves ~10¹⁶·⁵ nodes at the Knuth–Moore limit while the whole state space fits
+  in ~10¹¹ entries. **The 4×4 is not a search problem, it is an enumeration
+  problem.** Its binding resources are storage and enumeration throughput, and
+  effort spent on ordering heuristics there is wasted.
+
+**3. The pn-search argument in Amendment 1 was wrong; the alternative is reopened
+in narrower form.** Amendment 1 (Phase 2, 2026-07-31) argued that proof-number
+search "shines on sudden-death goal-proving … FLIPHEX has no such goal to prove,
+so pn-search loses its structural edge here." That inference does not hold.
+PN-search is a best-first method for **binary AND/OR trees with irregular
+branching**; its edge comes from expanding the most-proving node, i.e. from tree
+*shape*, not from goal type. Schaeffer's proof has no sudden-death goal either —
+the target value is a draw reached by piece reduction — and the proof-tree manager
+uses **Df-pn / proof-number search** anyway. FLIPHEX has both properties
+PN-search needs: a binary question (no draws, so one search rather than the two a
+three-valued game requires) and a wildly non-uniform tree.
+
+What actually parks PN-search here is narrower and survives the correction:
+FLIPHEX's exact solve is an **enumeration, and an enumeration has no scheduling
+problem**. Schaeffer needed a manager because his proof was a forward search over
+sub-problems that had to be *chosen*; the 4×4 sweep visits every layer
+unconditionally in a fixed order. So PN-search is reopened as a **scheduler for a
+forward proof**, not as a second search paradigm, and it becomes relevant only if
+a forward proof is ever attempted — which per (1) it will not be. Parked, for the
+right reason.
+
+**4. "Draws are impossible" is a trade, recorded here so it is not rediscovered.**
+It **buys** a backward pass with no cycles, no fixpoint iteration and no
+graph-history-interaction problem: values propagate in a single stratified sweep
+from ply 25 downward. It **costs** the forward proof's main economy — on a
+two-element value set a bound *is* the value, so Schaeffer's "partially proven"
+category is empty by construction and no branch can be cheaply discharged as
+irrelevant. The trade is heavily positive for FLIPHEX only because the cost lands
+entirely in a regime this ADR never enters: the 4×4 is an enumeration with no
+forward proof, and the 5×5 is out of reach on branching regardless.
+
+**5. Zobrist word count corrected.** The Decision says "50 random words". Keying
+on `(cell, colour)` and `(player, tile)` gives 25 × 2 + 2 × 13 = **76**.
+
+**6. Cross-axis rule (new, and previously unstated).** The Alternatives section
+rejects MCTS as the Axis-1 method "on principle: … using it for Axis 1 would
+destroy the independence that makes cross-axis verification meaningful." The
+principle is right but "independence" is the wrong word, and the imprecision
+hides where the rule actually bites. Correctness is untouched: alpha-beta returns
+the same value under any ordering, and retrograde enumeration has no ordering to
+corrupt. What is damaged is independence of **error**, via a specific mechanism —
+a solver whose order is seeded by the learner finishes fastest exactly on the
+lines the learner already plays well, so if the Axis-1 run then stops on a budget,
+the resolved positions are a biased sample over-representing the region where
+agreement was structurally guaranteed. That is **selection bias**, and it exists
+only when the Axis-1 run is *incomplete*. Hence three clauses, implementable as
+two metadata fields and a filter:
+
+> **R1.** Any Axis-1 result cited as ground truth for H1, H2 or H3 must come from
+> a run that terminated by **exhaustion**, not by a budget. Exhausted runs are
+> order-invariant, so Axis-2 seeding of their order is harmless by construction
+> and needs no prohibition.
+>
+> **R2.** Any Axis-1 run terminating on a budget — the depth-limited 5×5 agent, a
+> partial endgame database, a capped proof — uses **Axis-1-internal ordering
+> only** (iterative deepening, TT move, killer/history), and carries that
+> restriction as a recorded property of the artefact.
+>
+> **R3.** Every Axis-1 artefact records `ordering: internal | az-seeded` and
+> `termination: exhausted | budget`. H3's comparison set is the artefacts
+> satisfying R1, and the filter is applied *before* any comparison is computed.
+
+Scoping to *proof-producing* runs rather than to Axis 1 as a whole is deliberate:
+a blanket ban would forbid the depth-limited 5×5 agent from using a learned
+policy for move ordering, where nearly all its speed lives, and that agent is a
+**player, not a proof** — nothing it produces enters H3. The general form, which
+[adr-005](adr-005-alphazero-scope-and-network.md) applies in the other direction:
+*neither axis may be used to select or terminate the other along the dimension on
+which they are later compared.* For the 4×4 the rule is **vacuous today** —
+enumeration has no ordering degrees of freedom — which is the best possible time
+to adopt it.
+
+**Alternative added — meet-in-the-middle enumeration.** Enumerate forward from
+ply 0 and backward from ply 25 and meet at layer ~12. **Rejected**, and the layer
+profile is the reason: the middle of FLIPHEX is the *widest* part of the state
+space (the hump peaks at `t = 15`), so "meeting in the middle" means materialising
+the single largest layer in the game — 1.09 × 10¹⁷ positions on the 5×5. The
+technique pays off when the profile is a funnel; against a hump it is the worst
+available meeting point.
+
 ## Related
 
 - [adr-003](adr-003-piece-representation.md) — the state space this rests on
 - [adr-005](adr-005-alphazero-scope-and-network.md) — the axis this is compared against
+- [adr-008](adr-008-board-mirror-symmetry.md) — the mirror the endgame DBs can fold on
+- [adr-009](adr-009-reduced-deck-policy.md) — the reduced-deck policy this defers to
+- [adr-010](adr-010-solver-correctness.md) — how the results of this ADR are defended
 - `docs/research.md` — H1, H2, H3
+- `notes/phase2-synthesis.md` — S4, S6 (the readings behind the 2026-08-05 amendment)
