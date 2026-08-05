@@ -145,7 +145,9 @@ def _hits(board: Board, cell: int, pattern: int) -> str:
     )
 
 
-def show_case(board: Board, pi, rho, archetype: str, rotation: int, cell_name: str) -> None:
+def show_case(
+    board: Board, pi, rho, archetype: str, rotation: int, cell_name: str
+) -> None:
     """Walk one placement through the mirror, step by step.
 
     Told as a narrative rather than a picture, because the *position* on the
@@ -175,7 +177,9 @@ def show_case(board: Board, pi, rho, archetype: str, rotation: int, cell_name: s
     ))
 
     after = apply_move(board, before, Move(cell, tile, rotation))
-    flipped = [c for c in board.cells if before.colours[c] != after.colours[c] and c != cell]
+    flipped = [
+        c for c in board.cells if before.colours[c] != after.colours[c] and c != cell
+    ]
     print(f"\nSTEP 2 — purple plays {archetype} on {cell_name} (rotation {rotation}).")
     print(f"         Arrows {fmt(pattern)} fire once: {_hits(board, cell, pattern)}")
     print(f"         Flipped: {', '.join(board.cell_name(c) for c in flipped)}\n")
@@ -195,11 +199,11 @@ def show_case(board: Board, pi, rho, archetype: str, rotation: int, cell_name: s
         print(f"           rot {r}: {fmt(got):<24}{flag}")
 
     if found is None:
-        print(f"\n         >> NONE match {fmt(m_pattern)}, and no other tile in the deck")
-        print(f"            produces it either. {archetype} is CHIRAL: a hex tile can be")
-        print("            rotated but never turned face-down, so its own reflection is")
-        print("            not among the patterns it can present.")
-        print("\n         >> There is NO legal move from M(s) giving the mirrored result.")
+        print(f"\n         >> NONE match {fmt(m_pattern)}, and no other tile in the")
+        print(f"            deck produces it either. {archetype} is CHIRAL: a hex tile")
+        print("            can be rotated but never turned face-down, so its own")
+        print("            reflection is not among the patterns it can present.")
+        print("\n         >> There is NO legal move from M(s) giving that result.")
         print("            The position on the right of STEP 1 is fine. The *move* is")
         print("            what has no mirror image — and that is the whole break.")
         return
@@ -216,7 +220,8 @@ def show_case(board: Board, pi, rho, archetype: str, rotation: int, cell_name: s
           f"{board.cell_name(m_cell)}.\n")
     print("\n".join(render(
         board, m_after.colours,
-        {m_cell: "*", **{c: "!" for c in m_flipped}}, "mirrored board after the mirrored move",
+        {m_cell: "*", **{c: "!" for c in m_flipped}},
+        "mirrored board after the mirrored move",
     )))
     assert mirror_state(after, pi).colours == m_after.colours
     print("\n         >> And this equals M(result of STEP 2), checked exactly.")
@@ -255,10 +260,16 @@ def show_inertness(board: Board) -> None:
     )
     final = apply_move(board, after, Move(reply_cell, reply_tile, reply_rot))
 
-    changed = [board.cell_name(c) for c in board.cells if after.colours[c] != final.colours[c]]
+    changed = [
+        board.cell_name(c)
+        for c in board.cells
+        if after.colours[c] != final.colours[c]
+    ]
     print("  NOTE: the two boards below are NOT a mirror pair — they are the SAME")
     print("        board, one ply apart. Only one tile is ever played per cell.\n")
-    left = render(board, after.colours, {cell: "*"}, "ply n   — purple has just played B2")
+    left = render(
+        board, after.colours, {cell: "*"}, "ply n   — purple has just played B2"
+    )
     right = render(
         board, final.colours, {reply_cell: "*", cell: "!"},
         f"ply n+1 — green plays B3, arrow {DIRECTION_NAMES[back]} flips B2",
@@ -279,7 +290,7 @@ def main() -> int:
     enable_colour(sys.stdout.isatty() or "--color" in sys.argv)
     pi, rho = mirror_of(board)
 
-    print("Legend:  · empty   P purple   G green   * tile placed   ! flipped by an arrow")
+    print("Legend:  · empty   P purple   G green   * tile placed   ! flipped")
     print("Columns B and D are drawn half a row lower — the board's real geometry.")
     print("(pipe the output somewhere? pass --color to keep the colours)")
 

@@ -71,7 +71,9 @@ def mirror_of(board: Board) -> tuple[tuple[int, ...], dict[int, int]]:
         if perm != identity:
             autos.append((perm, {d: rho[d] for d in range(N_SLOTS)}))
     if len(autos) != 1:
-        raise AssertionError(f"expected exactly one non-trivial automorphism, got {len(autos)}")
+        raise AssertionError(
+            f"expected exactly one non-trivial automorphism, got {len(autos)}"
+        )
     return autos[0]
 
 
@@ -98,7 +100,9 @@ def find_placement(hand: int, pattern: int) -> tuple[int, int] | None:
     return None
 
 
-def mirror_move(move: Move, hand: int, pi: tuple[int, ...], rho: dict[int, int]) -> Move | None:
+def mirror_move(
+    move: Move, hand: int, pi: tuple[int, ...], rho: dict[int, int]
+) -> Move | None:
     """Return the mirror image of ``move``, or ``None`` if no tile can play it.
 
     The mirrored move must land on the mirrored cell and present the mirrored
@@ -133,7 +137,8 @@ def part_a(rho: dict[int, int]) -> list[str]:
     print("=" * 74)
     print("A. Is each tile's rotation orbit closed under the mirror?")
     print("=" * 74)
-    print(f"   mirror on directions: {', '.join(f'{d}->{rho[d]}' for d in range(N_SLOTS))}")
+    moved = ", ".join(f"{d}->{rho[d]}" for d in range(N_SLOTS))
+    print(f"   mirror on directions: {moved}")
     print(f"   {'tile':<9} {'rotations':>9}  {'orbit closed?':<14} mirror of canonical")
     broken = []
     for tile, piece in enumerate(TILES):
@@ -169,7 +174,8 @@ def part_b(board: Board, pi: tuple[int, ...], rho: dict[int, int]) -> None:
 
     print(f"   legal moves on ply 1 .................. {len(moves)}")
     print(f"   moves whose mirror is NOT legal ....... {len(without)}")
-    print(f"   ... all of them play {CHIRAL}? ......... {all(m.tile == chiral_idx for m in without)}")
+    all_chiral = all(m.tile == chiral_idx for m in without)
+    print(f"   ... all of them play {CHIRAL}? ......... {all_chiral}")
     print(f"   = 25 cells x {len(orbit(chiral_idx))} rotations ............... "
           f"{board.n_cells * len(orbit(chiral_idx))}")
     assert all(m.tile == chiral_idx for m in without)
@@ -177,10 +183,10 @@ def part_b(board: Board, pi: tuple[int, ...], rho: dict[int, int]) -> None:
 
     bad = without[0]
     pattern = TILES[bad.tile].rotated(bad.rotation)
-    print(f"\n   witness: play {CHIRAL} on cell {board.cell_name(bad.cell)} at rotation "
-          f"{bad.rotation}, arrows {fmt(pattern)}")
-    print(f"            its mirror needs arrows {fmt(mirror_mask(pattern, rho))} on cell "
-          f"{board.cell_name(pi[bad.cell])}")
+    print(f"\n   witness: play {CHIRAL} on cell {board.cell_name(bad.cell)} at "
+          f"rotation {bad.rotation}, arrows {fmt(pattern)}")
+    print(f"            its mirror needs arrows {fmt(mirror_mask(pattern, rho))} "
+          f"on cell {board.cell_name(pi[bad.cell])}")
     print("            no tile in the deck presents that pattern at any rotation.")
 
 
@@ -230,7 +236,7 @@ def part_c(board: Board, pi: tuple[int, ...], rho: dict[int, int]) -> None:
         print(f"\n   hand = {held}")
         print(f"     legal moves ......................... {len(moves)}")
         print(f"     without a legal mirror image ........ {missing}")
-        print(f"     M(RESULT(s,a)) == RESULT(M(s),M(a)) . {commutes} (where M(a) exists)")
+        print(f"     M(RESULT(s,a)) == RESULT(M(s),M(a)) . {commutes} (where defined)")
         print(f"     => mirror is a game symmetry here ... {missing == 0 and commutes}")
         assert commutes, "the flip rule itself must commute with the mirror"
         if chiral_in_hand:
