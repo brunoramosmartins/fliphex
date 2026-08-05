@@ -6,7 +6,9 @@
 **Which decision does this source inform?**
 [adr-012](../docs/adr/adr-012-endgame-database-storage.md) — whether FLIPHEX
 should materialise a retrograde endgame database at all, and if so from which
-`k`. adr-012 is Proposed and explicitly waits on this reading plus EXP-003.
+`k`. adr-012 is **Accepted** and defers the build decision to `EXP-003`; this
+reading is what the pre-registered prediction (`k* >= 6`) should be checked
+against **before** that experiment runs, not after.
 
 **Why this source, and where it sits in the reading order.** Read **after**
 Allis 1994 (the diverging/converging taxonomy) and **after** Schaeffer 2007 (the
@@ -42,14 +44,28 @@ FLIPHEX's opening 1450. Those cut in opposite directions.
 **Legend.** 🔄 marks prompts that require synthesis with another source already
 in `notes/`.
 
-**Reading material.** Not yet ingested. Section numbers below are provisional —
-run `/paper-study` on the PDF first and renumber against the real manifest.
+**Reading material.** Ingested 2026-08-05 —
+[`notes/sources/takizawa-2023-othello-is-solved/`](sources/takizawa-2023-othello-is-solved/manifest.json)
+(local only; `notes/sources/` is gitignored). 18 sections, ~5,500 words: this is
+a short paper, and the whole method fits in §§8–12.
+
+The prompts below are grouped by *question*, not by the paper's own numbering,
+because the paper splits its method across seven small sections. Each group
+names the section files it draws on.
+
+**The manifest already corrects the scout's summary on one point: there are two
+thresholds, not one** — `§09` obtains target positions at **50** empty squares
+and `§10` at **36**. Read them as a pair; the two-stage structure is itself the
+finding, and it is the part that maps onto `EXP-003`'s search for a crossover
+`k*` rather than a single depth.
 
 ---
 
-## §1 — What was claimed, and how strong is it
+## A — What was claimed, and how strong is it
 
-### 1.1 — Which solution strength?
+*Sections `01-abstract.md`, `02-1-introduction.md`, `03-2-1-solved-games.md`.*
+
+### A1 — Which solution strength?
 
 **Prompt.** Allis distinguishes ultra-weak, weak and strong solutions. Which one
 does this paper claim, in its own words? Predict before checking: given the title
@@ -61,7 +77,7 @@ abstract invite that reading or guard against it? Write down what the claim does
 
 **Refined write-up.**
 
-### 1.2 — What is the game value, and from which position?
+### A2 — What is the game value, and from which position?
 
 **Prompt.** What value does the paper report for Othello 8×8, and is it the value
 from the initial position or from some set of positions? Compare with FLIPHEX,
@@ -72,7 +88,7 @@ tell you about how informative "who wins" is as a headline?
 
 **Refined write-up.**
 
-### 1.3 — 🔄 Place Othello in the Allis two-axis table
+### A3 — 🔄 Place Othello in the Allis two-axis table
 
 **Prompt.** Using [notes/allis-1994-searching-for-solutions.md](allis-1994-searching-for-solutions.md),
 write down Othello's state-space and game-tree complexity and put them beside
@@ -87,9 +103,14 @@ easy on the *tree* axis. Does Othello fit that story or is it a third pattern?
 
 ---
 
-## §2 — The method
+## B — The method
 
-### 2.1 — The core algorithm, stated precisely
+*Sections `04-2-2-solving-technique.md`, `08-3-3-modification-to-edax.md`,
+`09-3-4-obtaining-a-set-of-target-positions-with-50-.md`,
+`10-3-5-obtaining-a-set-of-target-positions-with-36-.md`,
+`11-3-6-constructing-a-program-that-never-loses.md`.*
+
+### B1 — The core algorithm, stated precisely
 
 **Prompt.** What is the search algorithm, in one sentence? Identify: the search
 framework, the pruning, the role of the transposition table, and whether any
@@ -101,20 +122,22 @@ the proof path allowed to be approximate?**
 
 **Refined write-up.**
 
-### 2.2 — The endgame threshold — the central question for adr-012
+### B2 — The endgame threshold — the central question for adr-012
 
-**Prompt.** The paper exhaustively resolves positions at some number of empty
-squares and references those results from shallower search. Find: (a) the exact
-threshold, (b) how many such subproblems there were, (c) whether those results
-were **stored** and reused across queries or recomputed per query, and (d) what
-the storage footprint was, if any. This is the single most important fact in the
-paper for this project — adr-012 Option B rests on it. Quote it exactly.
+**Prompt.** There are **two** thresholds, in `§09` (50 empty squares) and
+`§10` (36 empty squares). For each, find: (a) how the target set was obtained,
+(b) how many positions it contains, (c) whether the results were **stored** and
+reused across queries or recomputed per query, and (d) the storage footprint, if
+any. Then answer the question the two-stage structure raises: **why two, and what
+decided where each cut fell?** That is the shape `EXP-003` is looking for — a
+crossover, not a single magic depth. This is the most important passage in the
+paper for this project, since adr-012 Option B rests on it. Quote it exactly.
 
 **My take.**
 
 **Refined write-up.**
 
-### 2.3 — Why no retrograde database?
+### B3 — Why no retrograde database?
 
 **Prompt.** The paper says the authors considered a *strong* solution intractable
 and did not attempt one. Reconstruct the reasoning: what specifically makes a
@@ -129,7 +152,7 @@ different about checkers that makes them pay there?
 
 **Refined write-up.**
 
-### 2.4 — Move ordering and where the engineering actually went
+### B4 — Move ordering and where the engineering actually went
 
 **Prompt.** How much of the feasibility comes from the algorithm and how much
 from move ordering, the evaluation function used for ordering, and engineering?
@@ -144,9 +167,11 @@ if it does not, does its proof survive the objection?
 
 ---
 
-## §3 — Validation, and what "solved" obliged them to prove
+## C — Validation, and what "solved" obliged them to prove
 
-### 3.1 — How was the result verified?
+*Sections `12-3-7-materials.md`, `13-4-results.md`.*
+
+### C1 — How was the result verified?
 
 **Prompt.** A solve produces one answer out of an astronomical space, and the
 failure mode is a plausible wrong answer rather than a crash. What verification
@@ -160,7 +185,7 @@ at the time of writing?
 
 **Refined write-up.**
 
-### 3.2 — Is anything here statistical?
+### C2 — Is anything here statistical?
 
 **Prompt.** Identify every number in the paper that is an estimate rather than an
 exact count, and how its uncertainty is reported. Predict first: in a paper about
@@ -171,7 +196,7 @@ your prediction was right.
 
 **Refined write-up.**
 
-### 3.3 — Compute budget
+### C3 — Compute budget
 
 **Prompt.** How much compute did the solve take, and on what hardware? Divide by
 the state-space ratio to FLIPHEX 5×5 (~10²⁸ vs 4.9 × 10¹⁷) and by the branching
@@ -184,9 +209,11 @@ directions. This is the honest version of "could I do this on a laptop?".
 
 ---
 
-## §4 — Limitations, in the authors' own words
+## D — Limitations, in the authors' own words
 
-### 4.1 — What do they say they did not do?
+*Section `14-5-discussion-and-conclusions.md`.*
+
+### D1 — What do they say they did not do?
 
 **Prompt.** List the acknowledged limitations verbatim. Which of them would a
 critical reader add that the authors do not? Pay attention to whether "solved"
@@ -196,7 +223,7 @@ in the title is defended or simply asserted.
 
 **Refined write-up.**
 
-### 4.2 — 🔄 What does this change in this project?
+### D2 — 🔄 What does this change in this project?
 
 **Prompt.** Three concrete questions, each of which has a live decision behind it:
 

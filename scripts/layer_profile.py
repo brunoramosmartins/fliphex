@@ -24,8 +24,13 @@ Note the bound counts *configurations consistent with the invariants*, not
 positions reachable by legal play, so it is an upper bound. Measuring the gap is
 V1's other job.
 
+Cell counts must be **odd** (``adr-011``): scoring is a cell count, so an even
+board admits ties and the canonical rules define no tie-break. ``--even`` exists
+only to inspect such a board, never to cost a solve on one.
+
     python scripts/layer_profile.py                  # shipped 5x5, full deck
-    python scripts/layer_profile.py --cells 16 --hands 8 8    # 4x4, adr-009 deck
+    python scripts/layer_profile.py --cells 15 --hands 8 7    # 5x3, adr-011 deck
+    python scripts/layer_profile.py --cells 9 --hands 5 4     # 3x3, adr-011 deck
     python scripts/layer_profile.py --cells 9                 # 3x3, full deck
 """
 
@@ -121,7 +126,19 @@ def main() -> int:
         default=5,
         help="largest k to report an endgame slice for (default 5)",
     )
+    p.add_argument(
+        "--even",
+        action="store_true",
+        help="allow an even cell count (adr-011 forbids it for a playable "
+        "variant; this is for inspecting a board, not costing a solve)",
+    )
     args = p.parse_args()
+    if args.cells % 2 == 0 and not args.even:
+        p.error(
+            f"{args.cells} cells is even, so the board admits ties and the rules "
+            f"define no tie-break -- adr-011 forbids it as a variant. Pass "
+            f"--even to profile it anyway."
+        )
     report(args.cells, args.hands[0], args.hands[1], args.endgame)
     return 0
 
