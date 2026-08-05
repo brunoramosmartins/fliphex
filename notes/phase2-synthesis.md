@@ -289,26 +289,26 @@ not its full symmetry orbit. Part B measures the cost: **150 of the 1450 opening
 moves have no legal mirror image**, exactly 25 cells × 6 rotations, every one of
 them `P3-y`. The break lives in `ACTIONS(s)`, not in `s`.
 
-**"A small fraction" can be quantified.** Each player holds 13 tiles; purple
-plays all 13 (odd plies), green plays 12 of 13 (even plies). Under a
-uniform-random play order, the mirror becomes a full game symmetry only after
-*both* copies are on the board:
+**"A small fraction" can be quantified.** Purple holds 13 tiles (the 12-tile deck
+plus the joker) and plays all 13 on the odd plies; green holds 12 and plays all
+12 on the even plies ([rules-canonical.md](docs/rules-canonical.md) §2, I3/I5).
+Every tile reaches the board, so both `P3-y` copies are *always* placed — the
+mirror always becomes a game symmetry eventually, the only question is when.
+Under a uniform-random play order:
 
 | quantity | value |
 |---|--:|
-| E[fraction of plies where the mirror is a valid game symmetry] | **0.29** |
-| P(both placed by ply 16) | 0.38 |
-| P(both placed by ply 20) | 0.59 |
-| P(the mirror is *never* valid in a game) | **1/13 ≈ 7.7 %** |
+| E[fraction of plies where the mirror is a valid game symmetry] | **0.31** |
+| E[ply on which the second `P3-y` lands] | 17.2 |
+| P(both placed by ply 16) | 0.41 |
+| P(both placed by ply 20) | 0.64 |
 
-That last row is the one worth keeping: green plays only 12 of its 13 tiles, so
-roughly one game in thirteen ends with a `P3-y` still in hand and the mirror
-never becomes a symmetry at all. (Random-order estimate — the distribution under
-optimal play is unknown and could move in either direction. It is the right order
-of magnitude for a design decision, not a measurement.)
+(Random-order estimate — the distribution under optimal play is unknown and could
+move in either direction. It is the right order of magnitude for a design
+decision, not a measurement.)
 
-**(b) The decision, with the arithmetic done.** 2× on 29 % of positions is an
-effective **1.29×** in data. Against b₀ = 1450 and a laptop budget that is a
+**(b) The decision, with the arithmetic done.** 2× on 31 % of positions is an
+effective **1.31×** in data. Against b₀ = 1450 and a laptop budget that is a
 rounding error, and it is not free: every augmented sample needs a
 validity check (is `P3-y` out of *both* hands?), and augmenting one invalid
 position silently poisons the policy target with a move that does not exist.
@@ -320,9 +320,9 @@ group is trivial (adr-002)", which is **false** — adr-008 supersedes it):
 > **No symmetry augmentation.** The board has a Z/2 mirror
 > ([adr-008](docs/adr/adr-008-board-mirror-symmetry.md)), but the chiral `P3-y`
 > tile makes it a *partial* game symmetry: it is valid only once both copies are
-> placed, ~29 % of plies under random order and never at all in ~1/13 of games.
-> The available gain is ≈1.29× in data, against a per-sample validity check and a
-> silent-corruption risk if the check is wrong. Not worth it.
+> placed, ≈31 % of plies under a random play order. The available gain is ≈1.31×
+> in data, against a per-sample validity check and a silent-corruption risk if
+> the check is wrong. Not worth it.
 
 **(c) The inversion is a pattern, not an accident, and it has a mechanism.**
 Symmetries in games are broken by state components that are *consumed*: hands,
@@ -353,7 +353,7 @@ adr-008 entirely. Symmetry was never part of it.
 **On redesigning `P3-y` — I would argue against, and the section's own numbers
 are the argument.** Removing chirality would make the mirror a full game symmetry
 throughout, which buys: ≈2× data on Axis 2 (you just valued the partial version
-at 1.29× and rejected it), and ~⅓ of a k level on Axis 1. Against that,
+at 1.31× and rejected it), and ~⅓ of a k level on Axis 1. Against that,
 chirality is the **only** thing in the design that distinguishes a line of play
 from its mirror image. Remove it and every opening acquires an exactly-as-good
 twin — the strategically distinct opening set halves, and H1 becomes partly

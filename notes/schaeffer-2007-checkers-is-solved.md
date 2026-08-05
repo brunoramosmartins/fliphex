@@ -524,7 +524,36 @@ For ADR-004, this paper provides additional motivation to reconsider the earlier
 
 **Refined write-up.**
 
-_(preencho depois que você compartilhar seu take)_
+The manager/solver split and the existential-vs-universal asymmetry are correct,
+and the Knuth–Moore distinction is the sharpest thing in the note: the minimal
+tree is a *complexity bound*, the proof tree is a *certificate*. Keep that
+wording verbatim. But the claim that decides the ADR question is wrong.
+
+**Proof-number search is not absent from this paper — it is the manager's core
+algorithm.** The text: *"The manager maintains the master copy of the proof, and
+identifies a prioritized list of positions that need to be examined **using the
+Proof Number search algorithm** (6)."* Reference (6) is Allis. The paper also
+names the **Df-pn** variant — *"builds the search tree in a depth-first manner,
+requiring less computer storage"*. So the largest game-solving result ever
+published uses PN-search as the scheduler deciding *what to prove next*, with
+alpha-beta (Chinook, 17–23 ply) as the solver underneath. Your sentence "the
+paper does not describe the manager as implementing PNS" inverts this.
+
+**This forces a correction to something I wrote, not only to your take.** The
+adr-004 Phase 2 amendment argued that pn-search "loses its structural edge" on
+FLIPHEX because pn-search shines on *sudden-death* goal-proving while FLIPHEX is
+fixed-termination. Checkers is **also fixed-termination** (Allis classifies it
+so), and pn-search is central to its proof anyway. That argument was wrong as
+stated and the amendment needs rewriting.
+
+What survives is a distinction the ADR currently conflates. adr-004 rejected
+pn-search *as a replacement search paradigm* — a second full engine to build,
+debug and explain on top of a three-axis project. **That rejection still stands.**
+What adr-004 never considered is pn-search in Schaeffer's actual role: a **work
+scheduler over a proof tree**, sitting above ordinary alpha-beta solvers, which is
+a much smaller commitment. Those are two different decisions. Your closing
+sentence lands on the right verdict — reopened as a scoped extension, not adopted
+— and it is now better supported than you knew when you wrote it.
 
 ### 4.2 — Where the effort actually went
 **Prompt.** The paper describes the manager choosing which positions to expand
@@ -546,55 +575,66 @@ For FLIPHEX, the situation depends on the solver architecture. A pure retrograde
 
 **Refined write-up.**
 
-*(Note: this answers prompt **4.1**, not 4.2 — 4.1's slot above is still empty and
-4.2's actual question, about the manager's failure mode, is unanswered. Worth
-moving this text up; the missing 4.2 answer is sketched at the end here.)*
+The scheduling framing is right — "the objective is not simply to prove positions,
+but to allocate computation so that the overall proof is completed with minimal
+total work" is the sentence the paper is making — and the FLIPHEX verdict at the
+end is correct. But the prompt asked you to *retrieve* the truncated sentence, and
+you reconstructed it instead. The reconstruction is plausible and wrong, in a way
+worth noticing.
 
-The manager/solver split and the existential-vs-universal asymmetry are correct,
-and the Knuth–Moore distinction is the sharpest thing in the note: the minimal
-tree is a *complexity bound*, the proof tree is a *certificate*. Keep that
-wording. But the claim that decides the ADR question is wrong.
+**The real passage.** From the PDF (the extraction interleaves the columns here):
 
-**Proof-number search is not absent from this paper — it is the manager's core
-algorithm.** The text: *"The manager maintains the master copy of the proof, and
-identifies a prioritized list of positions that need to be examined **using the
-Proof Number search algorithm** (6)."* Reference (6) is Allis. The paper also
-names the **Df-pn** variant — *"builds the search tree in a depth-first manner,
-requiring less computer storage"*. So the largest game-solving result ever
-published uses PN-search as the scheduler that decides *what to prove next*, with
-alpha-beta (Chinook, 17–23 ply) as the solver underneath.
+> "From the human literature, a single 'best' line of play was identified and used
+> to guide the initial foray of the manager into the depths of the search tree.
+> Although not essential for the proof, this is an important performance
+> enhancement. It allows the proof process to immediately focus its work on the
+> parts of the search space that are likely to be relevant. **Without it, the
+> manager may spend unnecessary effort looking for an important line to explore.**
+> The line leads from the start of the game into the endgame databases."
 
-This forces a correction to something **I** wrote, not just to your take. The
-adr-004 Phase 2 amendment argued that pn-search "loses its structural edge" on
-FLIPHEX because pn-search shines on *sudden-death* goal-proving and FLIPHEX is
-fixed-termination. Checkers is **also fixed-termination** (Allis classifies it
-so), and pn-search is central to its proof anyway. That argument was wrong as
-stated.
+You read the failure mode as *"the manager may spend unnecessary effort searching
+for an alternative proof even though a sufficient proof already exists elsewhere
+in the tree"* — i.e. redundant work on a solved problem. The actual failure mode
+is the opposite and worse: without a seed line, the manager has **no spine to work
+along at all**, and wastes effort *finding somewhere worth working*. The waste is
+at the start, not the margin. Note also what the seed line *is*: a path "from the
+start of the game into the endgame databases" — a hand-supplied hypothesis about
+where the two ends meet, which is exactly the junction §3.1 identified as the
+whole architecture.
 
-What survives, and is the right distinction: adr-004 rejected pn-search *as a
-replacement search paradigm* — a second full engine to build, debug and explain.
-That rejection still stands. What adr-004 never considered is pn-search in
-Schaeffer's actual role: a **work scheduler over a proof tree**, sitting above
-ordinary alpha-beta solvers. Those are different decisions and the ADR conflates
-them. The amendment should be corrected to say so, and the honest verdict is your
-last sentence — reopened as a scoped extension, not adopted.
+**And this is the part that matters for FLIPHEX: there is no human literature.**
+No opening book, no master games, no expert lines — the game has been played by a
+handful of people. So the one bootstrap Schaeffer describes as "an important
+performance enhancement" is simply unavailable. This is the same "no domain
+knowledge" hole R&N §6.3.2 found in the evaluation function, reappearing one level
+up in the scheduler, and it is a *third* place where FLIPHEX's novelty costs it
+something concrete.
 
-Two more things the paper gives that belong in the ADR's thinking. First, the
-manager iterates not on depth but **on the error threshold of the heuristic
-score** (`t`, raised by ∆ until it reaches a win): sketch the proof outline
-cheaply, then fill in detail. Second — and this is the missing **4.2** answer —
-the manager is bootstrapped by a human-supplied line: *"From the human
-literature, a single 'best' line of play was identified and used to guide the
-initial foray of the manager… Without it, the manager may spend unnecessary
-effort looking for an important line to explore. The line leads from the start of
-the game into the endgame databases."* **FLIPHEX has no human literature.** There
-are no book openings, no expert lines, nothing to seed the manager with — the
-same "no domain knowledge" hole that R&N §6.3.2 identified for the evaluation
-function, reappearing in the scheduler. The obvious substitute is a policy from
-Axis 2: the learned network supplies the seed line that human masters supplied
-for checkers. That is a genuine, non-obvious cross-axis use of the learner — the
-solver consuming the learner's output rather than merely being checked against it
-— and it belongs in synthesis **S4**.
+The obvious substitute is a policy from **Axis 2** — the learned network supplying
+the seed line that human masters supplied for checkers. That is a genuine
+cross-axis use of the learner, with the solver *consuming* its output rather than
+merely being checked against it, and adr-004's independence principle has never
+been tested against it. It is now synthesis **S6**; do not settle it here.
+
+**Your FLIPHEX verdict is right, and §3.1 makes it stronger than you claimed.**
+You said a pure 4×4 retrograde enumeration has essentially no scheduling problem
+("every reachable position must eventually be processed exactly once") — correct,
+and per §2.1 the layers are processed in strict ply order, so there is not even a
+choice of *which layer* next. You then hedge that a meet-in-the-middle 4×4 solver
+would inherit the scheduling problem. It would, but per §3.1 that architecture is
+*unnecessary* on 4×4 (full enumeration already solves the whole board) and
+*unavailable* on 5×5 (the two ends cannot be made to meet). So the hedge describes
+a configuration the project should not build. The clean statement: **FLIPHEX's
+exact solve has no scheduling problem, because it is enumeration rather than
+proof** — and that is a real simplification worth stating in adr-004, not a gap.
+
+One more scheduling idea from the paper worth banking even though it does not
+transfer: the manager iterates not on depth but **on the error threshold of the
+heuristic score** — assume all scores ≥ `t` are wins and ≤ −`t` are losses, prove
+the result under that assumption, then raise `t` by ∆ and repeat. Sketch the proof
+outline cheaply at low `t`, flesh out details later. It is an elegant answer to
+"where do I start when everything is unproven", and it needs a heuristic FLIPHEX
+does not have — which is the same hole again, for the third time in one prompt.
 
 ---
 

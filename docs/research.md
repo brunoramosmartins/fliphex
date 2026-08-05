@@ -2,7 +2,7 @@
 
 **Status:** DRAFT. Hypotheses are **not yet locked** — locking happens at the
 end of Phase 2 and is marked by the `v0.3-hypotheses` tag, which is what
-timestamps the pre-registration. Until then H1–H5 may be reworded, split, or
+timestamps the pre-registration. Until then H1–H6 may be reworded, split, or
 dropped. After that tag, this file may only gain verdicts; anything else needs
 an ADR.
 
@@ -45,8 +45,8 @@ argument — stated explicitly, never by narrative.
 |---|---|---|---|
 | **H1** | With perfect play the first player wins (strictly, since draws are impossible). | Exhaustive solve of the 3×3 (calibration) and 4×4 (primary strategic) variants; 20-seed self-play win rate with Wilson 95% CI on the full game. | 1 + 2 |
 | **H2** | Removing the joker does not change which player holds the theoretical advantage. | Solver + self-play on a joker-less variant (exact on 3×3/4×4). | 1 + 2 |
-| **H3** | The learned policy converges to a stable win-rate across independent seeds, and agrees with the solver's exact verdict on shared variants. | ≥5-seed training; per-seed win rate with Wilson 95% CI and variance reported across seeds; comparison against Axis 1. | 2 |
-| **H4** | FLIPHEX's state-space complexity is comparable to Reversi 6×6 and strictly below Othello 8×8 and Hex 11×11. | Direct computation of state-space and game-tree bounds. | 3 |
+| **H3** | The learned policy converges to a stable win-rate across independent seeds, and agrees with the solver's exact verdict on **every member of the pre-declared comparison set**: 3×3 (full deck), 4×4 ([adr-009](adr/adr-009-reduced-deck-policy.md) deck), and the 5×5 retrograde endgame layers at the largest `k` achieved. | ≥5-seed training; per-seed win rate with Wilson 95% CI and variance reported across seeds; per-variant agreement rate against Axis 1, restricted to Axis-1 artefacts satisfying [adr-004](adr/adr-004-solver-approach.md) R1 (`termination: exhausted`). | 2 |
+| **H4** | FLIPHEX 5×5 is out of reach on **both** complexity axes: its state space (~4.9 × 10¹⁷) exceeds every game solved by full enumeration (Nine Men's Morris 10¹¹, Awari 10¹², Connect Four 10¹⁴), and its game-tree complexity (~10⁶¹; ~10³⁰·⁵ at the Knuth–Moore minimal tree) puts it beyond the weak-solution route that carried checkers *despite* checkers' larger 5 × 10²⁰ state space. | Direct computation of both bounds; placement in the Allis/Schaeffer cross-game table. | 3 |
 | **H5** | No archetype dominates placement frequency in self-play, i.e. the 12-tile deck is well balanced. | Frequency and win-contribution analysis over the self-play database. | 2 + 3 |
 | **H6** *(optional / stretch)* | The design's balance is *robust to counterfactual variation* — the first-player advantage and joker effect hold their sign under a bounded set of design perturbations (board size 3×3→4×4→5×5; deck swaps, e.g. removing the chiral `P3-y`). | Re-run the H1/H2 verdicts against each perturbation and report whether the *direction* of the effect is preserved; exact where solvable, self-play otherwise. | 1 + 2 |
 
@@ -122,15 +122,57 @@ choice that makes 4×4 tractable is pinned in
 fill by ascending arrow count; reduced boards are a purely computational
 device).
 
+**H3 — the comparison set is now named, because it was going to be n = 1.** As
+originally worded, H3's cross-axis clause said "shared variants" and left the
+count to be discovered in Phase 5. The only variant both axes were committed to
+was the 4×4, so the hypothesis would have rested on a **single** board. Two fixes,
+both already available: [adr-009](adr/adr-009-reduced-deck-policy.md)'s policy
+generates a family of reduced boards, and — more valuable — the **5×5 retrograde
+endgame layers give solver-vs-learner comparison on the shipped game**, not on a
+toy. H3 now enumerates its comparison set explicitly, and restricts it to Axis-1
+artefacts that terminated by exhaustion
+([adr-004](adr/adr-004-solver-approach.md) R1), so no comparison can be drawn
+from a run whose search order was seeded by the learner it is being compared to.
+
+**H4 — reworded onto both complexity axes.** The Phase 0 wording ("comparable to
+Reversi 6×6") was flagged above as probably false against the corrected bound,
+and it was also the wrong *shape* of claim: it asserted proximity to one game
+rather than a position in the landscape. Reading Allis against Schaeffer supplied
+the missing distinction — state-space and game-tree complexity are **independent**
+axes, and checkers was weakly solved with ~1000× *more* states than FLIPHEX 5×5
+because it is easy on the axis that governs a forward proof. H4 now states a
+falsifiable position on both axes and names the datapoints it is measured against.
+
+**Verification is now an ADR, and the verdict table carries an evidence class.**
+The 4×4 solve produces one verdict out of ~10¹¹ states, where the failure mode is
+a *plausible wrong answer* rather than a crash.
+[adr-010](adr/adr-010-solver-correctness.md) fixes the six checks that must pass
+before any Axis-1 number may appear in the table below, and drafts — before the
+result exists — the strongest sentence a single implementation run once is
+entitled to. Its last clause ("it has not been independently reimplemented") is
+what the evidence-class column exists to carry.
+
 ## Verdicts
 
 Empty until Phase 5 and Phase 6. One row per hypothesis, each citing the
 experiment ID in [`experiments/registry.md`](../experiments/registry.md).
 
-| ID | Verdict | Evidence | Experiment | Phase |
-|---|---|---|---|---|
-| H1 | — | | | |
-| H2 | — | | | |
-| H3 | — | | | |
-| H4 | — | | | |
-| H5 | — | | | |
+Every row carries an **evidence class**, because the hypotheses do not all get the
+same *kind* of answer and a bare "supported" erases the difference between an
+enumerated fact and a 20-seed win rate:
+
+- **`exact`** — an exhaustive computation, qualified by its verification status
+  per [adr-010](adr/adr-010-solver-correctness.md). E.g. *"supported (exact,
+  single implementation, V0–V5 passed, not independently reimplemented)"*.
+- **`statistical`** — an estimate with a stated interval and seed count.
+- **`structural`** — a closed-form bound or an argument from the rules, with no
+  run behind it.
+
+| ID | Verdict | Evidence class | Evidence | Experiment | Phase |
+|---|---|---|---|---|---|
+| H1 | — | | | | |
+| H2 | — | | | | |
+| H3 | — | | | | |
+| H4 | — | | | | |
+| H5 | — | | | | |
+| H6 | — | | | | |
