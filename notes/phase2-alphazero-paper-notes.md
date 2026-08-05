@@ -54,8 +54,61 @@ TIL skeleton here before transcribing.
 
 ## Lessons Learned
 
-_(first-person, written by the author at phase close — not ghost-written)_
+This phase changed what I think AlphaZero *is*. I began with "MCTS guided by a
+neural network" and ended with a closed learning system — one where search
+continuously improves the policy and value functions that will guide the next
+search. Search is not only a decision algorithm; it is also the data-generation
+mechanism.
+
+Separating the two networks was the next step. Early on I lumped them together as
+"neural guidance". They solve different problems: the policy biases exploration
+toward promising actions, while the value network replaces rollout-based
+evaluation with an estimate of the state's value under increasingly strong play.
+
+Reading AlphaGo Zero and AlphaZero side by side taught an engineering lesson as
+much as a technical one: architectural decisions are contextual, not universally
+optimal. The evaluator gate and symmetry augmentation are not features to copy —
+each has to earn its place against my compute budget, this game's properties, and
+what the experiment is trying to establish.
+
+The largest change, though, was methodological rather than algorithmic. I set out
+to implement AlphaZero for FLIPHEX; I now see the project as an experimental
+framework for understanding the game. The learner, the exact solver and the
+design hypotheses answer different questions, and their value depends on staying
+complementary rather than competing.
+
+Last, the phase reinforced a research habit: literature should challenge design
+decisions, not merely ratify them. Several ADRs predate the papers, and treating
+them as hypotheses to confront — rather than assumptions to defend — is what made
+the study worth the week.
 
 ## Failed Attempts
 
-_(first-person, written by the author at phase close — not ghost-written)_
+Several assumptions recorded in Phase 0 turned out to be incomplete or simply
+wrong.
+
+I underestimated the distance between classical UCT and AlphaZero's PUCT, filing
+the latter as a better exploration strategy. The deeper innovation is coupling
+search to learning through visit-count supervision — not swapping one exploration
+formula for another.
+
+I also read the value network as a computational optimization over rollouts. Read
+more carefully, the substantive change is *what is being estimated*: rollout
+values reflect random play, learned evaluations reflect increasingly strong
+policies. The compute saving follows from that choice; it is not the motivation
+for it.
+
+I treated board symmetry as equivalent to game symmetry. Revisiting FLIPHEX's
+state representation showed the chiral `P3-y` tile breaks the mirror for most of
+the game, which leaves AlphaGo Zero's augmentation largely inapplicable even
+though the board does carry a mirror automorphism.
+
+And I entered the phase believing that reproducing AlphaZero's architecture as
+faithfully as possible was the safe strategy. I now think it is a poor default.
+Several choices in the papers are engineering decisions taken under DeepMind's
+constraints rather than justified principles, and each should be adopted only
+where it serves this project's goals.
+
+The biggest failed assumption was that solving FLIPHEX was the point. By the end
+of the phase I understood the solver as an instrument for evaluating the game's
+design, not as the research outcome.

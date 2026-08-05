@@ -69,8 +69,55 @@ is the tagged commit `v0.3-hypotheses`.
 
 ## Lessons Learned
 
-_(first-person, written by the author at phase close — not ghost-written)_
+This phase supplied the vocabulary the project was designed without. Before the
+reading I could reason intuitively about search and complexity, but I had no
+precise language in which to justify a decision. Three distinctions changed how I
+think about exact solvers: state-space against game-tree complexity, why
+alpha-beta preserves the minimax value under any move ordering, and what a
+transposition table actually buys.
+
+Feasibility, I learned, is not one quantity — it depends on which algorithm is
+doing the work. State-space size governs exhaustive enumeration and retrograde
+analysis; game-tree complexity governs forward search. I used to compare games by
+reachable-state count alone, which is why it once seemed paradoxical that a game
+with a vastly larger state space can be the easier one to solve, provided its
+branching is constrained enough.
+
+Exact solving and reinforcement learning also stopped looking like rivals. They
+answer different questions, and each becomes appropriate in a different region of
+the complexity landscape: small FLIPHEX variants yield exact ground truth by
+exhaustive methods, larger ones require approximation. That split is the
+conceptual foundation of H1 and H3.
+
+Last, I now treat architectural decisions as hypotheses rather than facts.
+Writing the ADRs before the reading turned out to be an advantage — every
+assumption had to confront the literature head-on instead of being quietly
+adjusted to fit it. Most of the decisions survived unchanged, but they carry far
+stronger justification than they did.
 
 ## Failed Attempts
 
-_(first-person, written by the author at phase close — not ghost-written)_
+Several assumptions from the project's early design did not survive this phase.
+
+I treated game complexity as a single quantity. Allis made clear that state-space
+and game-tree complexity are independent measures constraining different solution
+methods — which is exactly why ranking games by state count alone produces wrong
+conclusions about what is solvable.
+
+I underestimated what the exact solver is *for*. I had it filed as an
+implementation goal; the literature convinced me its real value is as objective
+ground truth, the thing against which approximate methods and design hypotheses
+get measured.
+
+I assumed that improving a search algorithm changes what it concludes. Alpha-beta
+showed otherwise: move ordering changes cost, not correctness. That distinction
+came back later, when reasoning about how independent the project's exact and
+approximate methods really are.
+
+And I entered the phase expecting the literature to confirm the ADRs. What it did
+instead was expose the assumptions needing stronger justification, more careful
+wording, or a narrower scope. Treating those as falsifiable claims was far more
+productive than defending them as design constraints.
+
+The most valuable outcome of this phase was not a set of new algorithms but a way
+of asking more precise questions about games.
