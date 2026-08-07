@@ -18,7 +18,7 @@ Freely editable (append-only in practice).
 | ID | Date | Hypothesis | Axis | Description | Config / commit | Seed | Status | Result |
 |---|---|---|---|---|---|---|---|---|
 | EXP-001 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 3×3, both H2 arms; adr-010 V3 double-solve | 9 cells (3×3), hands 5 + 4, commit `4a081d8`+ | — | **complete** | **P1 wins in both arms.** 711,963 configurations enumerated, matching the closed form **exactly at every layer** (V1). V0 512 ✓, V2 asserted on every terminal ✓, V5 checksummed ✓. V3: both methods agree on every position compared (24,460 h1 / 15,376 h2) — **but that is 2–3% of the space, not "every position"; see the V3 caveat below.** [`data/subgame-solutions/3x3-h1.json`](../data/subgame-solutions/3x3-h1.json), [`3x3-h2.json`](../data/subgame-solutions/3x3-h2.json) |
-| EXP-002 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 5×3, both H2 arms | 15 cells (5 cols × 3), hands 8 + 7, commit TBD | — | registered | |
+| EXP-002 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 5×3, both H2 arms | 15 cells (5 cols × 3), hands 8 + 7, commit `17aac45` | — | running (h1 launched 2026-08-07) | |
 | EXP-003 | 2026-08-05 | — | 1 | Endgame subtree cost at `k = 3…8` on the 5×5: does searching beat storing? | 25 cells, hands 13 + 12; 200 sampled positions per `k`, with and without TT; commit `4a081d8` | 1 | **complete** | **`k* > 8`.** Median nodes to prove one position: k=5 **480**, k=8 **806,474** — against a `k ≤ 5` database of ~1.2 × 10¹⁵ positions (~150 TB). Rule fires "build no database" at every registered `k`. Prediction `k* ≥ 6` **held**. → adr-012 **Option B**. [`results/exp003.json`](../results/exp003.json), [`results/exp003-tail.json`](../results/exp003-tail.json), analysis `scripts/exp003_analysis.py` |
 | EXP-004 | 2026-08-05 | — | 1 | Real compressibility of a solved layer: raw / block-RLE / block-Zstd / logic-minimized | 3×3 and 5×3 layers from EXP-001/EXP-002 | — | blocked on EXP-001 | |
 | EXP-005 | 2026-08-05 | — | 1 | Don't-care yield and adr-010 V1 reachability gap, per layer | 5×3, 15 cells, hands 8 + 7 | — | registered | |
@@ -119,6 +119,57 @@ Three ways out, undecided as of 2026-08-05:
 Recommended: measure (2) first, and amend under (1) only if the coverage is
 still far from "every position". An amendment informed by a number beats one
 made for convenience.
+
+#### Amendment (2026-08-07) — option (2) measured, and it exposed an instrument defect
+
+Option (2) was run: `pypy scripts/exp001_solve_3x3.py --arm h1 --no-prune
+--no-write`, unpruned forward pass, on commit `17aac45`.
+
+**Coverage rose from 3.4% to 46.2%** — 328,884 of 711,963 configurations —
+at 314,387,787 nodes and 1,286 s forward (sweep 94.7 s under PyPy, against
+379 s under CPython). The value was again **P1 wins** and the sweep's checksum
+was again `9a16d65a…`, byte-identical to the pruned run: **no table, no value,
+and no earlier result is affected by anything below.**
+
+**What broke.** The run printed `DISAGREE`. Every reported problem read
+`an UPPER bound of 1 is not extremal`, and **not one was a value mismatch**.
+That is `check_v3`'s own precondition guard firing, not the two solvers
+disagreeing.
+
+**Mechanism, read from the source rather than inferred from the symptom.**
+`Solver.prune=False` disabled the beta cutoff but left the window narrowing in
+place: children were still searched at `(-beta, -alpha)` (`solver/minimax.py`,
+the `_negamax` child call). Without a cutoff, `alpha` reaches `WIN` and the
+remaining children are searched at `alpha == beta`; two plies down a node is
+entered with `alpha = WIN`, and if its value is `WIN` then `value <= alpha`
+flags it **UPPER of WIN** — an upper bound on the maximum, which constrains
+nothing. V3 correctly refuses to compare a vacuous bound, so those entries were
+counted as problems and skipped. The guard did exactly what its docstring said
+it was for.
+
+**Fix.** `prune=False` now also stops the narrowing: every node is searched at
+`(LOSS, WIN)`. `prune=True` is untouched and byte-identical, so EXP-002 (whose
+V4 uses the pruned solver) is unaffected. Every stored bound is then extremal
+again — UPPER of `LOSS` or LOWER of `WIN` — which is the invariant V3 reads the
+table on.
+
+**Probe.** `tests/test_minimax.py::test_unpruned_stores_only_extremal_bounds`
+asserts the invariant directly on an unpruned solve, and
+`test_unpruned_reaches_more_positions_than_pruned` pins the reason the mode
+exists. The first fails on the pre-fix code, which is the point — a probe that
+passes either way would have proved nothing.
+
+**Recovery.** Nothing to heal: the sweep side never ran through the defect and
+the checksums match, so the only affected unit is the unpruned forward pass
+itself, which is deterministic and simply re-runs. The measured 46.2% is a
+**lower bound** on what the fixed run will compare, since the discarded entries
+become comparable.
+
+**The adr-010 V3 decision stays open** pending the re-run. 46.2% is already an
+order of magnitude better than 3.4% and still not "every position", so option
+(1) — amending V3 to read "every position the forward search visits" — remains
+the likely landing place. It should be decided on the fixed number, not this
+one.
 
 ### EXP-002 — 5×3 exhaustive solve, both arms
 
@@ -313,6 +364,34 @@ guard caught it on first execution.
   inequality voids the run, or (b) a **one-sided measurement**
   `count_enum ≤ count_formula`, in which case it is not a gate. This experiment
   supplies the calibration for (b).
+
+#### Amendment (2026-08-07) — the calibration clause's premise is now closed
+
+The adr-010 **Phase 3 amendment took option (a)**: V1 is exact per-layer
+equality against the configuration space, a genuine `perft`, and EXP-001 passed
+it exactly on both arms. So the clause above no longer describes an open choice.
+What survives of it is the *measurement*, which is this experiment's own
+objective and is unchanged: the closed form and the reachable set are different
+quantities, V1 gates the first, and EXP-005 measures the second. The 2× figure
+at `t = 1` stays as the calibration anchor — it is now pinned as a test rather
+than a note (`tests/test_reachable.py::test_layer_one_is_exactly_half`).
+
+**Instrument** (written 2026-08-07, before the run, on commit `17aac45` plus
+`solver/reachable.py`): predecessors are counted **forward**, not by inverting
+the flip rule. The pass walks every configuration of layer `t-1`, generates
+every legal move with the machinery `solver/packed_sweep.py` already uses, and
+marks the successor's bit; what stays unmarked has no predecessor by
+construction. Inverting the rule would have been a second hand-written statement
+of it, which is exactly what adr-010 V3 exists to prevent. One bit per
+configuration, one layer resident: the 5×3's largest layer is 5.02 × 10⁹
+configurations, so **628 MB** peak.
+
+Unlike the sweep, this must not stop at the first successor — a short-circuit
+would undercount predecessors and inflate the orphan count — so the loop is
+written out rather than shared, and
+`tests/test_reachable.py::test_marking_matches_the_reference_move_generation`
+checks the marked set against `legal_moves`/`apply_move`/`LayerIndex` on every
+layer of both 5×1 arms.
 
 ### EXP-006 — exact ground truth on the shipped 5×5, for H3
 
