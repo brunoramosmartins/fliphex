@@ -273,8 +273,30 @@ class PackedSweep:
             return values
         return bytearray((values[i >> 2] >> ((i & 3) << 1)) & 3 for i in range(size))
 
-    def sweep(self, keep: dict[int, bytearray] | None = None) -> RetrogradeResult:
-        """Run the whole sweep, top layer to opening position."""
+    def get(self, values: bytearray, index: int) -> int:
+        """Read one slot, whatever the bit width."""
+        if self.bits == 8:
+            return values[index]
+        return (values[index >> 2] >> ((index & 3) << 1)) & 3
+
+    def sweep(
+        self,
+        keep: dict[int, bytearray] | None = None,
+        observer=None,
+    ) -> RetrogradeResult:
+        """Run the whole sweep, top layer to opening position.
+
+        Args:
+            keep: Retain every layer, widened to one byte per entry. Fine for
+                the 3×3 (712 kB); **out of the question for the 5×3**, where the
+                widened tables total 17.5 GB.
+            observer: Called ``observer(t, values, self)`` as each layer
+                completes, while that layer is still resident. This is how a
+                long sweep gets verified without keeping it: a sampler can read
+                what it needs and let the layer go. It is the only way V4 and V6
+                are affordable on a board whose database never exists all at
+                once.
+        """
         stats = SweepStats()
         n = self.n
         full = (1 << n) - 1
@@ -304,6 +326,8 @@ class PackedSweep:
                 stats.terminal_wins += 1
         if keep is not None:
             keep[n] = self.unpack(values, terminal_size)
+        if observer is not None:
+            observer(n, values, self)
 
         for t in range(n - 1, -1, -1):
             layer_size = self.layer_size(t)
@@ -376,6 +400,8 @@ class PackedSweep:
             values = current
             if keep is not None:
                 keep[t] = self.unpack(values, layer_size)
+            if observer is not None:
+                observer(t, values, self)
 
         opening = values[0] & 3 if packed else values[0]
         if opening == SLOT_UNSET:
