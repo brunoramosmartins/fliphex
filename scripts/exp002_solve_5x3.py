@@ -80,6 +80,10 @@ class Checks:
     v4_per_layer: int
     v6_per_layer: int
     seed: int
+    #: Print a line per layer. A 5×3 arm runs for the better part of a day and
+    #: the summary only prints at the end, so without this the log is empty for
+    #: hours and there is no way to tell a slow sweep from a hung one.
+    progress: bool = True
 
     digest: object = field(default_factory=hashlib.sha256)
     layer_counts: dict[int, int] = field(default_factory=dict)
@@ -95,6 +99,7 @@ class Checks:
         board = self.variant.board()
         self.mirror = _mirror_permutation(board)
         self.chiral_tile = TILE_INDEX[CHIRAL]
+        self._started = self._last = time.perf_counter()
 
     # -- called once per layer, while `values` is still in memory -------------
 
@@ -113,6 +118,15 @@ class Checks:
             self.v4_samples.append((t, index, sweep.get(values, index)))
 
         self._mirror_check(t, values, sweep, size)
+
+        if self.progress:
+            now = time.perf_counter()
+            print(
+                f"    layer {t:2d}  {size:>15,} configs  "
+                f"{now - self._last:7.1f}s  ({now - self._started:,.0f}s total)",
+                flush=True,
+            )
+            self._last = now
 
     def _mirror_check(self, t, values, sweep, size) -> None:
         """A configuration and its mirror image must share a value.
@@ -234,7 +248,10 @@ def main() -> int:
 
     print(f"  === EXP-002 — {variant.name}, {variant.n_cells} cells, hands {hands} ===")
     print(f"  {total:,} configurations, {args.bits} bits/entry, seed {args.seed}")
-    print(f"  interpreter: {sys.implementation.name} {sys.version.split()[0]}")
+    print(
+        f"  interpreter: {sys.implementation.name} {sys.version.split()[0]}",
+        flush=True,
+    )
 
     checks = Checks(variant, args.v4_per_layer, args.v6_per_layer, args.seed)
     started = time.perf_counter()

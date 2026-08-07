@@ -171,6 +171,40 @@ order of magnitude better than 3.4% and still not "every position", so option
 the likely landing place. It should be decided on the fixed number, not this
 one.
 
+#### Amendment (2026-08-07) — the fixed re-run, and what the residue actually is
+
+Re-run on commit `a1a7eb1` (the window fix), h1 arm, PyPy:
+`data/subgame-solutions/3x3-h1-unpruned.json`.
+
+| | pruned | unpruned, pre-fix | unpruned, fixed |
+|---|---|---|---|
+| compared | 24,460 (3.4%) | 328,884 (46.2%) | **604,347 (84.9%)** |
+| outcome | agree | DISAGREE (the guard) | **agree** |
+| forward nodes | 115,615 | 314,387,787 | 307,340,818 |
+| sweep / forward | 379 s / 2.4 s | 94.7 s / 1,286.1 s | 116.5 s / 1,438.6 s |
+
+Fewer nodes than the pre-fix unpruned run, which is the expected direction: with
+a single window every stored bound applies at every probe, so the table cuts more
+often. `V0`, `V1`, `V2`, `V5` unchanged; checksum still `9a16d65a…`; the
+principal variation is the same line.
+
+**The remaining 15.1% is not a shortfall in V3.** An unpruned search with a
+transposition table visits every position **reachable from the opening**, once.
+What it does not compare are configurations no game ever reaches — which is
+precisely the quantity EXP-005 measures. So the three options recorded on
+2026-08-05 were framed on a false premise: option (1) is not a weakening of
+adr-010 but the *correct* statement of what V3 can mean, and under it 84.9%
+would be 100% of what exists to compare.
+
+**Held open pending one cheap number.** EXP-005 on the 3×3 gives the
+unreachable-configuration floor for this exact board. Orphans are a lower bound
+on unreachability — a configuration whose only predecessors are themselves
+unreachable is also unvisitable and the one-step test misses it — so the
+prediction is **≤ 15.1%**, and the closer it lands the more the amendment carries
+itself. The adr-010 V3 amendment is drafted only after that number exists; an
+amendment argued from a number beats one argued from a plausible story about a
+number.
+
 ### EXP-002 — 5×3 exhaustive solve, both arms
 
 - **Objective.** The exact game value of the 5×3 variant. This is the
