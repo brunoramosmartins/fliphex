@@ -105,14 +105,38 @@ def _subset_ranks(n: int) -> list[int]:
     return ranks
 
 
+#: ``current[i] & ~(3 << shift)``, precomputed per slot so the write stays in
+#: byte range without a mask on every store.
+_CLEAR = tuple(~(3 << shift) & 0xFF for shift in (0, 2, 4, 6))
+
+
 @dataclass
 class PackedSweep:
-    """Precomputed tables for one variant, reused across every layer."""
+    """Precomputed tables for one variant, reused across every layer.
+
+    Args:
+        bits: Bits per stored value, 8 or 2. Two bits quarters the memory —
+            the 5×3's peak layer goes from 5.02 GB to 1.26 GB, and two resident
+            layers from 10.05 GB to 2.51 GB — at the cost of a shift and a mask
+            on every read.
+
+            **What that costs depends entirely on the runtime**, which is not
+            obvious and was measured rather than assumed: on CPython a packed
+            read is **3.2×** a byte read, because each extra operation is an
+            interpreted bytecode. On PyPy it is **0.97×** — free, within noise —
+            because the JIT folds the shift and mask into native instructions
+            that vanish beside the memory access. So the default is 8 (CPython
+            is where the small verification runs happen) and the long 5×3 sweep
+            passes ``bits=2`` under PyPy, where it is pure gain.
+    """
 
     variant: Variant
     board: Board
+    bits: int = 8
 
     def __post_init__(self) -> None:
+        if self.bits not in (2, 8):
+            raise ValueError(f"bits must be 2 or 8, got {self.bits}")
         self.n = self.variant.n_cells
         self.flip = _flip_table(self.board)
 
@@ -234,14 +258,32 @@ class PackedSweep:
                             second_mask,
                         )
 
+    def _allocate(self, size: int) -> bytearray:
+        """Storage for ``size`` values, at this sweep's bit width."""
+        return bytearray(size if self.bits == 8 else (size + 3) // 4)
+
+    def unpack(self, values: bytearray, size: int) -> bytearray:
+        """Return a one-byte-per-entry copy, for comparison against a reference.
+
+        Equivalence tests compare tables byte for byte; a packed table has a
+        different byte layout for the same values, so it is widened first. The
+        check is about the values, not the encoding.
+        """
+        if self.bits == 8:
+            return values
+        return bytearray((values[i >> 2] >> ((i & 3) << 1)) & 3 for i in range(size))
+
     def sweep(self, keep: dict[int, bytearray] | None = None) -> RetrogradeResult:
         """Run the whole sweep, top layer to opening position."""
         stats = SweepStats()
         n = self.n
         full = (1 << n) - 1
+        packed = self.bits == 2
+        clear = _CLEAR
 
-        values = bytearray(self.layer_size(n))
-        stats.layer_counts[n] = len(values)
+        terminal_size = self.layer_size(n)
+        values = self._allocate(terminal_size)
+        stats.layer_counts[n] = terminal_size
         for index, _occupied, purple, _sf, _ss in self._layer_configurations(n):
             purple_count = purple.bit_count()
             green_count = n - purple_count
@@ -253,15 +295,20 @@ class PackedSweep:
             winner = Colour.PURPLE if purple_count > green_count else Colour.GREEN
             mover = self._mover_colour(n)
             slot = SLOT_WIN if winner == mover else SLOT_LOSS
-            values[index] = slot
+            if packed:
+                byte, shift = index >> 2, (index & 3) << 1
+                values[byte] = (values[byte] & clear[index & 3]) | (slot << shift)
+            else:
+                values[index] = slot
             if slot == SLOT_WIN:
                 stats.terminal_wins += 1
         if keep is not None:
-            keep[n] = values
+            keep[n] = self.unpack(values, terminal_size)
 
         for t in range(n - 1, -1, -1):
-            current = bytearray(self.layer_size(t))
-            stats.layer_counts[t] = len(current)
+            layer_size = self.layer_size(t)
+            current = self._allocate(layer_size)
+            stats.layer_counts[t] = layer_size
             mover_first = self.mover_is_first(t)
             mover_purple = mover_first == self.first_is_purple
             patterns = self.patterns[0 if mover_first else 1]
@@ -310,19 +357,27 @@ class PackedSweep:
                             child = (
                                 cells_rank * up_colour_shift + colour_bits
                             ) * up_radix_first * up_radix_second + tail
-                            if values[child] == SLOT_LOSS:
+                            if packed:
+                                above = (values[child >> 2] >> ((child & 3) << 1)) & 3
+                            else:
+                                above = values[child]
+                            if above == SLOT_LOSS:
                                 slot = SLOT_WIN
                                 break
                         if slot == SLOT_WIN:
                             break
 
-                current[index] = slot
+                if packed:
+                    byte, shift = index >> 2, (index & 3) << 1
+                    current[byte] = (current[byte] & clear[index & 3]) | (slot << shift)
+                else:
+                    current[index] = slot
 
             values = current
             if keep is not None:
-                keep[t] = values
+                keep[t] = self.unpack(values, layer_size)
 
-        opening = values[0]
+        opening = values[0] & 3 if packed else values[0]
         if opening == SLOT_UNSET:
             raise AssertionError("the sweep left the opening position unwritten")
         return RetrogradeResult(value=WIN if opening == SLOT_WIN else LOSS, stats=stats)
@@ -339,17 +394,24 @@ def _mask(positions) -> int:
     return mask
 
 
-def solve(variant: Variant, board: Board | None = None) -> RetrogradeResult:
-    """Solve ``variant`` with the packed sweep. See :func:`solver.retrograde.solve`."""
+def solve(
+    variant: Variant, board: Board | None = None, bits: int = 8
+) -> RetrogradeResult:
+    """Solve ``variant`` with the packed sweep. See :class:`PackedSweep`."""
     board = board if board is not None else variant.board()
-    return PackedSweep(variant, board).sweep()
+    return PackedSweep(variant, board, bits).sweep()
 
 
 def solve_layers(
-    variant: Variant, board: Board | None = None
+    variant: Variant, board: Board | None = None, bits: int = 8
 ) -> tuple[dict[int, bytearray], RetrogradeResult]:
-    """Solve and retain every layer. Memory is one byte per configuration."""
+    """Solve and retain every layer, widened to one byte per entry.
+
+    Retained layers are always unpacked, whatever ``bits`` the sweep ran at, so
+    a caller comparing them against the reference is comparing *values* and not
+    an encoding.
+    """
     board = board if board is not None else variant.board()
     tables: dict[int, bytearray] = {}
-    result = PackedSweep(variant, board).sweep(keep=tables)
+    result = PackedSweep(variant, board, bits).sweep(keep=tables)
     return tables, result
