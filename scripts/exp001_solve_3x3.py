@@ -129,7 +129,9 @@ def principal_variation(variant: Variant, board, tt: TranspositionTable) -> list
     return out
 
 
-def run(variant: Variant, out_dir: Path | None, prune: bool = True) -> dict:
+def run(
+    variant: Variant, out_dir: Path | None, prune: bool = True, tt_bits: int = 21
+) -> dict:
     board = variant.board()
     hands = "+".join(str(len(hand)) for hand in variant.deck_names())
     print(f"\n  === {variant.name} — {variant.n_cells} cells, hands {hands} ===")
@@ -144,7 +146,7 @@ def run(variant: Variant, out_dir: Path | None, prune: bool = True) -> dict:
         f"  forward alpha-beta (game tree, from the opening) — {mode} ...", flush=True
     )
     started = time.perf_counter()
-    tt = TranspositionTable(1 << 21, verify=True)
+    tt = TranspositionTable(1 << tt_bits, verify=True)
     forward = Solver(board, tt=tt, prune=prune).solve(variant.initial_state())
     forward_seconds = time.perf_counter() - started
 
@@ -175,6 +177,16 @@ def run(variant: Variant, out_dir: Path | None, prune: bool = True) -> dict:
         f"    V3 two methods ........ {compared:,} of {total_configs:,} "
         f"({coverage:.1f}%) compared, "
         f"{'agree' if not v3 and roots_agree else 'DISAGREE'}"
+    )
+    # The comparison reads surviving table entries, so coverage is capped by
+    # what the table *retained*, not by what the search visited: the table is
+    # direct-indexed (`zobrist & mask`, one entry per slot), so at this load
+    # colliding positions overwrite each other before V3 ever sees them.
+    # Reported alongside the coverage because otherwise the shortfall reads as
+    # a property of the game rather than of the instrument.
+    print(
+        f"    ^ table ............... 2^{tt_bits} slots, "
+        f"{tt.load:.1%} occupied, {tt.replacements:,} replacements"
     )
     for problem in v3[:5]:
         print(f"       {problem}")
@@ -208,6 +220,9 @@ def run(variant: Variant, out_dir: Path | None, prune: bool = True) -> dict:
                 "configurations_total": total_configs,
                 "coverage_percent": round(coverage, 3),
                 "forward_pruning": forward.stats.pruning,
+                "tt_capacity": tt.capacity,
+                "tt_occupied": len(tt),
+                "tt_replacements": tt.replacements,
                 "roots_agree": roots_agree,
                 "passed": not v3 and roots_agree,
                 "problems": v3[:20],
@@ -247,11 +262,25 @@ def main() -> int:
         "left' to 'every position reachable from the opening'. Slower, and the "
         "artefact records which mode produced it.",
     )
+    p.add_argument(
+        "--tt-bits",
+        type=int,
+        default=21,
+        help="log2 of the transposition table's slot count (default 21). V3 "
+        "compares surviving table entries, and the table is direct-indexed, so "
+        "coverage is capped by retention rather than by what the search "
+        "visited. Raising this raises coverage without changing any value.",
+    )
     args = p.parse_args()
 
     arms = [Arm.H1, Arm.H2] if args.arm == "both" else [Arm(args.arm)]
     results = [
-        run(Variant(3, 3, arm), None if args.no_write else args.out, not args.no_prune)
+        run(
+            Variant(3, 3, arm),
+            None if args.no_write else args.out,
+            not args.no_prune,
+            args.tt_bits,
+        )
         for arm in arms
     ]
 

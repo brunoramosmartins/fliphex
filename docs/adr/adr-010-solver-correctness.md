@@ -221,6 +221,52 @@ pre-run red-team rather than by a run.
 
 No 4×4 result may be cited under this ADR.
 
+## Amendment — V3's denominator (2026-08-07)
+
+**V3 was not achievable as written.** It required the two methods to agree on
+"the game-theoretic value of **every position**". No forward search can meet
+that, for a reason that is structural rather than budgetary: a configuration with
+**no legal predecessor** is never a node in any game tree, so there is no forward
+value in existence to compare against. The retrograde sweep computes a value for
+it — the recurrence is total over the configuration space — and the forward
+search correctly never produces one. Under the original wording, a run in which
+both solvers were entirely correct still failed V3.
+
+That defect stayed hidden while a second, unrelated one dominated the number.
+EXP-001's first runs reported 3.4% coverage, then 84.9%, and both figures were
+read as facts about the game. They were facts about the **instrument**: V3
+compares surviving transposition-table entries, and the table is direct-indexed
+(`zobrist & mask`, one entry per slot), so at high load colliding positions
+overwrite each other before V3 ever reads them. Coverage was bounded by
+*retention*, not by what the search visited.
+
+**V3 is restated as:** the two methods must agree on **every position the forward
+search reaches**, with the search **unpruned** and the table **sized so that
+retention is not the binding constraint**. A run reports three numbers, not one:
+configurations compared, the unreachable floor (EXP-005), and the table's
+occupancy — so that any shortfall is *attributable* rather than merely disclosed.
+
+Measured on the 3×3 h1 arm, commit `a1a7eb1`, with `--tt-bits 24`:
+
+| | configurations | share |
+|---|---|---|
+| configuration space | 711,963 | 100% |
+| no legal predecessor — never a tree node | 23,371 | 3.28% |
+| **reachable, so comparable at all** | **688,592** | **96.72%** |
+| compared, values agreeing on all | 679,202 | **98.64% of reachable** |
+| residue, entries lost to table collisions | 9,390 | 1.36% of reachable |
+
+The residue moves with table size alone and with nothing else: the same run at
+`--tt-bits 21` compared 604,347. That is what makes it attributable.
+
+**This is not the weakening that was on the table.** The option recorded in
+`experiments/registry.md` on 2026-08-05 was to restate V3 as "every position the
+forward search visits" and accept whatever pruning left — which was **3.4%**.
+This amendment instead *raises* the bar: it mandates the unpruned search, mandates
+a table that is not the constraint, and requires the unreachable floor to be
+measured independently rather than assumed. The 96.72% ceiling is not an
+allowance the solver grants itself; it comes from EXP-005, which can falsify it.
+
 ## Alternatives considered
 
 **Trust a single clean run.** The default, and the position the ADR exists to

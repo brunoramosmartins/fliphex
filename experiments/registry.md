@@ -205,6 +205,52 @@ itself. The adr-010 V3 amendment is drafted only after that number exists; an
 amendment argued from a number beats one argued from a plausible story about a
 number.
 
+#### Amendment (2026-08-07, later) — the prediction failed, and the residue was the instrument
+
+EXP-005 on the 3×3 returned **3.28%** orphans (23,371 of 711,963), not the
+≈15.1% predicted above. The prediction is recorded as failed rather than
+adjusted: orphans account for less than a quarter of the V3 residue, so
+"the missing 15.1% are unreachable" was **wrong**.
+
+Reading the source instead of the model: `check_v3` iterates `tt._slots`, and
+`TranspositionTable` is direct-indexed — `self._slots[state.zobrist & self._mask]`,
+one entry per slot, replace on collision. So "positions compared" is the count of
+**surviving table entries**, capped by retention rather than by what the search
+visited. At 2²¹ slots against ~7 × 10⁵ positions, collision loss is of the order
+of the residue.
+
+**Discriminating run, predicted before it was launched.** Re-run at `--tt-bits 24`.
+Prediction band 94.8–97.9%, with a hard falsifier: EXP-005 puts a ceiling of
+**96.72%** on any search, so a coverage *above* it would mean orphans were being
+probed — impossible by definition — and would indict one of the two instruments.
+
+**Result: 679,202 of 711,963 = 95.4%, values agreeing.** Inside the band, below
+the ceiling; the falsifier did not fire, and the two instruments are mutually
+consistent.
+
+| | configurations | % of total | % of reachable |
+|---|---|---|---|
+| total | 711,963 | 100% | |
+| orphans (never probeable) | 23,371 | 3.28% | |
+| **reachable ceiling** | 688,592 | 96.72% | 100% |
+| compared at 2²¹ | 604,347 | 84.9% | 87.8% |
+| **compared at 2²⁴** | **679,202** | **95.4%** | **98.64%** |
+
+The 4.6% not compared decomposes into 3.28 points of unreachability and 1.36
+points of collision loss. Neither is a failure of V3.
+
+**Decision taken.** adr-010 V3 amended 2026-08-07 — "every position the forward
+search reaches, unpruned, with the table sized so retention is not the binding
+constraint", reported as three numbers. Options 2 and 3 of 2026-08-05 are closed;
+option 1 is superseded, since it would have accepted the 3.4% pruned figure.
+
+**Instrument changes.** `scripts/exp001_solve_3x3.py` gained `--tt-bits` and now
+reports table occupancy and replacements beside the coverage — without them the
+shortfall reads as a property of the game rather than of the table, which is
+exactly the misreading that occurred. The artefact carries `tt_capacity`,
+`tt_occupied` and `tt_replacements`, so a stored run identifies its own table
+regardless of filename.
+
 ### EXP-002 — 5×3 exhaustive solve, both arms
 
 - **Objective.** The exact game value of the 5×3 variant. This is the
