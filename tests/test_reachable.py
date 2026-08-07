@@ -117,3 +117,97 @@ def test_every_layer_has_something_reachable():
     reach = Reachability(variant)
     for t in range(1, variant.n_cells + 1):
         assert reach.layer(t).with_predecessor > 0, f"layer {t} marked nothing"
+
+
+# -- the transitive closure is a different quantity ---------------------------
+
+
+def reference_closure(variant) -> dict[int, set[int]]:
+    """Breadth-first over the actual game, through ``legal_moves``.
+
+    The independent definition of "reachable": states an actual sequence of
+    legal moves produces, collected by playing them. No index arithmetic and no
+    bitsets, so agreement is evidence rather than a restatement.
+    """
+    board = variant.board()
+    marked = {0: {0}}
+    frontier = [variant.initial_state()]
+    for t in range(1, variant.n_cells + 1):
+        above = LayerIndex(variant, t)
+        seen, nxt = set(), []
+        for state in frontier:
+            for move in legal_moves(board, state):
+                child = apply_move(board, state, move)
+                index = above.encode(child)
+                if index not in seen:
+                    seen.add(index)
+                    nxt.append(child)
+        marked[t] = seen
+        frontier = nxt
+    return marked
+
+
+@pytest.mark.parametrize("variant", SMALL)
+def test_closure_matches_playing_the_game(variant):
+    expected = reference_closure(variant)
+    result = Reachability(variant).closure()
+    for layer in result.layers:
+        assert layer.reachable == len(expected[layer.t]), f"layer {layer.t} differs"
+
+
+@pytest.mark.parametrize("variant", SMALL)
+def test_closure_is_a_subset_of_one_step_reachable(variant):
+    """Never a superset — that ordering is the whole reason EXP-007 exists.
+
+    A configuration whose every predecessor is itself unreachable passes the
+    one-step test and is still unvisitable, so the closure can only shrink the
+    reachable set. If this ever inverted, the closure would be expanding from
+    configurations it had not marked.
+    """
+    reach = Reachability(variant)
+    one_step = reach.run()
+    closure = reach.closure()
+    for a, b in zip(one_step.layers, closure.layers):
+        assert b.reachable <= a.with_predecessor, f"layer {a.t}"
+
+
+def test_closure_layer_zero_is_the_opening_alone():
+    result = Reachability(Variant(5, 1)).closure()
+    assert result.layers[0].total == 1
+    assert result.layers[0].reachable == 1
+    assert result.layers[0].unreachable == 0
+
+
+# -- the counting identity behind the EXP-005 amendment -----------------------
+
+
+@pytest.mark.parametrize("variant", SMALL)
+def test_one_step_orphans_are_exactly_a_2_to_the_minus_t_share(variant):
+    """``orphans(t) = layer_size(t) / 2**t``, exactly, at every layer.
+
+    A configuration has no legal predecessor precisely when every occupied cell
+    carries the colour of the player who did *not* just move: the last-placed
+    cell always shows its placer's colour, since a tile's own arrows never point
+    at the cell it occupies. That is one colouring out of ``2**t`` under each
+    (cell-set, hand-state) pair.
+
+    This is what makes EXP-005's registered quantity a counting identity rather
+    than a fact about FLIPHEX — it does not depend on the arrow patterns, which
+    is why both 3×3 arms returned identical counts despite different decks. The
+    identity is pinned here on the boards where a run is affordable; the 3×3
+    confirmation lives in the registry, not in the suite.
+    """
+    for layer in Reachability(variant).run().layers[1:]:
+        assert layer.orphans * 2**layer.t == layer.total, f"layer {layer.t}"
+
+
+@pytest.mark.parametrize("variant", SMALL)
+def test_the_closure_does_not_obey_that_identity(variant):
+    """If it did, the closure would be measuring one-step-back again.
+
+    The registry records this as EXP-007's falsifier, so it is checked rather
+    than trusted: the two instruments must be able to disagree, and on these
+    boards they do.
+    """
+    layers = Reachability(variant).closure().layers[1:]
+    assert any(layer.unreachable * 2**layer.t != layer.total for layer in layers)

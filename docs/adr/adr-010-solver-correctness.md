@@ -251,13 +251,31 @@ Measured on the 3×3 h1 arm, commit `a1a7eb1`, with `--tt-bits 24`:
 | | configurations | share |
 |---|---|---|
 | configuration space | 711,963 | 100% |
-| no legal predecessor — never a tree node | 23,371 | 3.28% |
-| **reachable, so comparable at all** | **688,592** | **96.72%** |
-| compared, values agreeing on all | 679,202 | **98.64% of reachable** |
-| residue, entries lost to table collisions | 9,390 | 1.36% of reachable |
+| unreachable from the opening (EXP-007, exact) | 27,860 | 3.91% |
+| **reachable, so comparable at all** | **684,103** | **96.09%** |
+| **compared, values agreeing on all** | **679,202** | **99.28% of reachable** |
+| residue, bounded by table replacements | 4,901 | 0.72% of reachable |
 
-The residue moves with table size alone and with nothing else: the same run at
-`--tt-bits 21` compared 604,347. That is what makes it attributable.
+The three numbers V3 now reports are what makes that decomposition possible. The
+denominator is **EXP-007's** transitive closure, not EXP-005's one-step count:
+the two differ here by 4,489 configurations, because a configuration whose every
+predecessor is itself unreachable passes the one-step test and is still
+unvisitable. Using the one-step ceiling would understate unreachability and so
+overstate the residue — which is what an earlier draft of this amendment did,
+quoting `≥ 6,090 never visited` and `≥ 4.14% unreachable` before the closure was
+measured. The exact figures above supersede those.
+
+Against the positions the search actually reached, agreement is **99.28%**, and
+the residue is bounded by the 3,300 replacements the run prints plus the 512
+terminal configurations the search never stores (`_negamax` returns from a
+terminal before reaching `store`). It is bounded by numbers the run reports, not
+by an argument.
+
+Table size is not a free parameter to be tuned until the number looks good; it is
+constrained in the reported direction. At `--tt-bits 21` the same run compared
+604,347 and spent 307,340,818 nodes; at `--tt-bits 24`, 679,202 and 26,287,459 —
+**11.7× fewer nodes**, because a thrashing table forces re-search of subtrees it
+has already proved.
 
 **This is not the weakening that was on the table.** The option recorded in
 `experiments/registry.md` on 2026-08-05 was to restate V3 as "every position the

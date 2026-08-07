@@ -236,8 +236,36 @@ consistent.
 | compared at 2²¹ | 604,347 | 84.9% | 87.8% |
 | **compared at 2²⁴** | **679,202** | **95.4%** | **98.64%** |
 
-The 4.6% not compared decomposes into 3.28 points of unreachability and 1.36
-points of collision loss. Neither is a failure of V3.
+**Correction, twice.** The decomposition first written here — 3.28 points
+unreachable, 1.36 points collision loss — was wrong on the second term: the 2²⁴
+run reported **3,300 replacements**, so collisions cannot account for 9,390
+configurations. The repair written next — "≥ 6,090 never visited, so true
+unreachability is ≥ 4.14%" — was also wrong, because it measured the gap against
+the *one-step* ceiling. Both are superseded by EXP-007's exact closure, computed
+the same evening:
+
+| | configurations | share |
+|---|---|---|
+| configuration space | 711,963 | 100% |
+| unreachable from the opening (exact) | 27,860 | 3.91% |
+| **reachable** | 684,103 | 96.09% |
+| **compared** | 679,202 | **99.28% of reachable** |
+| residue | 4,901 | 0.72% of reachable |
+
+The residue is bounded by the 3,300 replacements plus the 512 terminal
+configurations the forward search never stores — `_negamax` returns from a
+terminal before reaching `store`, so terminals are structurally absent from the
+table and cannot be compared by V3 at all.
+
+Both wrong numbers are kept above rather than deleted. The pattern in them is
+the lesson: each was a plausible arithmetic on a ceiling that had not been
+measured, and each survived until an instrument was built to measure it.
+
+**Side effect worth recording.** Node count fell from 307,340,818 at 2²¹ to
+26,287,459 at 2²⁴ — **11.7×** — for the same values and the same checksum. A
+thrashing table does not merely lose entries for V3 to read; it forces the search
+to re-prove subtrees it had already proved. The forward pass went from 1,438.6 s
+to 121.6 s.
 
 **Decision taken.** adr-010 V3 amended 2026-08-07 — "every position the forward
 search reaches, unpruned, with the table sized so retention is not the binding
@@ -499,6 +527,86 @@ the 5×1 (1,023 configurations, not the registered board, **no verdict**): 14.76
 orphans overall, 50.0% at `t = 1` falling monotonically to 3.1% at the terminal
 layer. Recorded as an expectation-setter, not as evidence: 5 cells is not 15, and
 the shape of that curve is exactly what a real measurement could overturn.
+
+#### Amendment (2026-08-07, evening) — the measurement is a counting identity
+
+Both 3×3 arms returned **identical** orphan counts at every layer — 45, 720,
+3,360, 7,560, 7,560, 3,360, 720, 45, 1 — despite differing in their fifth
+archetype (`JOKER` vs `P2-skip`). That is not a coincidence, and checking it
+closed the experiment analytically:
+
+> **`orphans(t) = layer_size(t) / 2^t`, exactly**, on the 5×1 and on both 3×3
+> arms, at every layer.
+
+**Mechanism.** A configuration has no legal predecessor exactly when *every*
+occupied cell carries the colour of the player who did **not** just move. The
+last-placed cell always shows its placer's colour — a tile's own arrows never
+point at the cell it occupies — so if no cell has the right colour, no cell can
+have been the last. That is exactly 1 of the `2^t` colourings under each
+(cell-set, hand-state), hence the `2^-t`. It is the adr-010 V1 calibration note's
+`t = 1` observation generalised to every layer.
+
+**Consequences, both awkward for this experiment as registered.**
+
+1. **The 5×3 run is unnecessary for the registered number.** By the identity,
+   the answer is **60,009,757 of 17,506,580,337 = 0.3428%**. The hours-long run
+   becomes a *verification of the formula*, worth doing cheaply on small boards
+   and not worth a day of compute on the 5×3.
+2. **The quantity is an artefact of the index, not of the game.** It counts
+   colourings the mover's colour forbids — it does not depend on the arrow
+   patterns, which is why the two arms agree exactly. A don't-care yield of
+   0.34% fires the "drop" branch by an enormous margin, but for a reason that
+   says nothing about FLIPHEX.
+
+**This does not retro-fit the rule.** EXP-005's rule and threshold stand, and the
+0.3428% figure fires *drop don't-cares* once verified on the registered board.
+What changed is the assessment of how much that verdict is worth, and the answer
+is: very little on its own. The quantity adr-012 decision 7 needs is the
+transitive closure, which is registered separately as **EXP-007** rather than
+substituted in here.
+
+**Verification, not discovery.** The identity is checked as a unit test on the
+boards where it is affordable rather than by a 5×3 run.
+
+### EXP-007 — true reachable closure, and what one-step-back misses
+
+- **Objective.** The **transitive** reachable set from the opening position, per
+  layer, on the 5×3. EXP-005 counts configurations with no legal *predecessor*;
+  this counts configurations no *game* reaches. The second is the quantity
+  adr-012 decision 7 actually needs, and it is strictly larger.
+- **Hypothesis.** —
+- **Registered.** 2026-08-07, before the instrument existed, after EXP-005 on the
+  3×3 showed its own measurement to be a counting identity (see the EXP-005
+  amendment of the same date). Registered as a **new ID rather than an amendment
+  to EXP-005** deliberately: the two yields can fall on opposite sides of the 20%
+  threshold, and redefining a live experiment's measured quantity is the
+  anti-pattern adr-010 was already amended once to avoid. EXP-005 keeps its rule
+  and its number; this one gets its own.
+- **Configuration.** 5×3, 15 cells, hands 8 + 7, both arms. Forward closure by
+  layer: layer 0 is the opening; a configuration in layer `t` is marked iff some
+  legal move from a **marked** configuration in layer `t-1` produces it. One bit
+  per configuration, two layers resident — peak `5.02 × 10⁹ + 3.62 × 10⁹` bits =
+  **1.08 GB**. Deterministic and exhaustive: no seed.
+- **Decision rule, pre-committed.** The same threshold EXP-005 carries, on the
+  correct quantity: if the unreachable fraction is **under 20%**, don't-cares are
+  dropped from the adr-012 design entirely; at or above 20%, adr-012 keeps the
+  don't-care path and EXP-004 measures what it is worth after compression. The
+  rule runs on the complete 5×3 design only — not on the 3×3, not on a partial
+  run.
+- **Expected result, recorded before the instrument exists.** **Below 20%**, so
+  the expected branch is *drop don't-cares*. Basis: on the 3×3, one-step-back
+  gives 3.28% while the true figure is **≥ 4.14%** (from EXP-001's `--tt-bits 24`
+  run — at most 3,300 of the 9,390 configurations below the reachable ceiling are
+  attributable to table collisions, leaving ≥ 6,090 never visited); the closure
+  is therefore ≥ 1.26× the one-step figure there. The 5×3's one-step figure is
+  **0.3428%** by closed form. Nothing in that chain gets near 20%. **The
+  informative outcome is the opposite one** and is reported as such, not re-run.
+- **Predicted, so it can fail.** The one-step yield obeys
+  `orphans(t) = layer(t) / 2^t` exactly on the 5×1 and on both 3×3 arms. The
+  closure has no such prediction — if it also comes out at `layer(t)/2^t`, the
+  instrument is measuring one-step-back again and is wrong.
+- **Artefacts.** `results/exp007-5x3-h1.json`, `results/exp007-5x3-h2.json`,
+  written per layer so an interrupted run still reports what it finished.
 
 ### EXP-006 — exact ground truth on the shipped 5×5, for H3
 

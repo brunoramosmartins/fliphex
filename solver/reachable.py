@@ -118,8 +118,16 @@ class Reachability:
     def layer_size(self, t: int) -> int:
         return self.sweep.layer_size(t)
 
-    def predecessor_bits(self, t: int) -> bytearray:
+    def predecessor_bits(self, t: int, source: bytearray | None = None) -> bytearray:
         """Bitset over layer ``t``: set iff some layer ``t-1`` move produces it.
+
+        Args:
+            source: Restrict the expansion to layer ``t-1`` configurations whose
+                bit is set here. ``None`` expands from **every** configuration in
+                that layer, which is the one-step-back test EXP-005 registers.
+                Chaining the result forward instead — each layer expanded only
+                from what the previous layer marked — is the transitive closure
+                EXP-007 registers, and it is strictly smaller.
 
         Layer 0 is the opening position, which has no predecessor and needs
         none; it is reachable by definition and is handled by the caller.
@@ -131,9 +139,9 @@ class Reachability:
         size = sweep.layer_size(t)
         marks = bytearray((size + 7) // 8)
 
-        source = t - 1
+        below = t - 1
         full = (1 << self.n) - 1
-        mover_first = sweep.mover_is_first(source)
+        mover_first = sweep.mover_is_first(below)
         mover_purple = mover_first == sweep.first_is_purple
         patterns = sweep.patterns[0 if mover_first else 1]
         flip = sweep.flip
@@ -146,9 +154,10 @@ class Reachability:
         rank_first, rank_second = sweep.spent_ranks
         rank_cells = sweep._rank_cells  # noqa: SLF001 — same module family
 
-        for _index, occupied, purple, spent_f, spent_s in sweep._layer_configurations(  # noqa: SLF001
-            source
-        ):
+        configurations = sweep._layer_configurations(below)  # noqa: SLF001
+        for index, occupied, purple, spent_f, spent_s in configurations:
+            if source is not None and not (source[index >> 3] >> (index & 7) & 1):
+                continue
             spent = spent_f if mover_first else spent_s
 
             remaining = full & ~occupied
@@ -200,6 +209,88 @@ class Reachability:
             if observer is not None:
                 observer(layer)
         return result
+
+    # -- the transitive closure, which is a different quantity ----------------
+
+    def closure(self, observer=None) -> ClosureResult:
+        """Configurations reachable from the opening by an actual game.
+
+        Each layer is expanded only from what the previous layer marked, so a
+        configuration whose every predecessor is itself unreachable is correctly
+        left out — which is exactly what :meth:`layer` cannot see. The result is
+        therefore a subset of the one-step-reachable set, never a superset.
+
+        Two bitsets are live at a time and the older is dropped as soon as the
+        next is built, so the peak is the two largest adjacent layers: 1.08 GB
+        on the 5×3.
+        """
+        result = ClosureResult()
+
+        # Layer 0 is the opening position and nothing else.
+        marks = bytearray(b"\x01")
+        result.layers.append(ClosureLayer(t=0, total=self.layer_size(0), reachable=1))
+        if observer is not None:
+            observer(result.layers[0])
+
+        for t in range(1, self.n + 1):
+            size = self.layer_size(t)
+            marks = self.predecessor_bits(t, source=marks)
+            layer = ClosureLayer(t=t, total=size, reachable=_count(marks, size))
+            result.layers.append(layer)
+            if observer is not None:
+                observer(layer)
+        return result
+
+
+@dataclass
+class ClosureLayer:
+    """What one layer's *transitive* reachability looks like."""
+
+    t: int
+    total: int
+    reachable: int
+
+    @property
+    def unreachable(self) -> int:
+        return self.total - self.reachable
+
+    @property
+    def unreachable_fraction(self) -> float:
+        return self.unreachable / self.total if self.total else 0.0
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "layer": self.t,
+            "total": self.total,
+            "reachable": self.reachable,
+            "unreachable": self.unreachable,
+            "unreachable_fraction": round(self.unreachable_fraction, 6),
+        }
+
+
+@dataclass
+class ClosureResult:
+    layers: list[ClosureLayer] = field(default_factory=list)
+
+    @property
+    def total(self) -> int:
+        return sum(layer.total for layer in self.layers)
+
+    @property
+    def unreachable(self) -> int:
+        return sum(layer.unreachable for layer in self.layers)
+
+    @property
+    def unreachable_fraction(self) -> float:
+        return self.unreachable / self.total if self.total else 0.0
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "layers": [layer.as_dict() for layer in self.layers],
+            "total": self.total,
+            "unreachable": self.unreachable,
+            "unreachable_fraction": round(self.unreachable_fraction, 6),
+        }
 
 
 def _count(marks: bytearray, size: int) -> int:
