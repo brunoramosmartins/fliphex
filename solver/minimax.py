@@ -97,6 +97,10 @@ class SearchStats:
         tt_cutoffs: Nodes settled by the table without expanding a move.
         ordering: ``"internal"`` or ``"external"`` (adr-004 R2/R3).
         termination: ``"exhausted"`` or ``"budget"`` (adr-004 R1/R3).
+        pruning: Whether beta cutoffs were taken. A run with ``pruning=False``
+            is a different instrument, not a slower one — it visits every
+            reachable position instead of only those pruning left, which is what
+            adr-010 V3's coverage depends on.
     """
 
     nodes: int = 0
@@ -105,6 +109,7 @@ class SearchStats:
     tt_cutoffs: int = 0
     ordering: str = "internal"
     termination: str = "exhausted"
+    pruning: bool = True
 
     def as_dict(self) -> dict[str, int | str]:
         """Return the fields, for a JSON artefact header."""
@@ -115,6 +120,7 @@ class SearchStats:
             "tt_cutoffs": self.tt_cutoffs,
             "ordering": self.ordering,
             "termination": self.termination,
+            "pruning": self.pruning,
         }
 
 
@@ -151,6 +157,15 @@ class Solver:
             proof path unless the hook is itself internal to Axis 1.
         max_nodes: Node budget. ``None`` means unlimited, which is what a proof
             run uses.
+        prune: Take beta cutoffs. Turning this off does **not** change any
+            value — pruning is a speed decision, never a correctness one — but
+            it changes *which positions get visited*, from "those pruning left"
+            to "every position reachable from the root". adr-010 V3 compares the
+            forward and backward solvers position by position, and a pruned
+            search simply has no value to offer for a position it never reached,
+            so the coverage of that check is bounded by this flag. The
+            transposition table still memoises, so an unpruned run stays
+            feasible: it visits each reachable position once, not once per path.
     """
 
     def __init__(
@@ -159,12 +174,16 @@ class Solver:
         tt: TranspositionTable | None = None,
         order: Orderer | None = None,
         max_nodes: int | None = None,
+        prune: bool = True,
     ) -> None:
         self.board = board
         self.tt = tt if tt is not None else TranspositionTable()
         self.order = order
         self.max_nodes = max_nodes
-        self.stats = SearchStats(ordering="internal" if order is None else "external")
+        self.prune = prune
+        self.stats = SearchStats(
+            ordering="internal" if order is None else "external", pruning=prune
+        )
         self._killers: list[list[Move]] = [[] for _ in range(board.n_cells + 1)]
 
     # -- public ---------------------------------------------------------------
@@ -181,7 +200,8 @@ class Solver:
                 partial is returned.
         """
         self.stats = SearchStats(
-            ordering="internal" if self.order is None else "external"
+            ordering="internal" if self.order is None else "external",
+            pruning=self.prune,
         )
         self._killers = [[] for _ in range(self.board.n_cells + 1)]
         try:
@@ -251,7 +271,7 @@ class Solver:
                 best_value, best_move = score, move
             if best_value > alpha:
                 alpha = best_value
-            if alpha >= beta:
+            if self.prune and alpha >= beta:
                 self.stats.cutoffs += 1
                 self._remember_killer(state, move)
                 break

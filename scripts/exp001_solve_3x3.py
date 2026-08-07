@@ -129,7 +129,7 @@ def principal_variation(variant: Variant, board, tt: TranspositionTable) -> list
     return out
 
 
-def run(variant: Variant, out_dir: Path | None) -> dict:
+def run(variant: Variant, out_dir: Path | None, prune: bool = True) -> dict:
     board = variant.board()
     hands = "+".join(str(len(hand)) for hand in variant.deck_names())
     print(f"\n  === {variant.name} — {variant.n_cells} cells, hands {hands} ===")
@@ -139,10 +139,11 @@ def run(variant: Variant, out_dir: Path | None) -> dict:
     tables, backward = solve_layers(variant, board)
     sweep_seconds = time.perf_counter() - started
 
-    print("  forward alpha-beta (game tree, from the opening) ...", flush=True)
+    mode = "with pruning" if prune else "UNPRUNED (V3 coverage mode)"
+    print(f"  forward alpha-beta (game tree, from the opening) — {mode} ...", flush=True)
     started = time.perf_counter()
     tt = TranspositionTable(1 << 21, verify=True)
-    forward = Solver(board, tt=tt).solve(variant.initial_state())
+    forward = Solver(board, tt=tt, prune=prune).solve(variant.initial_state())
     forward_seconds = time.perf_counter() - started
 
     v1 = check_v1(variant, backward.stats.layer_counts)
@@ -167,9 +168,11 @@ def run(variant: Variant, out_dir: Path | None) -> dict:
     for problem in v1:
         print(f"       {problem}")
     print("    V2 no-draw ............ asserted on every terminal (winner() raises)")
+    coverage = 100 * compared / total_configs
     print(
-        f"    V3 two methods ........ {compared:,} of {total_configs:,} positions "
-        f"compared, {'agree' if not v3 and roots_agree else 'DISAGREE'}"
+        f"    V3 two methods ........ {compared:,} of {total_configs:,} "
+        f"({coverage:.1f}%) compared, "
+        f"{'agree' if not v3 and roots_agree else 'DISAGREE'}"
     )
     for problem in v3[:5]:
         print(f"       {problem}")
@@ -193,6 +196,7 @@ def run(variant: Variant, out_dir: Path | None) -> dict:
         "principal_variation": pv,
         "ordering": forward.stats.ordering,
         "termination": forward.stats.termination,
+        "pruning": forward.stats.pruning,
         "verification": {
             "V0_terminal_layer": {"count": terminal, "passed": v0_ok},
             "V1_layer_counts": {"passed": not v1, "problems": v1},
@@ -200,6 +204,8 @@ def run(variant: Variant, out_dir: Path | None) -> dict:
             "V3_two_methods": {
                 "positions_compared": compared,
                 "configurations_total": total_configs,
+                "coverage_percent": round(coverage, 3),
+                "forward_pruning": forward.stats.pruning,
                 "roots_agree": roots_agree,
                 "passed": not v3 and roots_agree,
                 "problems": v3[:20],
@@ -214,7 +220,8 @@ def run(variant: Variant, out_dir: Path | None) -> dict:
 
     if out_dir:
         out_dir.mkdir(parents=True, exist_ok=True)
-        path = out_dir / f"{variant.name}.json"
+        suffix = "" if forward.stats.pruning else "-unpruned"
+        path = out_dir / f"{variant.name}{suffix}.json"
         path.write_text(json.dumps(artefact, indent=2))
         print(f"    artefact -> {path}")
     return artefact
@@ -230,11 +237,20 @@ def main() -> int:
         help="artefact directory (default data/subgame-solutions)",
     )
     p.add_argument("--no-write", action="store_true", help="print only")
+    p.add_argument(
+        "--no-prune",
+        action="store_true",
+        help="run the forward pass without beta cutoffs. Values are identical "
+        "either way; what changes is V3's coverage, from 'positions pruning "
+        "left' to 'every position reachable from the opening'. Slower, and the "
+        "artefact records which mode produced it.",
+    )
     args = p.parse_args()
 
     arms = [Arm.H1, Arm.H2] if args.arm == "both" else [Arm(args.arm)]
     results = [
-        run(Variant(3, 3, arm), None if args.no_write else args.out) for arm in arms
+        run(Variant(3, 3, arm), None if args.no_write else args.out, not args.no_prune)
+        for arm in arms
     ]
 
     print()
