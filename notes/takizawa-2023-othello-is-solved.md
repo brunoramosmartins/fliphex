@@ -75,6 +75,14 @@ abstract invite that reading or guard against it? Write down what the claim does
 
 **My take.**
 
+I started this paper already expecting a **weak solution** under Allis' terminology, so the title itself did not change my expectations. For a reader unfamiliar with the game-solving literature, however, *Othello is Solved* could easily be interpreted as a strong solution, making the distinction worth stating explicitly.
+
+The main insight for me was not *what* was solved, but *how*. Before reading this paper, I still associated large solved games with the checkers route: constructing extensive retrograde endgame databases. Takizawa provides the strongest counterexample I have encountered so far. Othello shares several structural properties with FLIPHEX—irreversible piece placement, fixed game length and a hump-shaped state-space profile—yet its weak solution was obtained through a highly optimized forward alpha-beta search with transposition tables rather than by materialising a complete endgame database.
+
+This does **not** imply that FLIPHEX should avoid endgame databases. Instead, it changes the default assumption. Building one is no longer the obvious architectural choice simply because the objective is to solve the game. The precedent established here supports ADR-012's decision to postpone that choice until EXP-003 can determine whether a crossover point (`k*`) exists where retrograde storage becomes worthwhile.
+
+Finally, I found the presentation itself surprisingly instructive. The opening visualisation of the optimal line turns the weak solution into something concrete and inspectable instead of leaving it as an abstract claim. If FLIPHEX eventually reaches a comparable result, I would like its proof to include an equally clear visual certificate—whether as a principal variation, a reduced proof tree, or another reproducible witness—so that the solution is not only correct, but also understandable.
+
 **Refined write-up.**
 
 ### A2 — What is the game value, and from which position?

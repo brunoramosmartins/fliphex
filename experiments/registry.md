@@ -17,7 +17,7 @@ Freely editable (append-only in practice).
 
 | ID | Date | Hypothesis | Axis | Description | Config / commit | Seed | Status | Result |
 |---|---|---|---|---|---|---|---|---|
-| EXP-001 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 3×3, both H2 arms; adr-010 V3 double-solve | 9 cells (3×3), hands 5 + 4, commit TBD | — | registered | |
+| EXP-001 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 3×3, both H2 arms; adr-010 V3 double-solve | 9 cells (3×3), hands 5 + 4, commit `4a081d8`+ | — | **complete** | **P1 wins in both arms.** 711,963 configurations enumerated, matching the closed form **exactly at every layer** (V1). V0 512 ✓, V2 asserted on every terminal ✓, V5 checksummed ✓. V3: both methods agree on every position compared (24,460 h1 / 15,376 h2) — **but that is 2–3% of the space, not "every position"; see the V3 caveat below.** [`data/subgame-solutions/3x3-h1.json`](../data/subgame-solutions/3x3-h1.json), [`3x3-h2.json`](../data/subgame-solutions/3x3-h2.json) |
 | EXP-002 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 5×3, both H2 arms | 15 cells (5 cols × 3), hands 8 + 7, commit TBD | — | registered | |
 | EXP-003 | 2026-08-05 | — | 1 | Endgame subtree cost at `k = 3…8` on the 5×5: does searching beat storing? | 25 cells, hands 13 + 12; 200 sampled positions per `k`, with and without TT; commit `4a081d8` | 1 | **complete** | **`k* > 8`.** Median nodes to prove one position: k=5 **480**, k=8 **806,474** — against a `k ≤ 5` database of ~1.2 × 10¹⁵ positions (~150 TB). Rule fires "build no database" at every registered `k`. Prediction `k* ≥ 6` **held**. → adr-012 **Option B**. [`results/exp003.json`](../results/exp003.json), [`results/exp003-tail.json`](../results/exp003-tail.json), analysis `scripts/exp003_analysis.py` |
 | EXP-004 | 2026-08-05 | — | 1 | Real compressibility of a solved layer: raw / block-RLE / block-Zstd / logic-minimized | 3×3 and 5×3 layers from EXP-001/EXP-002 | — | blocked on EXP-001 | |
@@ -69,6 +69,56 @@ in `docs/research.md` with its reason before it can affect a verdict here.
   literal tile list of both hands, `ordering: internal | az-seeded` and
   `termination: exhausted | budget` (adr-004 R3), and the degree histogram of the
   board.
+
+#### Result (2026-08-05)
+
+**P1 wins with perfect play in both arms.** Sweep 379 s (h1) / 467 s (h2);
+forward search 2.4 s / 1.7 s over 115,615 / 78,947 nodes. The asymmetry is
+expected — enumerating 711,963 configurations is not the same shape of work as
+pruning a tree.
+
+| check | h1 | h2 |
+|---|---|---|
+| **V0** terminal layer = 2⁹ | 512 ✓ | 512 ✓ |
+| **V1** per-layer counts vs closed form | exact at every layer ✓ | exact ✓ |
+| **V2** no-draw, asserted on every terminal | ✓ | ✓ |
+| **V3** forward vs retrograde | agree on 24,460 | agree on 15,376 |
+| **V5** SHA-256 of the value tables | `9a16d65a…` | `307e99b8…` |
+
+The enumeration independently reproduced **711,963** configurations, matching
+the 7.12 × 10⁵ that adr-004 and adr-010 have carried since Phase 2 — and
+matching `scripts/layer_profile.py` layer by layer with no tolerance, which is
+what the adr-010 Phase 3 amendment turned V1 into.
+
+**This is a fixture result and is not an H1 or H2 verdict.** 9 cells is too
+cramped to carry a strategy claim (adr-004), and the pre-registered power caveat
+stands: agreement between two binary root values is at most 1 bit against a 50%
+prior, and on this board 8 of 9 cells are boundary cells, so many ordinary
+placements flip nothing and act as joker substitutes. H2 is reported from the
+criticality measure, not from the two arms agreeing. The Verdicts table in
+`docs/research.md` stays empty until Phase 5.
+
+#### ⚠ Open — V3's coverage falls short of what adr-010 asks
+
+adr-010 V3 requires the two methods to agree on the **game-theoretic value of
+every position**. This run compared **24,460 of 711,963** (3.4%) and 15,376
+(2.2%). The shortfall is not a defect in the script: alpha-beta only *visits*
+what it does not prune, so positions it never reached have no forward value to
+compare against. No amount of engineering closes that while the search prunes.
+
+Three ways out, undecided as of 2026-08-05:
+
+1. **Amend adr-010** so V3 reads "every position the forward search visits".
+   Free, honest, and weaker than the ADR promised.
+2. **Disable pruning for the V3 run.** The forward search becomes plain minimax
+   and visits far more; costs time, changes no ADR text.
+3. **Sample reachable configurations** and forward-solve each independently.
+   Covers the space uniformly rather than following what pruning left — but that
+   is sampling, which makes it V4 in substance, not V3.
+
+Recommended: measure (2) first, and amend under (1) only if the coverage is
+still far from "every position". An amendment informed by a number beats one
+made for convenience.
 
 ### EXP-002 — 5×3 exhaustive solve, both arms
 

@@ -20,6 +20,15 @@ from solver.minimax import (
     Solver,
     solve,
 )
+from solver.retrograde import (
+    SLOT_LOSS,
+    SLOT_UNSET,
+    SLOT_WIN,
+    LayerIndex,
+    RetrogradeResult,
+    SweepStats,
+)
+from solver.retrograde import solve as retrograde_solve
 from solver.transposition import Flag, NullTable, TranspositionTable
 
 __all__ = [
@@ -31,6 +40,16 @@ __all__ = [
     "SearchStats",
     "Solver",
     "solve",
+    # retrograde. Note `retrograde_solve` rather than `solve`: the two solvers
+    # answer the same question by different means (adr-010 V3) and must never be
+    # reachable under one name.
+    "LayerIndex",
+    "RetrogradeResult",
+    "SweepStats",
+    "retrograde_solve",
+    "SLOT_LOSS",
+    "SLOT_UNSET",
+    "SLOT_WIN",
     # transposition
     "Flag",
     "NullTable",
