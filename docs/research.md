@@ -46,7 +46,7 @@ argument — stated explicitly, never by narrative.
 |---|---|---|---|
 | **H1** | With perfect play the first player wins (strictly, since draws are impossible). | Exhaustive solve of the 3×3 (calibration) and **5×3 (primary strategic, [adr-011](adr/adr-011-reduced-variant-parity.md))** variants; 20-seed self-play win rate with Wilson 95% CI on the full game. | 1 + 2 |
 | **H2** | Removing the joker does not change which player holds the theoretical advantage. | Solver + self-play on a joker-less variant (exact on 3×3/5×3; per [adr-011](adr/adr-011-reduced-variant-parity.md) the contrast is what P1's extra tile is, not joker presence). | 1 + 2 |
-| **H3** | The learned policy converges to a stable win-rate across independent seeds, and agrees with the solver's exact verdict on **every member of the pre-declared comparison set**: 3×3, **5×3** ([adr-011](adr/adr-011-reduced-variant-parity.md) deck), and the 5×5 retrograde endgame layers at the largest `k` achieved **[contingent on adr-012]**. | ≥5-seed training; per-seed win rate with Wilson 95% CI and variance reported across seeds; per-variant agreement rate against Axis 1, restricted to Axis-1 artefacts satisfying [adr-004](adr/adr-004-solver-approach.md) R1 (`termination: exhausted`). | 2 |
+| **H3** | The learned policy converges to a stable win-rate across independent seeds, and agrees with the solver's exact verdict on **every member of the pre-declared comparison set**: 3×3, **5×3** ([adr-011](adr/adr-011-reduced-variant-parity.md) deck), and a pre-declared random sample of **shipped-5×5 endgame positions at `k ≤ 8` empty cells, solved exactly on demand** (`EXP-006`, registered 2026-08-05 — replaces the retrograde endgame layers, which `EXP-003` showed are not worth materialising). | ≥5-seed training; per-seed win rate with Wilson 95% CI and variance reported across seeds; per-variant agreement rate against Axis 1, restricted to Axis-1 artefacts satisfying [adr-004](adr/adr-004-solver-approach.md) R1 (`termination: exhausted`). | 2 |
 | **H4** | FLIPHEX 5×5 is out of reach on **both** complexity axes: its state space (~4.9 × 10¹⁷) exceeds every game solved by full enumeration (Nine Men's Morris 10¹¹, Awari 10¹², Connect Four 10¹⁴), and its game-tree complexity (~10⁶¹; ~10³⁰·⁵ at the Knuth–Moore minimal tree) puts it beyond the weak-solution route that carried checkers *despite* checkers' larger 5 × 10²⁰ state space. | Direct computation of both bounds; placement in the Allis/Schaeffer cross-game table. | 3 |
 | **H5** | No archetype dominates placement frequency in self-play, i.e. the 12-tile deck is well balanced. | Frequency and win-contribution analysis over the self-play database. | 2 + 3 |
 | **H6** *(optional / stretch)* | The design's balance is *robust to counterfactual variation* — the first-player advantage and joker effect hold their sign under a bounded set of design perturbations (board size 3×3→5×3→5×5; deck swaps, e.g. removing the chiral `P3-y`). | Re-run the H1/H2 verdicts against each perturbation and report whether the *direction* of the effect is preserved; exact where solvable, self-play otherwise. | 1 + 2 |
@@ -205,7 +205,35 @@ fraction of solved positions whose value changes when P1's extra tile is swapped
 — which requires the solved database to be indexed by hand. That is a constraint
 on the solver, decided before the solve.
 
-**H3's 5×5 endgame member is contingent (2026-08-05, [adr-012](adr/adr-012-endgame-database-storage.md)).**
+**H3 re-scoped: the shipped 5×5 stays in the comparison set, without a database
+(2026-08-05, `EXP-003`, authorised by [adr-012](adr/adr-012-endgame-database-storage.md)).**
+The contingency recorded below fired. `EXP-003` measured the cost of an exact
+endgame search on the shipped board and found it trivial: **480 nodes** at
+`k = 5` — the layer whose database would be ~1.2 × 10¹⁵ positions and ~150 TB —
+and 806,474 nodes at `k = 8`. `k* > 8`, so no database is built.
+
+But the member H3 loses and the member it needs are not the same thing. The
+Phase 2 amendment added the 5×5 endgame layers so that H3 would not rest entirely
+on reduced boards; what it actually required was **exact ground truth on the
+shipped game**, and the *database* was only the assumed means of getting it.
+EXP-003 shows a cheaper means: solve sampled endgame positions **on demand**.
+
+H3's comparison set therefore becomes 3×3, 5×3, and a pre-declared random sample
+of shipped-5×5 positions at `k ≤ 8`, each solved exactly at query time
+(`EXP-006`). This is stronger than what it replaces, on two counts. The
+retrograde route would have delivered whatever `k` the disk allowed, discovered
+after the fact; the sample is fixed in advance at a `k` already measured to be
+affordable. And `solver/minimax.py` proves or raises — it cannot return an
+approximate value — so every ground-truth value in the set satisfies
+[adr-004](adr/adr-004-solver-approach.md) R1 `termination: exhausted` by
+construction rather than by audit.
+
+`EXP-006`'s sampling protocol is registered **now**, before Axis 2 exists. That
+ordering is the point: a comparison set fixed after seeing the learner is not a
+comparison set.
+
+**The contingency as it was written, before the measurement
+(2026-08-05, [adr-012](adr/adr-012-endgame-database-storage.md)).**
 The Phase 2 amendment gave H3 the 5×5 retrograde endgame layers so it would not
 rest on toy boards. adr-012 now defers the decision to build those databases at
 all, pending `EXP-003`: Othello — FLIPHEX's structural twin — was weakly solved

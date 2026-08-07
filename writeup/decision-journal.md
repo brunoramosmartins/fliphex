@@ -9,6 +9,64 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-08-05 — The endgame database is cancelled, and H3 comes out better
+
+`EXP-003` ran the full registered sweep and the answer is not close. Median nodes
+to prove one 5×5 endgame position exactly: **480** at `k = 5` — the layer whose
+database would be ~1.2 × 10¹⁵ positions and ~150 TB — and 806,474 at `k = 8`.
+`k* > 8`, the pre-registered prediction (`k* ≥ 6`) held, and adr-012 takes
+**Option B**: no endgame database is built. Twelve orders of magnitude is not a
+constant factor to engineer away.
+
+**The consequence I had pre-recorded fired, and forced a better design.** adr-012
+said in advance that if the crossover was out of reach, H3 would lose the "5×5
+retrograde endgame layers" member of its comparison set — the member the Phase 2
+amendment added specifically so H3 would not rest on toy boards. Writing the
+re-scope, I noticed the member H3 loses and the member H3 *needs* are not the
+same thing. What it needed was **exact ground truth on the shipped game**; the
+database was only the assumed way to get it. EXP-003 supplies a cheaper way:
+solve sampled endgame positions on demand.
+
+So H3's set becomes 3×3, 5×3, and 500 shipped-5×5 positions at `k ≤ 8` solved at
+query time (`EXP-006`). That is stronger than what it replaces. The retrograde
+route would have delivered whatever `k` the disk allowed, discovered afterwards;
+the sample is fixed in advance at a `k` already measured to be affordable. And
+because `solver/minimax.py` proves or raises rather than approximating, every
+value in the set satisfies adr-004 R1 by construction instead of by audit.
+
+I registered EXP-006 **before Axis 2 exists**. A comparison set fixed after
+seeing the learner is not a comparison set. Two choices inside it that could
+easily have gone unexamined: it uses **seed 2**, not EXP-003's seed 1, because
+evaluating the learner on the very positions whose cost justified the design
+would be circular; and positions come from **random play, not the learner's own
+play**, because sampling from self-play lets Axis 2 choose its own exam. The
+learner-distribution version is a more interesting question and is a *different*
+experiment — it needs its own ID and may not be substituted for this one.
+
+**An instrument defect, found by the analysis rather than by the run.** The
+experiment printed `cens 0` for every `k` while `k = 8`'s no-TT arm had one
+sample pinned at the 20M budget: the column showed only the with-TT count. The
+JSON recorded it correctly per arm, which is the only reason it was recoverable,
+and the analysis script's validity guard caught it on first execution. No re-run
+— the rule reads the with-TT median, that arm is uncensored everywhere, and one
+censored sample in 200 cannot reach a median anyway.
+
+I got it wrong in both directions on the way through. The display hid censoring;
+then my first guard hard-failed on *any* censoring, which would have thrown away
+a perfectly usable result. The right criterion is the producer's own
+`median_is_lower_bound`, with the individually affected statistics named — `max`
+here, not the median. Both are now pinned by regression tests.
+
+**Secondary finding, exploratory and labelled as such.** The transposition
+table's value grows with `k`: 1.03× at `k = 3` to 2.15× at `k = 8`. Inside a
+single deep-endgame search there is almost no path re-convergence — the subgame
+graph is nearly a tree — and it only appears as empty cells accumulate. This does
+*not* settle the database case by itself: a database sells reuse across different
+roots, which is a different quantity from re-convergence within one search. Worth
+keeping the two apart.
+
+---
+
 ## 2026-08-05 — The 4×4 was never a FLIPHEX board
 
 A pre-run red-team of `EXP-001`/`EXP-002` — deliberately before either ran —

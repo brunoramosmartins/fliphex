@@ -154,16 +154,20 @@ def report(results: list[Measurement], threshold: int) -> int | None:
     print("  " + "-" * 68)
     print(
         f"  {'k':>3} {'ply':>4} {'median (TT)':>13} {'p90 (TT)':>12} "
-        f"{'median (raw)':>14} {'cens':>5}"
+        f"{'median (raw)':>14} {'cens':>7}"
     )
     print("  " + "-" * 68)
     for m in results:
-        tt = m.as_dict()["with_tt"]
-        raw = m.as_dict()["without_tt"]
+        row = m.as_dict()
+        tt, raw = row["with_tt"], row["without_tt"]
+        # Both arms, never just one: showing only the with-TT count once printed
+        # "cens 0" on a k where the no-TT arm had a censored sample. Censoring
+        # that a run can hide is worse than censoring it reports.
+        censored = f"{tt['censored']}/{raw['censored']}"
         flag = "  <== over threshold" if m.median_with_tt >= threshold else ""
         print(
             f"  {m.k:>3} {25 - m.k:>4} {tt['median']:>13,.0f} {tt['p90']:>12,.0f} "
-            f"{raw['median']:>14,.0f} {tt['censored']:>5}{flag}"
+            f"{raw['median']:>14,.0f} {censored:>7}{flag}"
         )
 
     over = [m.k for m in results if m.median_with_tt >= threshold]

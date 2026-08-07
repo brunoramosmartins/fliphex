@@ -19,9 +19,10 @@ Freely editable (append-only in practice).
 |---|---|---|---|---|---|---|---|---|
 | EXP-001 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 3×3, both H2 arms; adr-010 V3 double-solve | 9 cells (3×3), hands 5 + 4, commit TBD | — | registered | |
 | EXP-002 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 5×3, both H2 arms | 15 cells (5 cols × 3), hands 8 + 7, commit TBD | — | registered | |
-| EXP-003 | 2026-08-05 | — | 1 | Endgame subtree cost at `k = 3…8` on the 5×5: does searching beat storing? | 25 cells, hands 13 + 12; 200 sampled positions per `k`, with and without TT | 1 | registered | |
+| EXP-003 | 2026-08-05 | — | 1 | Endgame subtree cost at `k = 3…8` on the 5×5: does searching beat storing? | 25 cells, hands 13 + 12; 200 sampled positions per `k`, with and without TT; commit `4a081d8` | 1 | **complete** | **`k* > 8`.** Median nodes to prove one position: k=5 **480**, k=8 **806,474** — against a `k ≤ 5` database of ~1.2 × 10¹⁵ positions (~150 TB). Rule fires "build no database" at every registered `k`. Prediction `k* ≥ 6` **held**. → adr-012 **Option B**. [`results/exp003.json`](../results/exp003.json), [`results/exp003-tail.json`](../results/exp003-tail.json), analysis `scripts/exp003_analysis.py` |
 | EXP-004 | 2026-08-05 | — | 1 | Real compressibility of a solved layer: raw / block-RLE / block-Zstd / logic-minimized | 3×3 and 5×3 layers from EXP-001/EXP-002 | — | blocked on EXP-001 | |
 | EXP-005 | 2026-08-05 | — | 1 | Don't-care yield and adr-010 V1 reachability gap, per layer | 5×3, 15 cells, hands 8 + 7 | — | registered | |
+| EXP-006 | 2026-08-05 | H3 | 1 + 2 | Exact ground truth on the **shipped 5×5**: 500 endgame positions at `k ≤ 8`, solved on demand, as H3's third comparison-set member | 25 cells, hands 13 + 12; `k ∈ {6, 7, 8}`, 500 positions | 2 | registered (blocked on Axis 2) | |
 
 **Registration basis.** EXP-001 through EXP-005 are registered against the H1/H2
 text at tag `v0.3-hypotheses`. Any post-lock amendment to that text is recorded
@@ -130,6 +131,94 @@ in `docs/research.md` with its reason before it can affect a verdict here.
 - **Expected result.** Pre-registered: `k* ≥ 6`, i.e. the roadmap's `k ≤ 5` target
   is not worth materialising. Precedent: Othello was weakly solved at 36 empty
   squares with no endgame database at all (Takizawa 2023).
+- **Known sampling bias, recorded rather than fixed (2026-08-05).** Random
+  playout does **not** sample uniformly from reachable positions — it samples
+  uniformly from random-play *trajectories*, which is a different distribution.
+  More specifically, positions arising from random play may be systematically
+  easier or harder to solve than those a real search meets, which arise from
+  *good* play. The method stays as registered because this experiment measures
+  **cost**, not value, and changing the sampler after registration is the thing
+  pre-registration exists to prevent. The limitation is carried with the result;
+  it is not corrected in analysis.
+- **Each sampled position gets a fresh transposition table.** Sharing one across
+  samples would amortise work between them — which is precisely what a *database*
+  does — and would bias the comparison toward "searching is cheap". A fresh table
+  gives search its worst case, so a result favouring search is conservative.
+- **Censoring.** A sample that exceeds `--max-nodes` is recorded at the budget
+  and counted separately. A median computed over censored samples is a **lower
+  bound**, which is sufficient for the decision rule (the rule only asks whether
+  the median exceeds 10⁶) but must be reported as such.
+
+#### Result (2026-08-05, commit `4a081d8`)
+
+Complete registered sweep, `k = 3…8`, 200 positions per `k` per arm, seed 1.
+Median nodes to prove one position exactly:
+
+| `k` | ply | median (TT) | p90 (TT) | median (no TT) | TT gain |
+|--:|--:|--:|--:|--:|--:|
+| 3 | 22 | 18 | 60 | 18 | 1.03× |
+| 4 | 21 | 126 | 373 | 134 | 1.07× |
+| 5 | 20 | **480** | 1,735 | 560 | 1.17× |
+| 6 | 19 | 6,660 | 24,476 | 9,742 | 1.46× |
+| 7 | 18 | 20,024 | 105,897 | 32,523 | 1.62× |
+| 8 | 17 | **806,474** | 2,683,470 | 1,736,922 | 2.15× |
+
+**Verdict: `k* > 8`.** The rule fires "build no database" at every registered
+`k`. The pre-registered prediction `k* ≥ 6` **held**. adr-012 **Option B** is
+taken: no endgame database is materialised.
+
+The headline comparison is not close. The roadmap's `k ≤ 5` target is
+~1.2 × 10¹⁵ positions, ~150 TB at one bit — and an exact search there costs
+**480 nodes**. Twelve orders of magnitude, not a constant factor.
+
+**Secondary finding, not registered in advance and reported as exploratory.**
+The transposition table's value *grows* with `k`: 1.03× at `k = 3` rising to
+2.15× at `k = 8`. Within a single deep-endgame search there is almost no path
+re-convergence — the subgame graph is nearly a tree — and re-convergence only
+appears as empty cells accumulate. Note this does **not** settle the database
+case by itself: a database sells reuse across *different* roots, which is a
+different quantity from re-convergence within one search.
+
+Median growth per layer: 7.0× · 3.8× · 13.9× · 3.0× · 40.3×, geometric mean
+**8.5×**. Extrapolating one layer puts `k = 9` near 6.9 × 10⁶ — but that is an
+extrapolation, not a measurement, and `k*` is reported as `> 8`.
+
+**Qualification carried with the verdict.** `k = 8`'s median (806,474) sits
+within 1.25× of the threshold, and the artefacts persist only aggregates, so
+there is **no interval on any median**. The branch taken at `k = 8` and the exact
+location of `k*` are therefore provisional. The decision that actually matters —
+"do not build for `k ≤ 5`" — is unaffected: it clears the threshold by three
+orders of magnitude and no plausible sampling error touches it.
+
+#### Amendment (2026-08-05) — an instrument defect found by the analysis, not by the run
+
+The run's own console output printed `cens 0` for every `k`, because
+`scripts/exp003_endgame_cost.py`'s censored column showed **only the with-TT
+arm**. The `k = 8` no-TT arm in fact had **1 of 200** samples pinned at the
+20,000,000-node budget. The JSON recorded it correctly per arm, which is the
+only reason it was recoverable, and `scripts/exp003_analysis.py`'s validity
+guard caught it on first execution.
+
+- **Units affected:** one sample, `k = 8`, `without_tt` arm.
+- **Impact:** none on the verdict. The rule reads the **with-TT median**, and
+  that arm is uncensored at every `k`. In the affected arm, one censored sample
+  out of 200 cannot reach the median (the 100th sorted value) or the p90 (the
+  180th); it pins only `max`, which is therefore a lower bound (≥ 2 × 10⁷).
+- **No re-run.** The data on disk is correct; only the console display was
+  wrong. Equivalence argument: the JSON is written from the same `Sample`
+  objects the display reads, `censored` was recorded per arm correctly, and no
+  statistic the rule consumes was censored.
+- **Fix:** the column now prints `with/without` for both arms. Censoring that a
+  run can hide is worse than censoring it reports.
+- **Second fix, in the other direction:** the first analysis guard hard-failed on
+  *any* censoring, which would have discarded a usable result. The criterion is
+  now the producer's own `median_is_lower_bound` (censoring past half the
+  samples), with the individually affected statistics named.
+- **Regression test:** `tests/test_exp003_reporting.py` pins both — that the
+  column reports both arms, and that sub-median censoring warns while
+  past-median censoring refuses.
+- The display fix landed **after** commit `4a081d8`, which is the instrument as
+  it ran. The `Config / commit` field points at `4a081d8` deliberately.
 
 ### EXP-004 — real compressibility of a solved layer
 
@@ -174,6 +263,47 @@ in `docs/research.md` with its reason before it can affect a verdict here.
   inequality voids the run, or (b) a **one-sided measurement**
   `count_enum ≤ count_formula`, in which case it is not a gate. This experiment
   supplies the calibration for (b).
+
+### EXP-006 — exact ground truth on the shipped 5×5, for H3
+
+- **Objective.** Give H3 a comparison-set member on the **shipped game** rather
+  than on reduced boards only. Replaces the retrograde endgame layers the Phase 2
+  amendment assumed, which `EXP-003` showed are not worth materialising.
+- **Hypothesis.** H3.
+- **Status.** Registered 2026-08-05, **before Axis 2 exists**. That ordering is
+  the whole point — a comparison set fixed after seeing the learner is not a
+  comparison set. It runs in Phase 5.
+- **Why this is affordable, measured rather than assumed.** `EXP-003` puts the
+  median exact search at 6,660 nodes (`k = 6`), 20,024 (`k = 7`) and 806,474
+  (`k = 8`). 500 positions at `k ≤ 8` is therefore hours, not a database.
+- **Configuration.** 25 cells, hands 13 + 12 (the shipped game, no reduced deck).
+  **Seed 2**, deliberately not `EXP-003`'s seed 1: reusing seed 1 would evaluate
+  the learner on the exact positions whose cost was used to justify this design.
+  Positions are drawn by **random playout** to ply `25 − k`, matching EXP-003's
+  sampler and carrying the same registered bias. Stratified: 500 positions split
+  evenly across `k ∈ {6, 7, 8}` (166/167/167). `k ≤ 5` is excluded as too shallow
+  to discriminate — at 480 nodes the subgame is nearly forced.
+- **Positions come from random play, not from the learner's play.** This is a
+  pre-declared choice, not an oversight. Sampling from Axis 2's own self-play
+  would test the learner on its own distribution — a different and arguably more
+  interesting claim, but one that lets Axis 2 choose the exam. Registered here as
+  the *independent* set; a learner-distribution version, if wanted, needs its own
+  ID and must not be substituted for this one.
+- **Measure.** For each position: the exact game value, and whether the learned
+  policy's chosen move **preserves** it. Agreement rate with a Wilson 95% CI, per
+  `k` and pooled.
+- **Decision rule.** H3's clause on this member is satisfied only if the
+  agreement rate's Wilson lower bound exceeds a pre-declared floor, fixed here as
+  **0.90**. Below that, H3 is reported as failing on the shipped game regardless
+  of how it does on 3×3 and 5×3 — the reduced boards cannot rescue it, since
+  carrying the shipped game is the entire reason this member exists.
+- **Provenance is structural, not audited.** `solver/minimax.py` proves or raises
+  `BudgetExceededError`; it has no evaluation function and no depth limit, so
+  every ground-truth value here satisfies adr-004 R1 `termination: exhausted` by
+  construction. Any position that cannot be proved is reported as excluded, with
+  its count — never silently replaced by a fresh sample.
+- **Artefacts.** `data/ground-truth/5x5-endgame-seed2.json`, with the adr-004 R3
+  header fields.
 
 ## Planned
 
