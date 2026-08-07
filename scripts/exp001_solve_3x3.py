@@ -140,7 +140,9 @@ def run(variant: Variant, out_dir: Path | None, prune: bool = True) -> dict:
     sweep_seconds = time.perf_counter() - started
 
     mode = "with pruning" if prune else "UNPRUNED (V3 coverage mode)"
-    print(f"  forward alpha-beta (game tree, from the opening) — {mode} ...", flush=True)
+    print(
+        f"  forward alpha-beta (game tree, from the opening) — {mode} ...", flush=True
+    )
     started = time.perf_counter()
     tt = TranspositionTable(1 << 21, verify=True)
     forward = Solver(board, tt=tt, prune=prune).solve(variant.initial_state())
