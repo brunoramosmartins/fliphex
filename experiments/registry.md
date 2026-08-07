@@ -213,6 +213,25 @@ one.
 - **Artefacts.** `data/subgame-solutions/5x3-h1.json`,
   `data/subgame-solutions/5x3-h2.json`, headers as EXP-001.
 
+#### Amendment (2026-08-07) — the h1 arm ran without progress output
+
+The h1 arm was launched on commit `17aac45`, whose observer printed nothing per
+layer and left the header prints block-buffered. Redirected to a file that means
+**an empty log for the whole run** — on a job measured in hours there is then no
+way to distinguish a slow sweep from a hung one, and the peak-working-set clause
+above becomes unobservable while it matters.
+
+Fixed for the h2 arm: a flushed line per layer with its configuration count and
+elapsed time. The change is **output only** — no sampling, no RNG draw, no
+arithmetic is touched, so the two arms remain comparable and the h1 result stands
+as produced. Recorded here rather than silently, because the arms now run on
+different commits.
+
+The h1 arm was monitored instead by resident set size, which tracks the two
+co-resident layers and is therefore a real progress signal on this sweep: RSS
+climbs while `t` descends from 15 to 9, peaks near 2.5 GB at `t = 9`, and falls
+away after. It is a proxy and is not recorded as a measurement.
+
 ### EXP-003 — endgame subtree cost: does searching beat storing?
 
 - **Objective.** Find the crossover `k*` at which materialising an endgame
@@ -376,8 +395,9 @@ quantities, V1 gates the first, and EXP-005 measures the second. The 2× figure
 at `t = 1` stays as the calibration anchor — it is now pinned as a test rather
 than a note (`tests/test_reachable.py::test_layer_one_is_exactly_half`).
 
-**Instrument** (written 2026-08-07, before the run, on commit `17aac45` plus
-`solver/reachable.py`): predecessors are counted **forward**, not by inverting
+**Instrument** (written 2026-08-07, before the run): `solver/reachable.py` with
+`scripts/exp005_reachability.py` as the runner. Predecessors are counted
+**forward**, not by inverting
 the flip rule. The pass walks every configuration of layer `t-1`, generates
 every legal move with the machinery `solver/packed_sweep.py` already uses, and
 marks the successor's bit; what stays unmarked has no predecessor by
@@ -392,6 +412,13 @@ written out rather than shared, and
 `tests/test_reachable.py::test_marking_matches_the_reference_move_generation`
 checks the marked set against `legal_moves`/`apply_move`/`LayerIndex` on every
 layer of both 5×1 arms.
+
+The runner refuses to print a verdict on anything but the registered 5×3, and on
+an incomplete run — the rule applies to the complete design only. Smoke run on
+the 5×1 (1,023 configurations, not the registered board, **no verdict**): 14.76%
+orphans overall, 50.0% at `t = 1` falling monotonically to 3.1% at the terminal
+layer. Recorded as an expectation-setter, not as evidence: 5 cells is not 15, and
+the shape of that curve is exactly what a real measurement could overturn.
 
 ### EXP-006 — exact ground truth on the shipped 5×5, for H3
 
