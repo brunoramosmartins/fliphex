@@ -455,6 +455,60 @@ guard caught it on first execution.
 - The display fix landed **after** commit `4a081d8`, which is the instrument as
   it ran. The `Config / commit` field points at `4a081d8` deliberately.
 
+#### Note (2026-08-07) — `k*` was the wrong shape, and the missing half is arithmetic
+
+**Not an amendment.** EXP-003 is complete, its measured quantity is unchanged,
+its verdict stands, and `k* ≥ 6` held. Redefining a finished experiment's
+reported quantity is the anti-pattern that produced EXP-007 rather than an
+EXP-005 rewrite, and it is not repeated here. What follows is a reading note: the
+number EXP-003 produced answers **half** of adr-012's question, and the other
+half needs no experiment at all.
+
+**Where the shape came from.** Takizawa 2023 has *two* thresholds, not one — §3.4
+at 50 empty squares and §3.5 at 36 — and they are justified differently. The
+upper cut is set by **enumerability** (the last layer you can write down whole:
+2,958,551 positions after symmetry) and the lower by **solvability** (the depth
+at which Edax settles a position outright). Between them nothing is enumerated;
+the gap is bridged by conjecture-and-verify. EXP-003 was designed to locate a
+single crossover and measured the **solvability** cut only.
+
+**The enumerability cut is closed form.** From `scripts/layer_profile.py` on the
+shipped 5×5 (25 cells, hands 13 + 12), by empty-cell count `k = 25 − t`:
+
+| `k` | configurations in the layer | at 2 bits |
+|---:|---:|---:|
+| 0 | 33,554,432 | 8 MB |
+| 1 | 5,452,595,200 | **1.4 GB** |
+| 2 | 392,586,854,400 | 98 GB |
+| 3 | 9,029,497,651,200 | 2.3 TB |
+| 4 | 136,571,151,974,400 | 34 TB |
+| 5 | 1,051,597,870,202,880 | 263 TB |
+| 8 | 50,173,893,918,720,000 | **12.5 PB** |
+
+So the two cuts on the 5×5 are **enumerable at `k ≤ 1`** in memory (`k ≤ 2` if
+98 GB on disk is allowed) and **solvable on demand at `k > 8`**.
+
+**There is no crossover region.** The solvability cut sits far *above* the
+enumerability cut, so across the whole of `k = 3…8` nothing is enumerable and
+everything is solvable in under a second. Materialising is not merely worse at
+the measured points — it is **dominated over the entire interval**, by arithmetic
+rather than by sampling. adr-012 Option B is closed more firmly than EXP-003
+alone establishes.
+
+**The interesting consequence is about the 5×5 attempt, not about adr-012.**
+Because the layer profile is a hump, the layers are small at *both* ends: the
+opening is enumerable to `t ≤ 5` (32.1 × 10⁹ configurations, 8.0 GB) and the
+endgame to `k ≤ 2`. What has no coverage from either direction is
+**`t = 6…16`** — between 19 and 9 empty cells, eleven layers, peaking at
+1.09 × 10¹⁷ configurations at `t = 15`. That interval is precisely where
+Takizawa's Algorithm 1 lives, and it is the part FLIPHEX cannot attempt: it needs
+an evaluator whose predictions are almost always right, and adr-004 R1–R3 govern
+what an Axis-1 run may consume from one.
+
+**For future 5×5 work, the reportable quantity is a pair** — largest enumerable
+`k`, largest on-demand-solvable `k` — with the uncovered interval named. Any
+successor experiment registers its own ID; this note does not create one.
+
 ### EXP-004 — real compressibility of a solved layer
 
 - **Objective.** Measure bits/position achievable on an actual FLIPHEX layer,
@@ -655,6 +709,68 @@ boards where it is affordable rather than by a 5×3 run.
   its count — never silently replaced by a fresh sample.
 - **Artefacts.** `data/ground-truth/5x5-endgame-seed2.json`, with the adr-004 R3
   header fields.
+
+#### Amendment (2026-08-07) — the sampler's bias is not neutral, and a second stratum
+
+Amended **before the run**, which is the only time this is allowed. The
+registered design above is untouched: same seed, same 500 positions, same
+stratification, same decision rule. This adds a disclosed second stratum and
+records why.
+
+**What prompted it.** Takizawa 2023 §5, read for
+[the lit-note](../notes/takizawa-2023-othello-is-solved.md) B4/D1. Two findings
+bear directly on this design:
+
+> "many of our calculations to weakly solve Othello were devoted to positions
+> where, according to the estimation, there is a clear advantage in terms of
+> winning or losing. This indicates that one cannot claim a pseudo-solution by not
+> proving positions whose estimated game-theoretic value exceeds any threshold."
+
+> "systematic and significant errors in Edax's function to estimate the
+> game-theoretic value from a position […] **especially for positions unlikely to
+> appear in actual games**."
+
+**Why that lands here.** The registered sampler draws by *random playout* to ply
+`25 − k`. That was chosen to keep Axis 2 from choosing its own exam, and it still
+does that job. But random playout is a **play** distribution, and Takizawa gives
+empirical evidence that an evaluator's systematic errors concentrate exactly
+where play does not go. H3 asks whether the learned policy's move preserves the
+exact value. Measuring that only on positions a playout reaches risks reporting
+the agreement rate on the learner's easy half — a milder version of the failure
+the "not from self-play" clause already guards against, and one the existing
+disclosure ("carrying the same registered bias") names without bounding.
+
+**Second stratum, pre-declared here.** **250 positions**, `k ∈ {6, 7, 8}` split
+84/83/83, **seed 4**. Drawn **uniformly from the layer index**: pick a uniform
+random integer in `[0, layer_size(25 − k))` and `LayerIndex.decode` it
+(`solver/retrograde.py` already has `unrank_subset` and `decode`, so no new
+instrument is needed). Reject any configuration with **no legal predecessor**,
+using the closed characterisation proved for EXP-005 — a configuration is an
+orphan exactly when every occupied cell carries the colour of the player who did
+*not* just move — which is an `O(N)` test on a single position and needs no
+enumeration.
+
+**What this stratum is not, stated plainly.** It is uniform over the *layer*, not
+over the *reachable* set. Uniform-over-reachable is **not implementable on the
+5×5**: the `k = 8` layer holds 5.0 × 10¹⁶ configurations (12.5 PB at 2 bits) and
+EXP-007's transitive closure is infeasible at that scale. The orphan filter
+removes only the one-step-unreachable share, which the EXP-005 identity puts at
+`2^-t` — about **1 in 131,072** at `k = 8`. So the filter is a *correctness
+guard, not a meaningful filter*, and the residual gap between this stratum and
+true reachability is disclosed rather than closed. EXP-007 measured that gap on
+the 3×3 at 3.91% closure against 3.28% one-step; on the 5×5 it is unmeasured.
+
+**Reported separately; pooling is forbidden.** The H3 decision rule (Wilson lower
+bound > 0.90) runs on the **registered stratum only**. The second stratum is
+reported alongside with its own Wilson CI and is **descriptive**. A gap between
+the two strata is the finding — it is the FLIPHEX measurement of Takizawa's
+observation — and it must not be averaged away into a single number, in either
+direction.
+
+**Cost.** EXP-003's medians are 6,660 / 20,024 / 806,474 nodes at `k = 6/7/8`, so
+250 more positions is well under an hour. It is not a reason to skip it, and it
+was not free to *decide*: the decision had to be made before the run, which is
+why it is here and dated.
 
 ## Planned
 

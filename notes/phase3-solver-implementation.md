@@ -210,6 +210,35 @@ member H3 loses and the member it needs — exact ground truth on the *shipped*
 game — are not the same thing, so EXP-006 replaces it with 500 5×5 positions at
 `k ≤ 8` solved on demand, seeded differently from EXP-003 to avoid circularity.
 
+**`k*` was the wrong shape, and the Takizawa reading is what exposed it.**
+EXP-003 looked for
+one crossover. The Othello solve has *two* cuts with different justifications —
+enumerability above, solvability below — and EXP-003 measured only the second.
+The first needs no experiment; it is `scripts/layer_profile.py`. On the 5×5, by
+empty cells:
+
+| `k` | layer | at 2 bits |
+|---:|---:|---:|
+| 1 | 5,452,595,200 | **1.4 GB** |
+| 2 | 392,586,854,400 | 98 GB |
+| 3 | 9,029,497,651,200 | 2.3 TB |
+| 8 | 50,173,893,918,720,000 | **12.5 PB** |
+
+Enumerable at `k ≤ 1` in memory; solvable on demand at `k > 8`. The two cuts do
+not meet, so there is **no crossover region at all** — across `k = 3…8` nothing
+is enumerable and everything is solvable in under a second. adr-012 Option B is
+closed by arithmetic, not just by EXP-003's sampled medians.
+
+The sharper consequence is what the hump implies for a 5×5 attempt.
+Layers are small at *both* ends — the opening is enumerable to `t ≤ 5` (8.0 GB),
+the endgame to `k ≤ 2` — and what neither end reaches is `t = 6…16`, eleven
+layers between 19 and 9 empty cells, peaking at 1.09 × 10¹⁷ configurations at
+`t = 15`. That interval is exactly where Takizawa's Algorithm 1 does its work,
+and it is the part FLIPHEX has no instrument for: bridging it needs an evaluator
+whose predictions are almost always right. Recorded as a note under EXP-003 in
+the registry, not as an amendment — the experiment is complete and its quantity
+is not being redefined.
+
 ## Reachability — EXP-005 and EXP-007
 
 adr-012 decision 7 allows one source of don't-cares: a configuration with no
@@ -280,6 +309,36 @@ requires the unreachable floor to come from a separate experiment that can
 falsify it. Final figure: **679,202 of 684,103 reachable = 99.28%**, with the
 residue accounting for itself exactly — 511 terminal configurations the search
 never stores, plus 4,390 positions that lost a slot conflict.
+
+### The threat none of the six covers
+
+All six levels assume the machine computed what the code says. Takizawa §3.7
+records that every CPU in that cluster had ECC, and §5 defends the choice
+explicitly against this exact objection. EXP-002 cannot make the same claim, and
+until that reading nothing in this note said so.
+
+The 5×3 sweep is a **single** PyPy process holding ~4.2 GB resident for ~13
+hours, writing 17,506,580,337 packed 2-bit values, on consumer WSL hardware with
+**no ECC**. One flipped bit is a wrong value for one configuration, propagated to
+every ancestor that reads it, with no crash and no counter — a plausible answer,
+which is the whole failure mode adr-010 exists for.
+
+The ladder is blind to it. V1 counts entries, not values. V2 is total but only on
+terminals. V3 is 3×3-scale. V4 and V6 do read values, at **40 sampled positions
+per layer** against layers of up to 5.0 × 10⁹ — the chance of sampling a flipped
+entry is nil. V0–V6 are strong against *logic* errors, which repeat and therefore
+show up in samples, and have no coverage against *substrate* errors, which do
+not.
+
+The mitigation exists and is cheap to state: `PackedSweep` already keeps
+`checks.digest`, and the sweep is deterministic, so **re-running an arm and
+comparing digests is a real replay check**. It costs another ~13 hours per arm.
+
+It is not spent on the current run. The exposure is disclosed instead, with the
+trigger recorded in the adr-010 amendment of 2026-08-07: if the 5×3 value is cited
+as an H1 or H2 verdict, the digest replay runs first. Deliberately **not** a new
+`V7` — a mandatory level that gets skipped every time is worse than an honest
+gap, because it turns a limitation into a false claim of coverage.
 
 ## H1 / H2 partial verdicts
 

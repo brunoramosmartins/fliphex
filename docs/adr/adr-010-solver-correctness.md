@@ -296,6 +296,52 @@ a table that is not the constraint, and requires the unreachable floor to be
 measured independently rather than assumed. The 96.72% ceiling is not an
 allowance the solver grants itself; it comes from EXP-005, which can falsify it.
 
+## Amendment — memory integrity, a threat V0–V6 does not cover (2026-08-07)
+
+`V0`–`V6` all assume the machine computed what the code says. On a run the size
+of EXP-002 that assumption is load-bearing and was never stated.
+
+**The exposure.** The 5×3 sweep is a **single** PyPy process holding ~4.2 GB
+resident for ~13 hours, writing 17,506,580,337 packed 2-bit values, on consumer
+WSL hardware **without ECC memory**. A single flipped bit in the value array is a
+wrong game value for one configuration, propagated to every ancestor that reads
+it. It produces no crash, no counter, and no anomaly — it produces a plausible
+answer, which is the exact failure mode this ADR was written to address.
+
+**Why the ladder does not catch it.** `V1` counts entries per layer, not their
+values, so it is blind by construction. `V2` is the only *total* check and it
+runs on terminal configurations only. `V3` compares against an independent
+forward search, but only at 3×3 scale. `V4` (re-derivation) and `V6` (mirror
+agreement) do inspect values — at **40 sampled positions per layer**, against
+layers of up to 5.0 × 10⁹. The probability that sampling lands on a flipped
+entry is negligible. The ladder is strong against *logic* errors, which repeat,
+and has no coverage at all against *substrate* errors, which do not.
+
+**The precedent.** Takizawa 2023 §3.7 records that every CPU in the cluster had
+ECC, and §5 defends the choice against exactly this objection: *"computational
+errors due to CPU or memory faults cannot be entirely ruled out. However, as the
+vast majority of calculations were executed on a computer cluster with ECC
+memory, we believe the results to be nearly indisputable."* That is a
+verification claim about hardware, and it is one this project cannot make.
+
+**The available mitigation, and why it is not spent now.** `PackedSweep` already
+maintains `checks.digest`, a running hash over the sweep. The instrument is
+deterministic: same code, same variant, same seed ⇒ same digest. **Re-running an
+arm and comparing digests is therefore a genuine replay check** — a bit flip in
+either run changes the hash. It costs one further full sweep, ~13 hours per arm.
+
+It is **not** spent on the current 5×3 run, deliberately. The exposure is
+disclosed rather than mitigated, and the trigger is recorded here: **if the 5×3
+value is cited as a headline result — an H1 or H2 verdict in `docs/research.md`
+— the digest replay is run first.** Until then the 5×3 is reported as a
+single-run result on non-ECC hardware, and any artefact citing it says so.
+
+**This deliberately does not add a `V7`.** A mandatory level that is skipped on
+every run is worse than a disclosed gap: it converts an honest limitation into a
+false claim of coverage. The requirement here is on *reporting* — runs on
+non-ECC hardware disclose it, and the replay is a precondition for citation, not
+for computation.
+
 ## Alternatives considered
 
 **Trust a single clean run.** The default, and the position the ADR exists to
