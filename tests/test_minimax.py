@@ -21,7 +21,7 @@ from solver.minimax import (
     Solver,
     solve,
 )
-from solver.transposition import TranspositionTable
+from solver.transposition import Flag, TranspositionTable
 
 TINY = Variant(5, 1)
 
@@ -203,3 +203,54 @@ def test_principal_variation_of_a_terminal_position_is_empty(tiny):
     s = Solver(board)
     terminal = walk(board, root, root.n_cells)
     assert s.principal_variation(terminal) == []
+
+
+# -- unpruned mode is a measuring instrument, not just a slow solver ----------
+
+
+def _stored(tt):
+    return [e for e in tt._slots if e is not None and e.key is not None]  # noqa: SLF001
+
+
+def test_unpruned_stores_only_extremal_bounds(tiny):
+    """EXP-001's V3 reads the table on this invariant, so it is pinned here.
+
+    On a two-valued objective every score sits on a window endpoint, so nothing
+    is ever flagged EXACT: a value is stored as UPPER of ``LOSS`` or LOWER of
+    ``WIN``, and an extremal bound *is* the value. That is what lets V3 compare
+    a forward entry against the sweep at all.
+
+    It stops being true the moment an unpruned node is searched in a narrowed
+    window. Disabling the cutoff while still passing ``(-beta, -alpha)`` lets
+    alpha reach ``WIN`` and the remaining subtree be searched at ``alpha ==
+    beta``, which yields UPPER-of-``WIN`` — an upper bound on the maximum, which
+    constrains nothing. V3 cannot compare those and has to discard them, which
+    is how the defect was found: an unpruned 3×3 run reported 46.2% coverage and
+    ``DISAGREE``, with every reported problem reading "an UPPER bound of 1 is
+    not extremal" and not one of them an actual value mismatch.
+    """
+    board, root = tiny
+    tt = TranspositionTable(1 << 14, verify=True)
+    Solver(board, tt=tt, prune=False).solve(root)
+
+    entries = _stored(tt)
+    assert entries, "the probe never exercised the table"
+    for entry in entries:
+        if entry.flag is Flag.UPPER:
+            assert entry.value == LOSS, "an UPPER bound of WIN constrains nothing"
+        elif entry.flag is Flag.LOWER:
+            assert entry.value == WIN, "a LOWER bound of LOSS constrains nothing"
+
+
+def test_unpruned_reaches_more_positions_than_pruned(tiny):
+    """The whole reason V3 has an unpruned mode: coverage, not a different value."""
+    board, root = tiny
+
+    pruned_tt = TranspositionTable(1 << 14, verify=True)
+    pruned = Solver(board, tt=pruned_tt, prune=True).solve(root)
+
+    open_tt = TranspositionTable(1 << 14, verify=True)
+    unpruned = Solver(board, tt=open_tt, prune=False).solve(root)
+
+    assert pruned.value == unpruned.value
+    assert len(_stored(open_tt)) > len(_stored(pruned_tt))

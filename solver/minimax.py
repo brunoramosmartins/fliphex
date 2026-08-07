@@ -166,6 +166,11 @@ class Solver:
             so the coverage of that check is bounded by this flag. The
             transposition table still memoises, so an unpruned run stays
             feasible: it visits each reachable position once, not once per path.
+
+            ``prune=False`` also stops the window from narrowing, so every node
+            is searched at ``(LOSS, WIN)``. That is not cosmetic: it is what
+            keeps every stored bound **extremal**, and V3 reads the table by
+            trusting exactly that. See the comment in :meth:`_negamax`.
     """
 
     def __init__(
@@ -266,7 +271,17 @@ class Solver:
 
         for move in moves:
             child = apply_move(self.board, state, move)
-            score = -self._negamax(child, -beta, -alpha)
+            if self.prune:
+                score = -self._negamax(child, -beta, -alpha)
+            else:
+                # Not pruning means not narrowing either. Disabling only the
+                # cutoff while still passing `(-beta, -alpha)` is the worst of
+                # both: once alpha reaches WIN the remaining children are
+                # searched at `alpha == beta`, and a node entered with
+                # `alpha = WIN` whose value is WIN is flagged UPPER — an upper
+                # bound on the maximum, which says nothing. EXP-001's V3 then
+                # has to discard those entries, which is exactly what it did.
+                score = -self._negamax(child, LOSS, WIN)
             if score > best_value:
                 best_value, best_move = score, move
             if best_value > alpha:
