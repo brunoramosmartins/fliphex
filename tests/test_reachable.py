@@ -167,7 +167,7 @@ def test_closure_is_a_subset_of_one_step_reachable(variant):
     reach = Reachability(variant)
     one_step = reach.run()
     closure = reach.closure()
-    for a, b in zip(one_step.layers, closure.layers):
+    for a, b in zip(one_step.layers, closure.layers, strict=True):
         assert b.reachable <= a.with_predecessor, f"layer {a.t}"
 
 

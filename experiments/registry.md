@@ -252,10 +252,17 @@ the same evening:
 | **compared** | 679,202 | **99.28% of reachable** |
 | residue | 4,901 | 0.72% of reachable |
 
-The residue is bounded by the 3,300 replacements plus the 512 terminal
-configurations the forward search never stores — `_negamax` returns from a
-terminal before reaching `store`, so terminals are structurally absent from the
-table and cannot be compared by V3 at all.
+The residue accounts for itself exactly: **511** reachable terminal
+configurations, which `_negamax` returns from before reaching `store` and which
+are therefore structurally absent from the table, plus **4,390** non-terminal
+positions that shared a slot — 3,300 evicted (the reported `replacements`) and
+~1,090 *refused entry*, because `store` keeps the deeper of two entries on a
+conflict and drops the shallower without recording it. 511 + 4,390 = 4,901.
+
+The refusals matter beyond the arithmetic: `replacements` is a **lower** bound on
+coverage loss, not a measure of it, and a first pass at this decomposition
+assumed otherwise and came up 1,090 short. Both effects are birthday collisions
+and shrink with table size.
 
 Both wrong numbers are kept above rather than deleted. The pattern in them is
 the lesson: each was a plausible arithmetic on a ceiling that had not been

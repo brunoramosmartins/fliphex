@@ -266,10 +266,21 @@ quoting `≥ 6,090 never visited` and `≥ 4.14% unreachable` before the closure
 measured. The exact figures above supersede those.
 
 Against the positions the search actually reached, agreement is **99.28%**, and
-the residue is bounded by the 3,300 replacements the run prints plus the 512
-terminal configurations the search never stores (`_negamax` returns from a
-terminal before reaching `store`). It is bounded by numbers the run reports, not
-by an argument.
+the residue accounts for itself exactly:
+
+- **511** reachable terminal configurations, which the search never stores at all
+  — `_negamax` returns from a terminal before reaching `store`, so terminals are
+  structurally absent from the table and V3 cannot compare them by this route.
+- **4,390** non-terminal positions that shared a slot with another position:
+  3,300 evicted (the reported `replacements`) and the remaining ~1,090 *refused
+  entry*, because `store` keeps the deeper of two entries on a conflict and
+  silently drops the shallower — a refusal that no counter records.
+
+511 + 4,390 = 4,901, with nothing left over. Both effects are birthday collisions
+and shrink with table size; neither is a property of the game, and neither is a
+disagreement between the two solvers. That the second was invisible in the
+counters is itself the reason V3 now reports occupancy alongside coverage:
+`replacements` is a **lower** bound on coverage loss, not a measure of it.
 
 Table size is not a free parameter to be tuned until the number looks good; it is
 constrained in the reported direction. At `--tt-bits 21` the same run compared
