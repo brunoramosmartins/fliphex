@@ -20,7 +20,7 @@ from solver.minimax import (
     Solver,
     solve,
 )
-from solver.transposition import Flag, TranspositionTable
+from solver.transposition import Flag, NullTable, TranspositionTable
 
 __all__ = [
     # search
@@ -33,5 +33,6 @@ __all__ = [
     "solve",
     # transposition
     "Flag",
+    "NullTable",
     "TranspositionTable",
 ]

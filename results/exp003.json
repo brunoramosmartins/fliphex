@@ -1,0 +1,100 @@
+{
+  "experiment": "EXP-003",
+  "board_cells": 25,
+  "hands": [
+    13,
+    12
+  ],
+  "seed": 1,
+  "samples_per_k": 200,
+  "max_nodes": 2000000,
+  "threshold": 1000000,
+  "k_star": null,
+  "sampling": "random playout (see registry: known bias)",
+  "results": [
+    {
+      "k": 3,
+      "with_tt": {
+        "n": 200,
+        "median": 18.0,
+        "p90": 60,
+        "max": 114,
+        "total_seconds": 0.14544368092902005,
+        "censored": 0,
+        "median_is_lower_bound": false
+      },
+      "without_tt": {
+        "n": 200,
+        "median": 18.5,
+        "p90": 61,
+        "max": 130,
+        "total_seconds": 0.14169567311182618,
+        "censored": 0,
+        "median_is_lower_bound": false
+      }
+    },
+    {
+      "k": 4,
+      "with_tt": {
+        "n": 200,
+        "median": 125.5,
+        "p90": 373,
+        "max": 982,
+        "total_seconds": 1.0672710839135107,
+        "censored": 0,
+        "median_is_lower_bound": false
+      },
+      "without_tt": {
+        "n": 200,
+        "median": 134.5,
+        "p90": 455,
+        "max": 1308,
+        "total_seconds": 1.13762016207329,
+        "censored": 0,
+        "median_is_lower_bound": false
+      }
+    },
+    {
+      "k": 5,
+      "with_tt": {
+        "n": 200,
+        "median": 480.0,
+        "p90": 1735,
+        "max": 3767,
+        "total_seconds": 4.159344299812801,
+        "censored": 0,
+        "median_is_lower_bound": false
+      },
+      "without_tt": {
+        "n": 200,
+        "median": 560.5,
+        "p90": 2232,
+        "max": 5233,
+        "total_seconds": 4.883274463121779,
+        "censored": 0,
+        "median_is_lower_bound": false
+      }
+    },
+    {
+      "k": 6,
+      "with_tt": {
+        "n": 200,
+        "median": 6660.5,
+        "p90": 24476,
+        "max": 96577,
+        "total_seconds": 58.063134873780655,
+        "censored": 0,
+        "median_is_lower_bound": false
+      },
+      "without_tt": {
+        "n": 200,
+        "median": 9742.0,
+        "p90": 37700,
+        "max": 125037,
+        "total_seconds": 86.5284826727584,
+        "censored": 0,
+        "median_is_lower_bound": false
+      }
+    }
+  ]
+}
