@@ -301,8 +301,9 @@ allowance the solver grants itself; it comes from EXP-005, which can falsify it.
 `V0`–`V6` all assume the machine computed what the code says. On a run the size
 of EXP-002 that assumption is load-bearing and was never stated.
 
-**The exposure.** The 5×3 sweep is a **single** PyPy process holding ~4.2 GB
-resident for ~13 hours, writing 17,506,580,337 packed 2-bit values, on consumer
+**The exposure.** The 5×3 sweep is a **single** PyPy process holding 4.2 GB
+resident (7.5 GB high-water) for **32.4 hours of sweep plus ~20 hours of V4**,
+writing 17,506,580,337 packed 2-bit values, on consumer
 WSL hardware **without ECC memory**. A single flipped bit in the value array is a
 wrong game value for one configuration, propagated to every ancestor that reads
 it. It produces no crash, no counter, and no anomaly — it produces a plausible
@@ -328,13 +329,28 @@ verification claim about hardware, and it is one this project cannot make.
 maintains `checks.digest`, a running hash over the sweep. The instrument is
 deterministic: same code, same variant, same seed ⇒ same digest. **Re-running an
 arm and comparing digests is therefore a genuine replay check** — a bit flip in
-either run changes the hash. It costs one further full sweep, ~13 hours per arm.
+either run changes the hash.
 
-It is **not** spent on the current 5×3 run, deliberately. The exposure is
-disclosed rather than mitigated, and the trigger is recorded here: **if the 5×3
-value is cited as a headline result — an H1 or H2 verdict in `docs/research.md`
-— the digest replay is run first.** Until then the 5×3 is reported as a
-single-run result on non-ECC hardware, and any artefact citing it says so.
+**Corrected cost (2026-08-09).** This amendment originally priced the replay at
+"~13 hours per arm", from a projection made before any arm had finished. The h1
+arm actually took **32.4 h of sweep and ~52 h wall-clock end to end**. The replay
+is therefore a **multi-day** commitment per arm, not an overnight one, and the
+trigger below has to be read with that price attached.
+
+The trigger stands regardless: **if the 5×3 value is cited as a headline result —
+an H1 or H2 verdict in `docs/research.md` — the digest replay is run first.**
+Until then the 5×3 is reported as a single-run result on non-ECC hardware, and
+any artefact citing it says so. If the cost makes the replay impractical, the
+honest response is to weaken the *claim*, not to drop the trigger: a value that
+cannot be replayed is reported as unreplicated.
+
+**A second, cheaper check that does target the reported number.** The digest
+replay defends the whole database. The reported result is one root value, and
+EXP-002's own registration already requires a **principal-variation audit** for
+exactly that reason — `solver/minimax.py::principal_variation` documents itself
+as its input. That audit costs a forward search, not a second sweep. It was not
+run on h1 (see the EXP-002 amendment of 2026-08-09) and is the first thing to
+spend compute on, ahead of any replay.
 
 **This deliberately does not add a `V7`.** A mandatory level that is skipped on
 every run is worse than a disclosed gap: it converts an honest limitation into a

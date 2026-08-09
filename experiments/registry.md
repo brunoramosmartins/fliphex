@@ -18,7 +18,7 @@ Freely editable (append-only in practice).
 | ID | Date | Hypothesis | Axis | Description | Config / commit | Seed | Status | Result |
 |---|---|---|---|---|---|---|---|---|
 | EXP-001 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 3×3, both H2 arms; adr-010 V3 double-solve | 9 cells (3×3), hands 5 + 4, commit `4a081d8`+ | — | **complete** | **P1 wins in both arms.** 711,963 configurations enumerated, matching the closed form **exactly at every layer** (V1). V0 512 ✓, V2 asserted on every terminal ✓, V5 checksummed ✓. V3: both methods agree on every position compared (24,460 h1 / 15,376 h2) — **but that is 2–3% of the space, not "every position"; see the V3 caveat below.** [`data/subgame-solutions/3x3-h1.json`](../data/subgame-solutions/3x3-h1.json), [`3x3-h2.json`](../data/subgame-solutions/3x3-h2.json) |
-| EXP-002 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 5×3, both H2 arms | 15 cells (5 cols × 3), hands 8 + 7, commit `17aac45` | — | running (h1 launched 2026-08-07) | |
+| EXP-002 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 5×3, both H2 arms | 15 cells (5 cols × 3), hands 8 + 7, commit `17aac45` (h1) / `40355de` (h2) | — | **h1 complete**, h2 pending | **h1: P1 wins.** V0–V6 all pass; V1 exact on all 16 layers. Sweep 32.38 h (150,192 cfg/s), ~52 h wall. **The registered PV audit did not run**, and V4/V6 report no coverage (61.3% / 9.8%) — see the 2026-08-09 amendment. Not yet citable as an H1 input. [`5x3-h1.json`](../data/subgame-solutions/5x3-h1.json) |
 | EXP-003 | 2026-08-05 | — | 1 | Endgame subtree cost at `k = 3…8` on the 5×5: does searching beat storing? | 25 cells, hands 13 + 12; 200 sampled positions per `k`, with and without TT; commit `4a081d8` | 1 | **complete** | **`k* > 8`.** Median nodes to prove one position: k=5 **480**, k=8 **806,474** — against a `k ≤ 5` database of ~1.2 × 10¹⁵ positions (~150 TB). Rule fires "build no database" at every registered `k`. Prediction `k* ≥ 6` **held**. → adr-012 **Option B**. [`results/exp003.json`](../results/exp003.json), [`results/exp003-tail.json`](../results/exp003-tail.json), analysis `scripts/exp003_analysis.py` |
 | EXP-004 | 2026-08-05 | — | 1 | Real compressibility of a solved layer: raw / block-RLE / block-Zstd / logic-minimized | 3×3 and 5×3 layers from EXP-001/EXP-002 | — | blocked on EXP-001 | |
 | EXP-005 | 2026-08-05 | — | 1 | Don't-care yield and adr-010 V1 reachability gap, per layer | 5×3, 15 cells, hands 8 + 7 | — | registered | |
@@ -346,6 +346,79 @@ The h1 arm was monitored instead by resident set size, which tracks the two
 co-resident layers and is therefore a real progress signal on this sweep: RSS
 climbs while `t` descends from 15 to 9, peaks near 2.5 GB at `t = 9`, and falls
 away after. It is a proxy and is not recorded as a measurement.
+
+> **Retracted 2026-08-09.** The paragraph above is wrong and is kept for the
+> record. RSS is **not** a progress signal on this sweep. PyPy does not return
+> arena to the OS as layers shrink, so RSS froze at 4,204,888 kB for over five
+> hours across four samples, and `minflt` froze with it — both while the run was
+> progressing normally. RSS also rose late (to 4.5 GB) from the observer's
+> `bytes(values)` copy, not from a larger layer. Nothing outside the process's
+> own stdout locates the layer, which is exactly what the missing `flush` cost.
+
+#### Result — h1 arm (2026-08-09)
+
+**`P1` wins the 5×3-h1 with perfect play.** The pre-registered expectation was
+"P1 wins in both arms"; h1 holds. `termination: exhausted`, `ordering: internal`,
+so the artefact satisfies adr-004 R1. Artefact
+[`data/subgame-solutions/5x3-h1.json`](../data/subgame-solutions/5x3-h1.json),
+log [`results/exp002-h1.log`](../results/exp002-h1.log).
+
+| gate | outcome |
+|---|---|
+| V0 terminal layer | 32,768 — ok |
+| V1 per-layer counts | **ok**, exact equality on all 16 layers, 17,506,580,337 configurations |
+| V2 no-draw | asserted on every terminal |
+| V4 sampled re-derivation | 344 agree, 0 disagree, **217 over budget** |
+| V5 checksum | `ab2620e1707f983fb0f57b5486062601925ab7fc7d6b5e4eaae856843e4bb22d` |
+| V6 mirror | 518 pairs checked, 0 differ, **4,768 sampled but ineligible** |
+
+**Cost.** Sweep 32.38 h at 150,192 cfg/s; V4 a further ~20 h; ~52 h wall-clock
+end to end. The pre-run projection was ~13 h — wrong by 4×, with V4 alone
+exceeding the whole projection. Root cause in the phase note; in short, the
+estimate was made in configurations, and cost per configuration is not constant.
+
+**The timing figures are low-grade measurements and are not a benchmark.** The
+run executed in an uncontrolled environment: the laptop lid was closed several
+times, so the machine passed through sleep and low-power states during the run.
+`time.perf_counter()` is `CLOCK_MONOTONIC` and does not advance across a genuine
+suspend, but it does advance during frequency throttling, so 32.38 h includes an
+unknown amount of down-clocked execution. The wall-clock figure is worse still.
+**Correctness is unaffected** — suspend/resume preserves memory and the
+verification gates are indifferent to how long they took — but no scaling claim,
+cross-board comparison, or `cfg/s` figure may be built on these numbers without
+re-measuring on a quiescent machine.
+
+#### Amendment (2026-08-09) — a registered gate did not run, and two that did report no coverage
+
+**The principal-variation audit was not performed.** The decision rule above
+registers it explicitly, and states why it is not redundant with V4: *"V4 bounds
+the rate of errors in the database; only the PV audit targets the number actually
+reported."* `solver/minimax.py::principal_variation` exists and documents itself
+as this audit's input; `scripts/exp001_solve_3x3.py` calls it; **`scripts/exp002_solve_5x3.py`
+never does.** The 5×3 therefore passed every gate the instrument implements and
+skipped the only registered gate aimed at the value being reported.
+
+Consequence, stated plainly: `P1 wins the 5×3-h1` is **not yet fully verified to
+its own registered standard**. It may be reported with that qualification
+attached; it may not be cited as an H1 input until the audit runs. The audit is a
+forward search, not a second sweep, so it is affordable — and per the adr-010
+amendment of 2026-08-07 it takes priority over the digest replay.
+
+**V4 and V6 pass without reporting coverage, which is the V3 lesson recurring.**
+
+- **V4 covered 61.3%** — 217 of 561 samples exceeded the 2,000,000-node budget
+  and produced no evidence in either direction. The instrument sets
+  `passed: true` because `disagreed == 0`, which is defensible, but a check that
+  is silent on 38.7% of its own sample should say so in its verdict.
+- **V6 covered 9.8%** — 518 eligible pairs against 4,768 sampled and rejected,
+  because adr-008 makes the mirror a game symmetry only once neither hand holds
+  `P3-y`. V6 therefore tests the endgame and almost nothing else. This is a known
+  consequence of adr-008, now quantified for the first time.
+
+Both should report a coverage figure alongside their verdict, exactly as V3 was
+amended to do on 2026-08-07. Not changed here — a gate is not redefined between
+the two arms of a running experiment. Filed for the instrument's next revision,
+after h2 completes.
 
 ### EXP-003 — endgame subtree cost: does searching beat storing?
 

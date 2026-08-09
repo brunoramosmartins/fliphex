@@ -1,0 +1,87 @@
+{
+  "experiment": "EXP-002",
+  "variant": "5x3-h1",
+  "board": [
+    5,
+    3
+  ],
+  "cells": 15,
+  "hands": [
+    [
+      "P6",
+      "P3-y",
+      "P1",
+      "P2-adj",
+      "P2-skip",
+      "P2-opp",
+      "P3-fan",
+      "JOKER"
+    ],
+    [
+      "P6",
+      "P3-y",
+      "P1",
+      "P2-adj",
+      "P2-skip",
+      "P2-opp",
+      "P3-fan"
+    ]
+  ],
+  "configurations": 17506580337,
+  "value": "P1",
+  "ordering": "internal",
+  "termination": "exhausted",
+  "bits_per_entry": 2,
+  "interpreter": "pypy 3.11.15",
+  "seed": 3,
+  "seconds": 116561.04601037601,
+  "verification": {
+    "V0_terminal_layer": {
+      "count": 32768,
+      "passed": true
+    },
+    "V1_layer_counts": {
+      "passed": true,
+      "problems": []
+    },
+    "V2_no_draw": {
+      "passed": true,
+      "mode": "asserted on every terminal"
+    },
+    "V4_sampled_rederivation": {
+      "agreed": 344,
+      "disagreed": 0,
+      "unaffordable": 217,
+      "node_budget": 2000000,
+      "passed": true,
+      "problems": []
+    },
+    "V5_checksum_sha256": "ab2620e1707f983fb0f57b5486062601925ab7fc7d6b5e4eaae856843e4bb22d",
+    "V6_mirror": {
+      "applicable": true,
+      "pairs_checked": 518,
+      "sampled_but_ineligible": 4768,
+      "problems": [],
+      "passed": true
+    }
+  },
+  "layer_counts": {
+    "0": 1,
+    "1": 240,
+    "2": 23520,
+    "3": 713440,
+    "4": 12841920,
+    "5": 113008896,
+    "6": 627827200,
+    "7": 2018016000,
+    "8": 4036032000,
+    "9": 5022617600,
+    "10": 3616284672,
+    "11": 1643765760,
+    "12": 365281280,
+    "13": 48168960,
+    "14": 1966080,
+    "15": 32768
+  },
+  "passed": true
+}

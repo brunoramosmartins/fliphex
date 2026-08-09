@@ -175,6 +175,9 @@ instrument. That story is the substance of this phase's Failed Attempts.
 ## 5×3 — the strategically meaningful solve (EXP-002)
 
 Launched 2026-08-07, h1 arm, PyPy, 2 bits/entry, projected 13 h at 2.51 GB peak.
+**Finished 2026-08-09: `P1` wins, all six gates pass, sweep 32.38 h at 150,192
+cfg/s, ~52 h wall-clock, 7.5 GB high-water.** The projection was wrong by 4× and
+the peak by 3×.
 
 Verification rides in an **observer** called as each layer completes, while that
 layer is still resident: the widened tables would be 17.5 GB, so V4 and V6 are
@@ -192,6 +195,45 @@ The h1 arm ran with no per-layer output at all, which on a job measured in hours
 makes a slow sweep indistinguishable from a hung one. Fixed for h2; the change is
 output-only, so the arms stay comparable, and it is recorded in the registry
 because the two arms now run on different commits.
+
+### Why the 13 h projection missed by 4×
+
+Worth writing down, because every one of the three errors was a modelling
+mistake, not a surprise from the machine.
+
+**The estimate was made in configurations.** Cost per configuration is not
+constant. The inner loop exits as soon as it finds a losing child, so a *win*
+node stops after a couple of probes while a *loss* node examines all `b(t)` of
+them — and `b(t)` runs from 26 at `t = 12` to 155 at `t = 7`. The loss nodes set
+the price and the price rises as the sweep descends.
+
+**A mid-run calibration then pointed the other way, and it was measured in the
+wrong regime.** Timing the top layers gave 1.678 µs/cfg at `t = 13` and 1.619 at
+`t = 12` — flat despite `b(t)` nearly tripling, which looks like proof that cost
+does not track branching. It is not. Both points probe a layer that fits in cache
+(0.5 MB and 12 MB against a 9 MiB L3), so constant enumeration overhead swamps
+the branch term. The layers that dominate probe 0.9–1.3 GB arrays at random. The
+sweep's true average was **6.66 µs/cfg — 4.1× the calibrated figure.**
+
+**V4 was never in the model at all,** and it cost ~20 h, more than the entire
+original projection. It re-derives sampled positions by forward search, and
+positions sampled from low layers have enormous subtrees; 217 of 561 samples hit
+the 2,000,000-node budget.
+
+The calibration also had a cost I did not anticipate before starting it: it is
+memory-bandwidth bound, the same as the sweep, on a shared 9 MiB L3 — so
+measuring the run slowed the run. It was killed for that reason.
+
+**And the timing numbers are low-grade regardless.** The laptop lid was closed
+several times mid-run, so the machine passed through sleep and low-power states.
+`perf_counter` is `CLOCK_MONOTONIC` and does not advance across a true suspend,
+but it does advance while the CPU is down-clocked. Correctness is untouched;
+scaling claims cannot be built on these seconds without re-measuring quiescent.
+
+The transferable rule: **do not report a point estimate from a model validated
+only outside the regime that dominates the cost.** One data point in the cheap
+regime admitted totals from 7.9 h to 21.8 h, and the answer was 32.4 h. A range,
+or a refusal, was the honest output.
 
 ## `solver/retrograde.py` — endgame on 5×5 (EXP-003)
 
@@ -317,8 +359,9 @@ records that every CPU in that cluster had ECC, and §5 defends the choice
 explicitly against this exact objection. EXP-002 cannot make the same claim, and
 until that reading nothing in this note said so.
 
-The 5×3 sweep is a **single** PyPy process holding ~4.2 GB resident for ~13
-hours, writing 17,506,580,337 packed 2-bit values, on consumer WSL hardware with
+The 5×3 sweep is a **single** PyPy process holding 4.2 GB resident (7.5 GB
+high-water) for **32.4 h of sweep plus ~20 h of V4**, writing 17,506,580,337
+packed 2-bit values, on consumer WSL hardware with
 **no ECC**. One flipped bit is a wrong value for one configuration, propagated to
 every ancestor that reads it, with no crash and no counter — a plausible answer,
 which is the whole failure mode adr-010 exists for.
@@ -332,7 +375,9 @@ not.
 
 The mitigation exists and is cheap to state: `PackedSweep` already keeps
 `checks.digest`, and the sweep is deterministic, so **re-running an arm and
-comparing digests is a real replay check**. It costs another ~13 hours per arm.
+comparing digests is a real replay check**. Priced here originally at "~13 hours
+per arm" — that was a projection made before any arm finished, and h1 came in at
+**32.4 h of sweep, ~52 h wall-clock**. The replay is a multi-day commitment.
 
 It is not spent on the current run. The exposure is disclosed instead, with the
 trigger recorded in the adr-010 amendment of 2026-08-07: if the 5×3 value is cited
@@ -355,6 +400,21 @@ from the two arms agreeing on a root value.
 When the row is written it carries its evidence class qualified by adr-010
 status, e.g. *"supported (exact, single implementation, V0–V6 passed, not
 independently reimplemented)"*.
+
+**What is now in hand, and what it is not.** The 5×3-h1 finished 2026-08-09:
+`P1` wins, V0–V6 all pass, V1 exact on 17,506,580,337 configurations. Three
+things still separate that from an H1 input:
+
+1. **The registered principal-variation audit did not run.** EXP-002's decision
+   rule requires it and says why it is not redundant with V4 — V4 bounds the
+   error *rate* in the database, the PV audit targets the *number reported*. The
+   instrument never calls `principal_variation`. Until it does, the value is
+   reported qualified, not cited.
+2. **h2 has not run**, and H2 is reported from the criticality measure, not from
+   two root values agreeing.
+3. **adr-009 stands**: a reduced-board result transfers to the shipped 5×5 as
+   evidence, never as proof. The runner prints this line itself, and it belongs
+   next to the number wherever the number goes.
 
 ## Experiment registration
 

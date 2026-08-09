@@ -617,7 +617,9 @@ not ranked; they are **differently shaped**. adr-010 is stricter on cross-method
 agreement; Takizawa is stricter on the physical substrate.
 
 That asymmetry is worth acting on. adr-010 has no clause about memory integrity,
-and EXP-002 is a single PyPy process running ~13 hours over 17.5 × 10⁹ packed
+and EXP-002 is a single PyPy process running 32.4 h of sweep (~52 h
+wall-clock, measured after the fact — this note first said ~13 h, from a
+projection) over 17.5 × 10⁹ packed
 entries on consumer WSL hardware with no ECC. A single bit flip in the 2-bit
 value array is a silent wrong answer of exactly the kind adr-010 exists to
 prevent, and none of V0–V6 would catch it — V1 counts entries, not their values.
@@ -771,7 +773,7 @@ What does, concretely:
 3. **Storage stays closed regardless.** 4.9 × 10¹⁷ states × 2 bits = **122 PB**.
    The memoization ceiling being 10 orders below Othello's does not make it
    reachable; it makes on-demand solving (EXP-006) the only door.
-4. **1,600 core-years against one WSL laptop.** EXP-002's 5×3 sweep is ~13 hours
+4. **1,600 core-years against one WSL laptop.** EXP-002's 5×3 sweep is 32.4 hours
    on one core. The 5×5 is not a bigger version of that run.
 
 ---
