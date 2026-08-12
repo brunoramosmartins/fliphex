@@ -64,6 +64,7 @@ from layer_profile import layer as closed_form_layer  # noqa: E402
 
 from fliphex.state import TILE_INDEX, Colour  # noqa: E402
 from fliphex.variant import Arm, Variant  # noqa: E402
+from solver.checkpoint import Checkpoint  # noqa: E402
 from solver.minimax import WIN, BudgetExceededError, Solver  # noqa: E402
 from solver.packed_sweep import PackedSweep  # noqa: E402
 from solver.retrograde import SLOT_LOSS, SLOT_WIN, LayerIndex  # noqa: E402
@@ -169,6 +170,63 @@ class Checks:
         """
         return all(not (hand >> self.chiral_tile) & 1 for hand in state.hands)
 
+    # -- crash resume (solver/checkpoint.py) ---------------------------------
+
+    def checkpoint_state(self) -> dict:
+        """Everything a resumed run needs except the digest.
+
+        The digest is deliberately absent: ``hashlib`` objects cannot be
+        serialised, and storing a per-layer digest instead would redefine what
+        adr-010 V5 measures halfway through an experiment. It is rebuilt in
+        :meth:`restore_checkpoint` from the layers themselves.
+
+        The RNG state travels so that a resumed run draws the *same* V4 and V6
+        samples the uninterrupted run would have drawn. Without it a resume
+        would silently re-seed the sampling, and the two arms would no longer be
+        comparable on evidence that the registry pins by seed.
+        """
+        version, internal, gauss = self.rng.getstate()
+        return {
+            "rng": [version, list(internal), gauss],
+            "layer_counts": {str(k): v for k, v in self.layer_counts.items()},
+            "v1_problems": list(self.v1_problems),
+            "v4_samples": [list(s) for s in self.v4_samples],
+            "v6_checked": self.v6_checked,
+            "v6_rejected": self.v6_rejected,
+            "v6_problems": list(self.v6_problems),
+        }
+
+    def restore_checkpoint(self, state: dict, checkpoint) -> None:
+        """Rebuild the observer, including a byte-identical V5 digest.
+
+        ``checkpoint.replay()`` yields the completed layers in **sweep order**,
+        which is the order the digest was fed originally, so the checksum this
+        run finally reports is the one an uninterrupted run would have reported.
+        That is the whole reason every layer is retained on disk.
+        """
+        version, internal, gauss = state["rng"]
+        self.rng.setstate((version, tuple(internal), gauss))
+        self.layer_counts = {int(k): v for k, v in state["layer_counts"].items()}
+        self.v1_problems = list(state["v1_problems"])
+        self.v4_samples = [tuple(s) for s in state["v4_samples"]]
+        self.v6_checked = state["v6_checked"]
+        self.v6_rejected = state["v6_rejected"]
+        self.v6_problems = list(state["v6_problems"])
+
+        self.digest = hashlib.sha256()
+        replayed = []
+        for t, values in checkpoint.replay():
+            self.digest.update(bytes(values))
+            replayed.append(t)
+        print(
+            f"  resumed: {len(replayed)} layers replayed into the V5 digest "
+            f"(t={max(replayed)} down to t={min(replayed)}), "
+            f"{len(self.v4_samples)} V4 samples and {self.v6_checked} V6 pairs "
+            f"carried over",
+            flush=True,
+        )
+        self._started = self._last = time.perf_counter()
+
 
 def _mirror_permutation(board) -> tuple[int, ...] | None:
     """The board's non-identity automorphism as a cell permutation, if it has one."""
@@ -236,6 +294,23 @@ def main() -> int:
     p.add_argument("--v4-budget", type=int, default=2_000_000)
     p.add_argument("--out", type=Path, default=Path("data/subgame-solutions"))
     p.add_argument("--no-write", action="store_true")
+    p.add_argument(
+        "--checkpoint",
+        type=Path,
+        default=Path("data/checkpoints"),
+        help=(
+            "directory for crash-resume layers; an existing checkpoint for this "
+            "variant is RESUMED, not overwritten. ~4.4 GB for the 5x3. "
+            "Pass --no-checkpoint to disable."
+        ),
+    )
+    p.add_argument(
+        "--no-checkpoint",
+        dest="checkpoint",
+        action="store_const",
+        const=None,
+        help="run without crash resume (the pre-2026-08-12 behaviour)",
+    )
     args = p.parse_args()
 
     variant = Variant(args.board[0], args.board[1], Arm(args.arm))
@@ -254,13 +329,36 @@ def main() -> int:
     )
 
     checks = Checks(variant, args.v4_per_layer, args.v6_per_layer, args.seed)
+    ckpt = None
+    resumed_from = None
+    if args.checkpoint is not None:
+        ckpt = Checkpoint(args.checkpoint / variant.name)
+        resumed_from = ckpt.resume_point()
+        if resumed_from is None:
+            print(f"  checkpoint: {ckpt.root} (fresh start)", flush=True)
+        else:
+            print(
+                f"  checkpoint: {ckpt.root} — RESUMING, layer {resumed_from} is on "
+                f"disk, the sweep restarts at layer {resumed_from - 1}",
+                flush=True,
+            )
+
     started = time.perf_counter()
-    result = PackedSweep(variant, board, args.bits).sweep(observer=checks)
-    sweep_seconds = time.perf_counter() - started
-    print(
-        f"  sweep done in {sweep_seconds / 3600:.2f} h "
-        f"({total / sweep_seconds:,.0f} cfg/s)"
+    result = PackedSweep(variant, board, args.bits).sweep(
+        observer=checks, checkpoint=ckpt
     )
+    sweep_seconds = time.perf_counter() - started
+    if resumed_from is not None:
+        # A resumed run cannot report a rate: the earlier session's time died
+        # with the process, and the layers differ in cost by an order of
+        # magnitude, so the two pieces are not addable into anything meaningful.
+        print(f"  sweep done — {sweep_seconds / 3600:.2f} h in THIS session only")
+        print("  (resumed run: total elapsed is not recoverable, no cfg/s reported)")
+    else:
+        print(
+            f"  sweep done in {sweep_seconds / 3600:.2f} h "
+            f"({total / sweep_seconds:,.0f} cfg/s)"
+        )
 
     print("  V4 — re-deriving sampled positions by forward search ...", flush=True)
     v4 = run_v4(variant, checks, args.v4_budget)
@@ -320,7 +418,12 @@ def main() -> int:
         "bits_per_entry": args.bits,
         "interpreter": f"{sys.implementation.name} {sys.version.split()[0]}",
         "seed": args.seed,
+        # On a resumed run this is THIS SESSION only. The earlier session's
+        # elapsed time died with its process and is not recoverable, so the two
+        # are not addable — `resumed_from_layer` is what says the figure is
+        # partial, and it must travel with any timing claim made from it.
         "seconds": sweep_seconds,
+        "resumed_from_layer": resumed_from,
         "verification": {
             "V0_terminal_layer": {"count": terminal, "passed": v0_ok},
             "V1_layer_counts": {

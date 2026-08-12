@@ -47,6 +47,7 @@ from fliphex.board import OFF_BOARD, Board
 from fliphex.piece import N_SLOTS
 from fliphex.state import TILES, Colour, other, tiles_in
 from fliphex.variant import Variant
+from solver.checkpoint import Checkpoint
 from solver.minimax import LOSS, WIN
 from solver.retrograde import (
     SLOT_LOSS,
@@ -283,6 +284,7 @@ class PackedSweep:
         self,
         keep: dict[int, bytearray] | None = None,
         observer=None,
+        checkpoint: Checkpoint | None = None,
     ) -> RetrogradeResult:
         """Run the whole sweep, top layer to opening position.
 
@@ -296,6 +298,18 @@ class PackedSweep:
                 what it needs and let the layer go. It is the only way V4 and V6
                 are affordable on a board whose database never exists all at
                 once.
+            checkpoint: Persist each completed layer so a killed run resumes
+                instead of restarting. If the directory already holds layers,
+                the sweep **resumes** from the lowest one rather than rebuilding
+                the terminal layer. See :mod:`solver.checkpoint` — in particular
+                why every layer is kept, which is what lets a resumed run
+                reproduce adr-010 V5 byte for byte.
+
+                An observer that carries state across layers must expose
+                ``checkpoint_state()`` and ``restore_checkpoint(state, replay)``
+                for that to hold; without them a resumed sweep still computes
+                the right value but its V4/V5/V6 evidence covers only the layers
+                it personally saw, and it says so rather than pretending.
         """
         stats = SweepStats()
         n = self.n
@@ -303,33 +317,49 @@ class PackedSweep:
         packed = self.bits == 2
         clear = _CLEAR
 
-        terminal_size = self.layer_size(n)
-        values = self._allocate(terminal_size)
-        stats.layer_counts[n] = terminal_size
-        for index, _occupied, purple, _sf, _ss in self._layer_configurations(n):
-            purple_count = purple.bit_count()
-            green_count = n - purple_count
-            if purple_count == green_count:  # adr-010 V2, asserted not sampled
-                raise AssertionError(
-                    f"tied terminal on a {n}-cell board — adr-011 makes N odd "
-                    f"precisely so this cannot happen"
-                )
-            winner = Colour.PURPLE if purple_count > green_count else Colour.GREEN
-            mover = self._mover_colour(n)
-            slot = SLOT_WIN if winner == mover else SLOT_LOSS
-            if packed:
-                byte, shift = index >> 2, (index & 3) << 1
-                values[byte] = (values[byte] & clear[index & 3]) | (slot << shift)
-            else:
-                values[index] = slot
-            if slot == SLOT_WIN:
-                stats.terminal_wins += 1
-        if keep is not None:
-            keep[n] = self.unpack(values, terminal_size)
-        if observer is not None:
-            observer(n, values, self)
+        resume_at = checkpoint.resume_point() if checkpoint is not None else None
 
-        for t in range(n - 1, -1, -1):
+        if resume_at is not None:
+            values = checkpoint.load_layer(resume_at)
+            saved = checkpoint.load_state()
+            stats.layer_counts = {
+                int(k): v for k, v in saved.get("layer_counts", {}).items()
+            }
+            stats.terminal_wins = saved.get("terminal_wins", 0)
+            if observer is not None and hasattr(observer, "restore_checkpoint"):
+                observer.restore_checkpoint(saved.get("observer", {}), checkpoint)
+            top = resume_at
+        else:
+            terminal_size = self.layer_size(n)
+            values = self._allocate(terminal_size)
+            stats.layer_counts[n] = terminal_size
+            for index, _occupied, purple, _sf, _ss in self._layer_configurations(n):
+                purple_count = purple.bit_count()
+                green_count = n - purple_count
+                if purple_count == green_count:  # adr-010 V2, asserted not sampled
+                    raise AssertionError(
+                        f"tied terminal on a {n}-cell board — adr-011 makes N odd "
+                        f"precisely so this cannot happen"
+                    )
+                winner = Colour.PURPLE if purple_count > green_count else Colour.GREEN
+                mover = self._mover_colour(n)
+                slot = SLOT_WIN if winner == mover else SLOT_LOSS
+                if packed:
+                    byte, shift = index >> 2, (index & 3) << 1
+                    values[byte] = (values[byte] & clear[index & 3]) | (slot << shift)
+                else:
+                    values[index] = slot
+                if slot == SLOT_WIN:
+                    stats.terminal_wins += 1
+            if keep is not None:
+                keep[n] = self.unpack(values, terminal_size)
+            if observer is not None:
+                observer(n, values, self)
+            if checkpoint is not None:
+                checkpoint.save(n, values, self._checkpoint_state(stats, observer))
+            top = n
+
+        for t in range(top - 1, -1, -1):
             layer_size = self.layer_size(t)
             current = self._allocate(layer_size)
             stats.layer_counts[t] = layer_size
@@ -402,6 +432,8 @@ class PackedSweep:
                 keep[t] = self.unpack(values, layer_size)
             if observer is not None:
                 observer(t, values, self)
+            if checkpoint is not None:
+                checkpoint.save(t, values, self._checkpoint_state(stats, observer))
 
         opening = values[0] & 3 if packed else values[0]
         if opening == SLOT_UNSET:
@@ -411,6 +443,17 @@ class PackedSweep:
     def _mover_colour(self, t: int) -> Colour:
         first = self.variant.first
         return first if self.mover_is_first(t) else other(first)
+
+    @staticmethod
+    def _checkpoint_state(stats: SweepStats, observer) -> dict:
+        """What a resume needs beyond the layer itself, as JSON-able data."""
+        state: dict = {
+            "layer_counts": {str(k): v for k, v in stats.layer_counts.items()},
+            "terminal_wins": stats.terminal_wins,
+        }
+        if observer is not None and hasattr(observer, "checkpoint_state"):
+            state["observer"] = observer.checkpoint_state()
+        return state
 
 
 def _mask(positions) -> int:

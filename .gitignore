@@ -21,6 +21,9 @@ FLIPHEX.pdf
 # Large artifacts — tracked selectively, see docs/engineering.md
 data/models/*.pt
 data/selfplay/
+# Crash-resume layers (solver/checkpoint.py). ~4.4 GB for one 5×3 arm, and
+# reproducible from the run itself — the JSON artefact is the deliverable.
+data/checkpoints/
 results/*.jsonl
 figures/*.png
 !figures/.gitkeep

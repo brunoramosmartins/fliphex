@@ -18,7 +18,7 @@ Freely editable (append-only in practice).
 | ID | Date | Hypothesis | Axis | Description | Config / commit | Seed | Status | Result |
 |---|---|---|---|---|---|---|---|---|
 | EXP-001 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 3×3, both H2 arms; adr-010 V3 double-solve | 9 cells (3×3), hands 5 + 4, commit `4a081d8`+ | — | **complete** | **P1 wins in both arms.** 711,963 configurations enumerated, matching the closed form **exactly at every layer** (V1). V0 512 ✓, V2 asserted on every terminal ✓, V5 checksummed ✓. V3: both methods agree on every position compared (24,460 h1 / 15,376 h2) — **but that is 2–3% of the space, not "every position"; see the V3 caveat below.** [`data/subgame-solutions/3x3-h1.json`](../data/subgame-solutions/3x3-h1.json), [`3x3-h2.json`](../data/subgame-solutions/3x3-h2.json) |
-| EXP-002 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 5×3, both H2 arms | 15 cells (5 cols × 3), hands 8 + 7, commit `17aac45` (h1) / `40355de` (h2) | — | **h1 complete**, h2 pending | **h1: P1 wins.** V0–V6 all pass; V1 exact on all 16 layers. Sweep 32.38 h (150,192 cfg/s), ~52 h wall. **The registered PV audit did not run**, and V4/V6 report no coverage (61.3% / 9.8%) — see the 2026-08-09 amendment. Not yet citable as an H1 input. [`5x3-h1.json`](../data/subgame-solutions/5x3-h1.json) |
+| EXP-002 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 5×3, both H2 arms | 15 cells (5 cols × 3), hands 8 + 7, commit `17aac45` (h1) / h2 restarted with crash resume 2026-08-12 | — | **h1 complete**, h2 restarting | **h1: P1 wins.** V0–V6 all pass; V1 exact on all 16 layers. Sweep 32.38 h (150,192 cfg/s), ~52 h wall. **The registered PV audit did not run**, and V4/V6 report no coverage (61.3% / 9.8%) — see the 2026-08-09 amendment. Not yet citable as an H1 input. [`5x3-h1.json`](../data/subgame-solutions/5x3-h1.json) |
 | EXP-003 | 2026-08-05 | — | 1 | Endgame subtree cost at `k = 3…8` on the 5×5: does searching beat storing? | 25 cells, hands 13 + 12; 200 sampled positions per `k`, with and without TT; commit `4a081d8` | 1 | **complete** | **`k* > 8`.** Median nodes to prove one position: k=5 **480**, k=8 **806,474** — against a `k ≤ 5` database of ~1.2 × 10¹⁵ positions (~150 TB). Rule fires "build no database" at every registered `k`. Prediction `k* ≥ 6` **held**. → adr-012 **Option B**. [`results/exp003.json`](../results/exp003.json), [`results/exp003-tail.json`](../results/exp003-tail.json), analysis `scripts/exp003_analysis.py` |
 | EXP-004 | 2026-08-05 | — | 1 | Real compressibility of a solved layer: raw / block-RLE / block-Zstd / logic-minimized | 3×3 and 5×3 layers from EXP-001/EXP-002 | — | blocked on EXP-001 | |
 | EXP-005 | 2026-08-05 | — | 1 | Don't-care yield and adr-010 V1 reachability gap, per layer | 5×3, 15 cells, hands 8 + 7 | — | registered | |
@@ -354,6 +354,60 @@ away after. It is a proxy and is not recorded as a measurement.
 > progressing normally. RSS also rose late (to 4.5 GB) from the observer's
 > `bytes(values)` copy, not from a larger layer. Nothing outside the process's
 > own stdout locates the layer, which is exactly what the missing `flush` cost.
+
+#### Amendment (2026-08-12) — the h2 arm died at 20.8 h, and the instrument gained crash resume
+
+**What happened.** The h2 arm ran on commit `40355de`, completed layers `t = 15`
+down to `t = 8`, and died inside `t = 7` when the machine powered off after
+20.8 h. Nothing was recoverable: `PackedSweep` held two layers in RAM and wrote
+nothing until the end, so the run's own rule applies — *"a retrograde sweep
+resolves high `t` first, so a stall leaves the root untouched and the artefact
+carries zero information about H1/H2."* It carried none.
+
+**The per-layer times in `results/exp002-h2.log` are corrupt and must not be
+used.** The log records `t = 8` at 0.96 µs/cfg, which is faster than the
+cache-resident `t = 12` (1.15 µs/cfg) while probing a 1.26 GB array at random —
+physically impossible. `t = 9` reads 16.3 h and `t = 10` reads faster than the
+smaller `t = 11`. The cause is `CLOCK_MONOTONIC` being re-based across WSL2
+suspend/resume: one layer absorbs the gap and its neighbours come out deflated.
+**Only the layer *order* in that log is evidence.** The usable timings remain
+`t = 13`, `t = 12` and `t = 11`, all measured before the first suspend, and they
+are what established the cache cliff: 1.31 → 1.15 → **4.50 µs/cfg** as the
+probed array crosses this machine's 9 MiB L3 (0.5 MB → 12 MB → 91 MB).
+
+**Change to the instrument.** `solver/checkpoint.py` (new) persists each
+completed layer; `PackedSweep.sweep` gains a `checkpoint=` parameter and resumes
+from the lowest layer on disk. `scripts/exp002_solve_5x3.py` gains `--checkpoint`
+(on by default, `data/checkpoints/`) and `--no-checkpoint`. The directory is
+gitignored: ~4.4 GB per arm, against 915 GB free.
+
+**Why this does not compromise the comparison between arms.** The change is I/O
+only — no sampling, no RNG draw, no arithmetic is touched — the same class as the
+`flush` change disclosed above. Two properties are pinned by
+`tests/test_checkpoint.py` rather than asserted:
+
+- **V5 survives a resume byte for byte.** Every completed layer is retained, and
+  a resumed run re-feeds them into a fresh SHA-256 in the original sweep order.
+  The tempting cheaper design — one digest per layer, combined at the end — was
+  rejected because it would silently redefine what V5 measures between h1 and h2.
+- **The RNG state travels**, so a resumed run draws the same V4 and V6 samples an
+  uninterrupted run would have drawn. Without that a resume re-seeds the sampling
+  and the arms stop being comparable on evidence the registry pins by seed.
+
+Layers are written before the manifest that names them, and every write is
+`os.replace` over a temporary file, so a torn write is invisible to resume rather
+than resumed into silently.
+
+**Timing on a resumed run is reported as partial, never summed.** The earlier
+session's elapsed time dies with its process, and layers differ in cost by an
+order of magnitude, so the pieces are not addable. The runner prints "this
+session only", suppresses the `cfg/s` figure entirely, and the artefact carries
+`resumed_from_layer`. **A resumed h2 therefore yields no clean wall-clock
+number** — h1's 32.38 h stands as the only end-to-end sweep timing, itself
+degraded by the lid closures recorded below.
+
+**h2 restarts from zero**, since the dead run left no checkpoint. Third commit
+for this arm; recorded here because the arms now run on three different commits.
 
 #### Result — h1 arm (2026-08-09)
 

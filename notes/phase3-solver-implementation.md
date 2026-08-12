@@ -196,6 +196,33 @@ makes a slow sweep indistinguishable from a hung one. Fixed for h2; the change i
 output-only, so the arms stay comparable, and it is recorded in the registry
 because the two arms now run on different commits.
 
+### `solver/checkpoint.py` — resume, after losing 20.8 h twice over
+
+The h2 arm died inside `t = 7` when the machine powered off, with layers 15
+through 8 computed and nowhere to put them. A retrograde sweep resolves high `t`
+first, so a stall leaves the root untouched — the registry's own rule is that
+such a run carries *zero* information about the value, which makes the loss
+total rather than partial.
+
+What makes resume cheap is the shape of the sweep: layer `t` depends on layer
+`t + 1` and nothing else, so **one array on disk is a complete resume point**.
+The 5×3 ladder is 4.4 GB against 915 GB free.
+
+The design question worth recording is the digest. adr-010 V5 is a single running
+SHA-256 fed one layer at a time, and `hashlib` objects cannot be serialised. The
+cheap fix — a digest per layer, combined at the end — would have worked and would
+have quietly redefined what V5 measures between the h1 and h2 arms. Instead every
+layer is kept and a resumed run re-feeds them in the original order, so the
+checksum is byte-identical to the uninterrupted one. `tests/test_checkpoint.py`
+pins that, and pins that the RNG state travels so the V4/V6 samples stay the ones
+the seed selects.
+
+Two smaller decisions, both defensive: the layer file is written before the
+manifest that names it, so a crash between them loses the layer rather than
+resuming from a torn one; and a resumed run refuses to print `cfg/s` at all,
+because the earlier session's time died with its process and the two pieces are
+not addable.
+
 ### Why the 13 h projection missed by 4×
 
 Worth writing down, because every one of the three errors was a modelling
