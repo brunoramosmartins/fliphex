@@ -364,7 +364,7 @@ nothing until the end, so the run's own rule applies — *"a retrograde sweep
 resolves high `t` first, so a stall leaves the root untouched and the artefact
 carries zero information about H1/H2."* It carried none.
 
-**The per-layer times in `results/exp002-h2.log` are corrupt and must not be
+~~**The per-layer times in `results/exp002-h2.log` are corrupt and must not be
 used.** The log records `t = 8` at 0.96 µs/cfg, which is faster than the
 cache-resident `t = 12` (1.15 µs/cfg) while probing a 1.26 GB array at random —
 physically impossible. `t = 9` reads 16.3 h and `t = 10` reads faster than the
@@ -373,7 +373,22 @@ suspend/resume: one layer absorbs the gap and its neighbours come out deflated.
 **Only the layer *order* in that log is evidence.** The usable timings remain
 `t = 13`, `t = 12` and `t = 11`, all measured before the first suspend, and they
 are what established the cache cliff: 1.31 → 1.15 → **4.50 µs/cfg** as the
-probed array crosses this machine's 9 MiB L3 (0.5 MB → 12 MB → 91 MB).
+probed array crosses this machine's 9 MiB L3 (0.5 MB → 12 MB → 91 MB).~~
+
+> **Retracted 2026-08-13, struck through above.** The times are **not** corrupt.
+> The restarted h2 arm reproduced the same alternating pattern on a machine that
+> never suspended, and the two arms agree layer for layer: `t = 11` 7,393.8 s vs
+> 8,145.2 s (+10.2%), `t = 10` 4,429.5 vs 4,607.4 (+4.0%), `t = 9` 58,791.0 vs
+> 59,140.8 (**+0.6%**), `t = 8` 3,885.7 vs 3,824.8 (−1.6%). A re-based clock does
+> not reproduce to 0.6% across two runs with different decks. See the parity
+> finding below for the mechanism. The `CLOCK_MONOTONIC` concern was a real
+> possibility reasoned from a real event, and it was wrong; the h1 log's timings
+> are usable after all.
+>
+> The **cache-cliff claim in the same paragraph is also withdrawn**, as
+> unproven rather than as false — see below. It was confounded: `t = 12` → `t = 11`
+> is both a cache boundary *and* a parity flip, and the parity term alone
+> accounts for the jump.
 
 **Change to the instrument.** `solver/checkpoint.py` (new) persists each
 completed layer; `PackedSweep.sweep` gains a `checkpoint=` parameter and resumes
@@ -408,6 +423,57 @@ degraded by the lid closures recorded below.
 
 **h2 restarts from zero**, since the dead run left no checkpoint. Third commit
 for this arm; recorded here because the arms now run on three different commits.
+
+#### Finding (2026-08-13) — sweep cost alternates with the parity of `t`, and why
+
+The restarted h2 arm ran to a complete sweep with per-layer output, and the
+profile is not smooth. It alternates, hard, by the parity of `t`:
+
+| `t` | to move | WIN | LOSS | µs/cfg |
+|---:|---|---:|---:|---:|
+| 12 | P1 | 91.02% | 8.98% | 1.168 |
+| 11 | P2 | 53.46% | 46.54% | **4.955** |
+| 10 | P1 | 93.79% | 6.21% | 1.274 |
+| 9 | P2 | 46.96% | 53.04% | **11.775** |
+| 8 | P1 | 97.07% | 2.93% | 0.948 |
+| 7 | P2 | 34.38% | 65.62% | **21.351** |
+| 6 | P1 | 99.71% | 0.29% | 0.483 |
+| 5 | P2 | 3.88% | 96.12% | **32.302** |
+| 4 | P1 | 100.00% | 0.00% | 0.241 |
+| 3 | P2 | 0.00% | 100.00% | **39.947** |
+
+**Mechanism.** `PackedSweep`'s inner loop exits at the first losing child, so a
+**win** node stops after a couple of probes while a **loss** node examines all
+`b(t)` of them. Cost is therefore governed by `P(loss | t)`, not by layer size.
+On a board the first player wins, `P(loss)` is low when P1 is to move (even `t`)
+and high when P2 is (odd `t`) — so the cost alternates with the parity. A
+single-parameter model,
+
+    cost(t) ≈ 0.2 + 0.27 · b(t) · P(loss | t)   µs per configuration
+
+reproduces the whole 40× span from `t = 13` to `t = 3`.
+
+This is the term missing from the model that mis-predicted the h1 runtime by 4×.
+That model was `A + C·b(t)`; the correct shape carries `P(loss | t)` as a factor,
+and it swings by two orders of magnitude between adjacent layers.
+
+**Provenance.** The WIN/LOSS fractions were counted from the checkpoint layer
+files written by `solver/checkpoint.py` — an unplanned benefit of adding crash
+resume, and the same artefact `EXP-004` needs. **`t = 3` and `t = 4` are exact**
+(the whole layer fits the sample); `t ≥ 5` is the first 8 MB of the layer file,
+which is a **prefix of the mixed-radix index and not a random sample**, so those
+percentages indicate direction, not layer-wide values. A proper measurement is
+cheap now that the layers are on disk and has not been made.
+
+**What this withdraws.** The 2026-08-12 amendment attributed the `t = 12` →
+`t = 11` jump (1.17 → 4.96 µs/cfg) to the probed array crossing this machine's
+9 MiB L3. That boundary is real, but it coincides with a parity flip, and `b(t)`
+also rises 27 → 39 there. `b·P(loss)` goes 2.42 → 18.08, a 7.5× rise against a
+4.2× rise in cost — the parity term alone over-explains the jump, leaving no
+residual for cache to account for. The cache hypothesis is **not disproved**; it
+is **unsupported by this data** and must not be cited as established. Separating
+the two needs same-parity comparisons at controlled `b(t)`, which nothing here
+provides.
 
 #### Result — h1 arm (2026-08-09)
 
@@ -651,6 +717,20 @@ successor experiment registers its own ID; this note does not create one.
 - **Decision rule.** Chooses between adr-012 Options A and C, and calibrates the
   largest `k` that fits available disk. No pre-declared threshold: this is a
   measurement, not a test.
+
+#### Note (2026-08-13) — unblocked as a side effect of crash resume
+
+The blocker was never the solve; it was that a solved 5×3 layer existed only in
+RAM and was discarded as the sweep moved past it. `solver/checkpoint.py`, added
+for crash resume, now leaves **all 16 layers of the h2 arm on disk** —
+`data/checkpoints/5x3-h2/`, 4.1 GB, exactly the input this experiment specifies.
+Nothing here is re-registered and the decision rule is untouched; the status
+changes from *blocked* to *runnable* once h2 finishes, since the files are the
+live run's resume state until then.
+
+The same files already paid for themselves once: the WIN/LOSS-per-layer counts
+behind the parity finding in EXP-002 were read straight out of them, which is a
+measurement nobody could have made while the layers were transient.
 
 ### EXP-005 — don't-care yield and the V1 reachability gap
 

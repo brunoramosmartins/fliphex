@@ -58,7 +58,7 @@ class Recorder:
             self.digest.update(bytes(values))
 
 
-class Interrupted(Exception):
+class PowerCutError(Exception):
     """Raised by the observer to simulate the machine dying mid-sweep."""
 
 
@@ -70,7 +70,7 @@ class Killer(Recorder):
     def __call__(self, t, values, sweep) -> None:
         super().__call__(t, values, sweep)
         if t == self.die_at:
-            raise Interrupted
+            raise PowerCutError
 
 
 def _sweep(observer=None, checkpoint=None):
@@ -82,7 +82,7 @@ def _sweep(observer=None, checkpoint=None):
 def _crash_then_resume(tmp_path, die_at: int) -> tuple[Checkpoint, Recorder]:
     """Kill a sweep at ``die_at``, then resume it. Returns the resumed observer."""
     ckpt = Checkpoint(tmp_path / "run")
-    with pytest.raises(Interrupted):
+    with pytest.raises(PowerCutError):
         _sweep(observer=Killer(die_at=die_at), checkpoint=ckpt)
     resumed = Recorder()
     _sweep(observer=resumed, checkpoint=ckpt)
@@ -104,7 +104,7 @@ def clean_value():
 
 def test_a_resumed_sweep_returns_the_same_value(clean_value, tmp_path):
     ckpt = Checkpoint(tmp_path / "run")
-    with pytest.raises(Interrupted):
+    with pytest.raises(PowerCutError):
         _sweep(observer=Killer(die_at=3), checkpoint=ckpt)
 
     # The layer is saved *after* the observer returns, so a layer whose observer
@@ -140,7 +140,7 @@ def test_resume_works_from_any_layer(clean, clean_value, die_at, tmp_path):
 def test_a_half_written_layer_is_never_resumed_from(tmp_path):
     """The manifest is written after the layer, so a torn write is invisible."""
     ckpt = Checkpoint(tmp_path / "run")
-    with pytest.raises(Interrupted):
+    with pytest.raises(PowerCutError):
         _sweep(observer=Killer(die_at=3), checkpoint=ckpt)
 
     # Simulate a crash between the layer write and the manifest write: layer 3
@@ -152,7 +152,7 @@ def test_a_half_written_layer_is_never_resumed_from(tmp_path):
 
 def test_a_manifest_naming_a_missing_layer_refuses_to_resume(tmp_path):
     ckpt = Checkpoint(tmp_path / "run")
-    with pytest.raises(Interrupted):
+    with pytest.raises(PowerCutError):
         _sweep(observer=Killer(die_at=3), checkpoint=ckpt)
 
     ckpt.layer_path(4).unlink()
@@ -173,9 +173,9 @@ def test_an_uninterrupted_sweep_with_a_checkpoint_matches_one_without(clean, tmp
 def test_resuming_twice_still_reproduces_the_checksum(clean, tmp_path):
     """Two power cuts in one run. The digest is rebuilt from disk each time."""
     ckpt = Checkpoint(tmp_path / "run")
-    with pytest.raises(Interrupted):
+    with pytest.raises(PowerCutError):
         _sweep(observer=Killer(die_at=4), checkpoint=ckpt)
-    with pytest.raises(Interrupted):
+    with pytest.raises(PowerCutError):
         _sweep(observer=Killer(die_at=2), checkpoint=ckpt)
 
     resumed = Recorder()

@@ -234,28 +234,66 @@ node stops after a couple of probes while a *loss* node examines all `b(t)` of
 them — and `b(t)` runs from 26 at `t = 12` to 155 at `t = 7`. The loss nodes set
 the price and the price rises as the sweep descends.
 
-**A mid-run calibration then pointed the other way, and it was measured in the
-wrong regime.** Timing the top layers gave 1.678 µs/cfg at `t = 13` and 1.619 at
-`t = 12` — flat despite `b(t)` nearly tripling, which looks like proof that cost
-does not track branching. It is not. Both points probe a layer that fits in cache
-(0.5 MB and 12 MB against a 9 MiB L3), so constant enumeration overhead swamps
-the branch term. The layers that dominate probe 0.9–1.3 GB arrays at random. The
-sweep's true average was **6.66 µs/cfg — 4.1× the calibrated figure.**
+**A mid-run calibration then pointed the other way, and it was sampled from two
+layers that happen to disagree about the thing being measured.** Timing the top
+layers gave 1.678 µs/cfg at `t = 13` and 1.619 at `t = 12` — flat despite `b(t)`
+nearly tripling, which looks like proof that cost does not track branching. The
+sweep's true average was **6.66 µs/cfg, 4.1× the calibrated figure.**
+
+At the time I explained the flatness by cache: both points probe a layer that
+fits in this machine's 9 MiB L3 (0.5 MB and 12 MB), so enumeration overhead
+swamps the branch term. That was wrong, or at least unsupported — see below. The
+real reason those two points look flat is that `t = 13` and `t = 12` have
+**opposite parity**, and parity is what governs the cost.
+
+**The term I was missing entirely.** Cost is not `A + C·b(t)`. It is
+
+    cost(t) ≈ 0.2 + 0.27 · b(t) · P(loss | t)   µs per configuration
+
+Because the inner loop exits at the first losing child, a *loss* node pays the
+full `b(t)` and a *win* node pays almost nothing. On a board P1 wins, `P(loss)`
+is near zero when P1 is to move and near one when P2 is — so the cost alternates
+with the parity of `t`, by **two orders of magnitude between adjacent layers**:
+0.241 µs at `t = 4` against 39.9 µs at `t = 3`. Sampling any two adjacent layers,
+as the calibration did, samples one of each and averages away the only variable
+that matters. Measured in `experiments/registry.md`, EXP-002, finding of
+2026-08-13.
+
+**And the cache explanation is withdrawn as unproven.** The `t = 12` → `t = 11`
+jump is simultaneously a cache boundary, a parity flip, and a `b(t)` rise from 27
+to 39. `b·P(loss)` goes 2.42 → 18.08 there — a 7.5× rise against a 4.2× rise in
+cost, so parity over-explains the jump on its own and leaves nothing for cache to
+account for. Not disproved; unsupported. Separating them needs same-parity
+comparisons at controlled `b(t)`, which no measurement here provides.
 
 **V4 was never in the model at all,** and it cost ~20 h, more than the entire
 original projection. It re-derives sampled positions by forward search, and
 positions sampled from low layers have enormous subtrees; 217 of 561 samples hit
 the 2,000,000-node budget.
 
-The calibration also had a cost I did not anticipate before starting it: it is
-memory-bandwidth bound, the same as the sweep, on a shared 9 MiB L3 — so
-measuring the run slowed the run. It was killed for that reason.
+The calibration also had a cost I did not anticipate before starting it: it
+competes with the sweep for the same machine, so measuring the run slowed the
+run. It was killed for that reason.
 
-**And the timing numbers are low-grade regardless.** The laptop lid was closed
-several times mid-run, so the machine passed through sleep and low-power states.
-`perf_counter` is `CLOCK_MONOTONIC` and does not advance across a true suspend,
-but it does advance while the CPU is down-clocked. Correctness is untouched;
-scaling claims cannot be built on these seconds without re-measuring quiescent.
+**The lid closures turned out not to matter, and I over-corrected for them.**
+When the h1 log showed layers that looked impossible — `t = 8` faster than a
+small cache-resident layer — I attributed it to `CLOCK_MONOTONIC` being re-based
+across WSL2 suspend, and recorded in the registry that those timings were corrupt
+and only the layer *order* was evidence. The restarted h2 arm, on a machine that
+never suspended, reproduced the same shape and agreed with h1 layer for layer:
+`t = 9` within **0.6%**, `t = 8` within 1.6%. The pattern was the parity effect
+all along. A re-based clock does not reproduce to 0.6% across two runs with
+different decks.
+
+The lesson is narrower than "don't trust the clock": I had a real anomaly, a real
+recent event to blame it on, and I stopped there instead of asking what would
+reproduce and what would not. **The h1 timings are usable, and the retraction is
+recorded next to the original claim in the registry rather than replacing it.**
+
+Two smaller caveats that do stand: the wall-clock figures are inflated by
+low-power throttling (`perf_counter` does not advance across a true suspend but
+does advance while the CPU is down-clocked), and h1's V4 phase is not in any of
+the per-layer numbers.
 
 The transferable rule: **do not report a point estimate from a model validated
 only outside the regime that dominates the cost.** One data point in the cheap
