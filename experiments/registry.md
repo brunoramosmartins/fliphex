@@ -18,7 +18,7 @@ Freely editable (append-only in practice).
 | ID | Date | Hypothesis | Axis | Description | Config / commit | Seed | Status | Result |
 |---|---|---|---|---|---|---|---|---|
 | EXP-001 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 3×3, both H2 arms; adr-010 V3 double-solve | 9 cells (3×3), hands 5 + 4, commit `4a081d8`+ | — | **complete** | **P1 wins in both arms.** 711,963 configurations enumerated, matching the closed form **exactly at every layer** (V1). V0 512 ✓, V2 asserted on every terminal ✓, V5 checksummed ✓. V3: both methods agree on every position compared (24,460 h1 / 15,376 h2) — **but that is 2–3% of the space, not "every position"; see the V3 caveat below.** [`data/subgame-solutions/3x3-h1.json`](../data/subgame-solutions/3x3-h1.json), [`3x3-h2.json`](../data/subgame-solutions/3x3-h2.json) |
-| EXP-002 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 5×3, both H2 arms | 15 cells (5 cols × 3), hands 8 + 7, commit `17aac45` (h1) / h2 restarted with crash resume 2026-08-12 | — | **h1 complete**, h2 restarting | **h1: P1 wins.** V0–V6 all pass; V1 exact on all 16 layers. Sweep 32.38 h (150,192 cfg/s), ~52 h wall. **The registered PV audit did not run**, and V4/V6 report no coverage (61.3% / 9.8%) — see the 2026-08-09 amendment. Not yet citable as an H1 input. [`5x3-h1.json`](../data/subgame-solutions/5x3-h1.json) |
+| EXP-002 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 5×3, both H2 arms | 15 cells (5 cols × 3), hands 8 + 7, commit `17aac45` (h1) / crash-resume build (h2) | — | **both arms complete** | **P1 wins in both arms.** V0–V6 pass on both; V1 exact on all 16 layers. Sweeps 32.38 h / 34.25 h. **The registered PV audit has not run on either arm**, and V4/V6 report no coverage (~61% / ~10%) — see the amendments of 2026-08-09 and the h2 result. **Not yet citable as an H1 input, and H2's registered measure is criticality, not two roots agreeing** — that needs h1 re-run with checkpointing. [`5x3-h1.json`](../data/subgame-solutions/5x3-h1.json), [`5x3-h2.json`](../data/subgame-solutions/5x3-h2.json) |
 | EXP-003 | 2026-08-05 | — | 1 | Endgame subtree cost at `k = 3…8` on the 5×5: does searching beat storing? | 25 cells, hands 13 + 12; 200 sampled positions per `k`, with and without TT; commit `4a081d8` | 1 | **complete** | **`k* > 8`.** Median nodes to prove one position: k=5 **480**, k=8 **806,474** — against a `k ≤ 5` database of ~1.2 × 10¹⁵ positions (~150 TB). Rule fires "build no database" at every registered `k`. Prediction `k* ≥ 6` **held**. → adr-012 **Option B**. [`results/exp003.json`](../results/exp003.json), [`results/exp003-tail.json`](../results/exp003-tail.json), analysis `scripts/exp003_analysis.py` |
 | EXP-004 | 2026-08-05 | — | 1 | Real compressibility of a solved layer: raw / block-RLE / block-Zstd / logic-minimized | 3×3 and 5×3 layers from EXP-001/EXP-002 | — | blocked on EXP-001 | |
 | EXP-005 | 2026-08-05 | — | 1 | Don't-care yield and adr-010 V1 reachability gap, per layer | 5×3, 15 cells, hands 8 + 7 | — | registered | |
@@ -539,6 +539,64 @@ Both should report a coverage figure alongside their verdict, exactly as V3 was
 amended to do on 2026-08-07. Not changed here — a gate is not redefined between
 the two arms of a running experiment. Filed for the instrument's next revision,
 after h2 completes.
+
+#### Result — h2 arm (2026-08-13)
+
+**`P1` wins the 5×3-h2 with perfect play.** The pre-registered expectation was
+"P1 wins in both arms"; both arms now hold. Artefact
+[`data/subgame-solutions/5x3-h2.json`](../data/subgame-solutions/5x3-h2.json),
+log [`results/exp002-h2.log`](../results/exp002-h2.log). `resumed_from_layer:
+null` — the arm ran uninterrupted, so its timing is clean and its
+`seconds` figure is whole.
+
+| gate | h1 | h2 |
+|---|---|---|
+| V0 terminal layer | 32,768 ok | 32,768 ok |
+| V1 per-layer counts | ok | ok |
+| V2 no-draw | asserted | asserted |
+| V4 re-derivation | 344 / 0 / **217** over budget | 349 / 0 / **212** over budget |
+| V5 checksum | `ab2620e1707f983f…` | `51192b4d403ac1cb…` |
+| V6 mirror | 518 pairs, 4,768 ineligible | **518 pairs, 4,768 ineligible** |
+| sweep | 32.38 h, 150,192 cfg/s | 34.25 h, 142,004 cfg/s |
+
+**H2 is NOT reported from this.** Both arms agreeing on a root value is one bit.
+The registered measure is the **criticality** — the fraction of solved positions
+whose value changes when P1's extra tile is swapped — and that is a
+position-by-position comparison, not a comparison of two roots. The decision rule
+above says so explicitly and is not being reinterpreted now that a convenient
+agreement exists.
+
+**The criticality measure is one re-run away from being computable.** The two
+arms index the same object: 15 cells, hands 8 + 7, 17,506,580,337 configurations,
+the same mixed-radix encoding of cells, colours and spent slots. Criticality is
+an XOR and a popcount between the two databases. Only h2's layers survive — h1
+ran before `solver/checkpoint.py` existed and its layers were discarded as the
+sweep passed them.
+
+**Re-running h1 with `--checkpoint` therefore discharges three registered
+obligations at once**, which is the best ratio available on a ~52 h job:
+
+1. the layers the criticality measure needs, and with them H2's actual test;
+2. the **digest replay** the adr-010 amendment of 2026-08-07 requires before the
+   5×3 value may be cited — it is satisfied exactly when V5 comes back
+   `ab2620e1707f983f…`;
+3. a clean end-to-end wall-clock, which h1 has never had (lid closures).
+
+**Two observations from the artefacts.**
+
+*V6's two arms are not independent evidence.* Both report **exactly** 518 pairs
+checked and 4,768 rejected. Not a defect: seed 3 is registered for both arms, the
+hands are the same size, and eligibility turns only on whether `P3-y` has been
+played — never on the arrow patterns. Same seed ⇒ same indices drawn ⇒ same
+eligibility verdicts. The consequence is that V6 examined *the same positions*
+in both arms and the two results do not corroborate each other. V4 does differ
+(344/217 against 349/212) because forward-search cost depends on the deck.
+
+*The deck explains the runtime gap.* h2 was 5.8% slower. P1's hand holds 36
+distinct (tile, rotation) pairs in h2 against 35 in h1 — `P3-tri` has 2 rotation
+orbits where `JOKER` has 1 — so h2 carries **2.9% more branching** on every
+even-`t` layer. Same direction, same order of magnitude. The clock is explained
+by the deck, not by the machine.
 
 ### EXP-003 — endgame subtree cost: does searching beat storing?
 

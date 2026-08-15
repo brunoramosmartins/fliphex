@@ -466,20 +466,32 @@ When the row is written it carries its evidence class qualified by adr-010
 status, e.g. *"supported (exact, single implementation, V0–V6 passed, not
 independently reimplemented)"*.
 
-**What is now in hand, and what it is not.** The 5×3-h1 finished 2026-08-09:
-`P1` wins, V0–V6 all pass, V1 exact on 17,506,580,337 configurations. Three
-things still separate that from an H1 input:
+**What is now in hand, and what it is not.** Both 5×3 arms are solved — h1 on
+2026-08-09, h2 on 2026-08-13 — and **`P1` wins both**, with V0–V6 passing and V1
+exact on 17,506,580,337 configurations each. Three things still separate that
+from an H1 or H2 input:
 
-1. **The registered principal-variation audit did not run.** EXP-002's decision
-   rule requires it and says why it is not redundant with V4 — V4 bounds the
-   error *rate* in the database, the PV audit targets the *number reported*. The
-   instrument never calls `principal_variation`. Until it does, the value is
-   reported qualified, not cited.
-2. **h2 has not run**, and H2 is reported from the criticality measure, not from
-   two root values agreeing.
+1. **The registered principal-variation audit had not run on either arm.**
+   EXP-002's decision rule requires it and says why it is not redundant with V4 —
+   V4 bounds the error *rate* in the database, the PV audit targets the *number
+   reported*. `scripts/exp002_pv_audit.py` now exists and does two things: walks
+   the PV out of the sweep's own layer files and re-derives every position on it
+   by forward search, then re-derives the root under **every distinct first
+   move**, so a sweep that got one opening wrong cannot hide behind the opening
+   the PV happens to take.
+2. **Both arms agreeing on `P1` is not H2.** H2 is reported from the criticality
+   measure — the fraction of positions whose value *changes* when P1's extra tile
+   is swapped — and that needs both databases side by side. Only h2's layers
+   survive; h1 predates `solver/checkpoint.py`. Re-running h1 with
+   `--checkpoint` is the move that unlocks it, and it simultaneously discharges
+   the adr-010 digest replay and gives h1 its first clean wall-clock.
 3. **adr-009 stands**: a reduced-board result transfers to the shipped 5×5 as
    evidence, never as proof. The runner prints this line itself, and it belongs
    next to the number wherever the number goes.
+
+The audit is only possible because the layers survive the sweep. That was built
+for crash resume and has now paid for itself twice — the parity finding above
+came out of the same files.
 
 ## Experiment registration
 
