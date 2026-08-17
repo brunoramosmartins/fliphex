@@ -141,9 +141,21 @@ class Checkpoint:
 
     @staticmethod
     def _atomic_write(path: Path, payload: bytes) -> None:
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        with open(tmp, "wb") as handle:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(tmp, path)
+        atomic_write(path, payload)
+
+
+def atomic_write(path: Path, payload: bytes) -> None:
+    """Write ``payload`` to ``path`` so a crash cannot leave it half-written.
+
+    Temporary file in the same directory, fsync, then ``os.replace``, which is
+    atomic on POSIX. Shared with the experiment runners: any file a long run
+    rewrites as it progresses needs this, or a power cut turns a resume point
+    into silent corruption.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp, "wb") as handle:
+        handle.write(payload)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(tmp, path)

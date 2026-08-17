@@ -57,7 +57,7 @@ from fliphex.moves import apply_move, legal_moves  # noqa: E402
 from fliphex.notation import encode_move  # noqa: E402
 from fliphex.state import Colour  # noqa: E402
 from fliphex.variant import Arm, Variant  # noqa: E402
-from solver.checkpoint import Checkpoint  # noqa: E402
+from solver.checkpoint import Checkpoint, atomic_write  # noqa: E402
 from solver.minimax import LOSS, WIN, BudgetExceededError, Solver  # noqa: E402
 from solver.packed_sweep import PackedSweep  # noqa: E402
 from solver.retrograde import SLOT_LOSS, SLOT_WIN, LayerIndex  # noqa: E402
@@ -153,6 +153,29 @@ def rederive(board, state, tt, budget: int) -> tuple[int | None, int]:
     return result.value, result.stats.nodes
 
 
+def partial_path(args, variant: Variant) -> Path:
+    return args.out / f"exp002-pv-audit-{variant.name}.json"
+
+
+def load_partial(args, variant: Variant) -> dict:
+    """Completed rows from an earlier session, keyed so they can be skipped.
+
+    The audit is hours of forward proofs and has no state beyond "which
+    positions are already settled", so resume is just: write the artefact after
+    every position, and on start skip what it already names. Each first-move
+    proof is independent of the others, which is what makes this sound — unlike
+    the sweep, there is no digest or RNG stream whose order matters.
+    """
+    path = partial_path(args, variant)
+    if args.no_resume or not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError:
+        print(f"  partial artefact at {path} is unreadable; starting over")
+        return {}
+
+
 def audit(variant: Variant, args) -> dict:
     board = variant.board()
     ckpt = Checkpoint(args.checkpoint / variant.name)
@@ -163,7 +186,19 @@ def audit(variant: Variant, args) -> dict:
     print(f"  database: {ckpt.root}")
     print(f"  root value from the sweep: {'P1' if db.value(root) == WIN else 'P2'}")
     print(f"  interpreter: {sys.implementation.name} {sys.version.split()[0]}")
-    print(f"  node budget: {args.budget:,} per position\n", flush=True)
+    print(f"  node budget: {args.budget:,} per position", flush=True)
+
+    prior = load_partial(args, variant)
+    done_pv = {r["ply"]: r for r in prior.get("pv", {}).get("rows", [])}
+    done_first = {r["move"]: r for r in prior.get("first_moves", {}).get("rows", [])}
+    if done_pv or done_first:
+        print(
+            f"  RESUMING from {partial_path(args, variant)}: "
+            f"{len(done_pv)} PV positions and {len(done_first)} first moves "
+            f"already settled",
+            flush=True,
+        )
+    print(flush=True)
 
     tt = TranspositionTable(1 << args.tt_bits, verify=True)
 
@@ -192,6 +227,11 @@ def audit(variant: Variant, args) -> dict:
         if state.is_terminal():
             break
         expected = db.value(state)
+        if ply in done_pv:
+            row = done_pv[ply]
+            pv_rows.append(row)
+            print(f"    ply {ply:2d}  (from a previous session)", flush=True)
+            continue
         fresh = TranspositionTable(1 << args.tt_bits, verify=True)
         got, nodes = rederive(board, state, fresh, args.budget)
         status = (
@@ -203,23 +243,24 @@ def audit(variant: Variant, args) -> dict:
             f"{status:9s}  {nodes:>12,} nodes",
             flush=True,
         )
+        _save(args, variant, db, root, line, pv_rows, [], started, board)
 
     # -- part 2: every distinct first move ----------------------------------
     moves = legal_moves(board, root)
     print(f"\n  part 2 — re-deriving the root under each of {len(moves):,} first moves")
     first_rows = []
     for i, move in enumerate(moves):
+        name = encode_move(board, move)
+        if name in done_first:
+            first_rows.append(done_first[name])
+            continue
         child = apply_move(board, root, move)
         expected = db.value(child)
         got, nodes = rederive(board, child, tt, args.budget)
         first_rows.append(
-            {
-                "move": encode_move(board, move),
-                "expected": expected,
-                "got": got,
-                "nodes": nodes,
-            }
+            {"move": name, "expected": expected, "got": got, "nodes": nodes}
         )
+        _save(args, variant, db, root, line, pv_rows, first_rows, started, board)
         if got is not None and got != expected:
             print(f"    DISAGREE on {encode_move(board, move)}", flush=True)
         if (i + 1) % args.report_every == 0:
@@ -231,36 +272,30 @@ def audit(variant: Variant, args) -> dict:
                 flush=True,
             )
 
-    return _report(variant, args, db, root, line, pv_rows, first_rows, started, board)
+    artefact = _artefact(
+        variant, args, db, root, line, pv_rows, first_rows, started, board
+    )
+    _print_summary(variant, artefact, first_rows)
+    _save(args, variant, db, root, line, pv_rows, first_rows, started, board)
+    return artefact
 
 
-def _report(variant, args, db, root, line, pv_rows, first_rows, started, board) -> dict:
-    def tally(rows):
-        agree = sum(1 for r in rows if r["got"] == r["expected"])
-        disagree = sum(1 for r in rows if r["got"] not in (None, r["expected"]))
-        unproven = sum(1 for r in rows if r["got"] is None)
-        return agree, disagree, unproven
+def _tally(rows) -> tuple[int, int, int]:
+    agree = sum(1 for r in rows if r["got"] == r["expected"])
+    disagree = sum(1 for r in rows if r["got"] not in (None, r["expected"]))
+    unproven = sum(1 for r in rows if r["got"] is None)
+    return agree, disagree, unproven
 
-    pv_a, pv_d, pv_u = tally(pv_rows)
-    fm_a, fm_d, fm_u = tally(first_rows)
-    passed = pv_d == 0 and fm_d == 0 and pv_u == 0
 
-    print()
-    print(f"    PV positions .......... {pv_a} agree, {pv_d} disagree, {pv_u} unproven")
-    print(f"    first moves ........... {fm_a} agree, {fm_d} disagree, {fm_u} unproven")
-    print(f"    coverage (first moves)  {fm_a / max(len(first_rows), 1):.1%}")
-    print(f"    elapsed ............... {time.perf_counter() - started:,.1f}s")
-    print()
-    if passed:
-        print(f"    {variant.name}: PV AUDIT PASSED")
-    else:
-        print(f"    {variant.name}: PV AUDIT FAILED — see disagreements above")
-    if pv_u:
-        print(
-            "    note: an unproven position on the PV is a gap, not a pass — the "
-            "audit exists precisely to cover this line."
-        )
-
+def _artefact(
+    variant, args, db, root, line, pv_rows, first_rows, started, board
+) -> dict:
+    """Build the artefact. Written after *every* position, so it doubles as the
+    resume point — which is why ``rows`` is carried in full for both parts."""
+    pv_a, pv_d, pv_u = _tally(pv_rows)
+    fm_a, fm_d, fm_u = _tally(first_rows)
+    total_first = len(legal_moves(board, root))
+    complete = len(first_rows) == total_first and pv_u == 0
     return {
         "experiment": "EXP-002",
         "audit": "principal-variation",
@@ -274,15 +309,56 @@ def _report(variant, args, db, root, line, pv_rows, first_rows, started, board) 
             "agree": fm_a,
             "disagree": fm_d,
             "unproven": fm_u,
-            "total": len(first_rows),
+            "settled": len(first_rows),
+            "total": total_first,
+            "rows": first_rows,
             "disagreements": [
                 r for r in first_rows if r["got"] not in (None, r["expected"])
             ],
         },
-        "passed": passed,
+        # A partial run is never "passed": the audit exists to cover a specific
+        # line, and a line half-covered is a gap, not a weaker pass.
+        "complete": complete,
+        "passed": complete and pv_d == 0 and fm_d == 0,
         "interpreter": f"{sys.implementation.name} {sys.version.split()[0]}",
         "seconds": time.perf_counter() - started,
     }
+
+
+def _save(args, variant, db, root, line, pv_rows, first_rows, started, board) -> None:
+    if args.no_write:
+        return
+    artefact = _artefact(
+        variant, args, db, root, line, pv_rows, first_rows, started, board
+    )
+    atomic_write(partial_path(args, variant), json.dumps(artefact, indent=2).encode())
+
+
+def _print_summary(variant, artefact, first_rows) -> None:
+    pv, fm = artefact["pv"], artefact["first_moves"]
+    print()
+    print(
+        f"    PV positions .......... {pv['agree']} agree, {pv['disagree']} "
+        f"disagree, {pv['unproven']} unproven"
+    )
+    print(
+        f"    first moves ........... {fm['agree']} agree, {fm['disagree']} "
+        f"disagree, {fm['unproven']} unproven"
+    )
+    print(f"    coverage (first moves)  {fm['agree'] / max(fm['total'], 1):.1%}")
+    print(f"    elapsed ............... {artefact['seconds']:,.1f}s")
+    print()
+    if artefact["passed"]:
+        print(f"    {variant.name}: PV AUDIT PASSED")
+    elif fm["disagree"] or pv["disagree"]:
+        print(f"    {variant.name}: PV AUDIT FAILED — see disagreements above")
+    else:
+        print(f"    {variant.name}: INCOMPLETE — no disagreement, but not full cover")
+    if pv["unproven"]:
+        print(
+            "    note: an unproven position on the PV is a gap, not a pass — the "
+            "audit exists precisely to cover this line."
+        )
 
 
 def main() -> int:
@@ -295,6 +371,11 @@ def main() -> int:
     p.add_argument("--budget", type=int, default=200_000_000)
     p.add_argument("--tt-bits", type=int, default=24)
     p.add_argument("--report-every", type=int, default=25)
+    p.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="ignore a partial artefact and re-prove every position",
+    )
     p.add_argument("--out", type=Path, default=Path("results"))
     p.add_argument("--no-write", action="store_true")
     args = p.parse_args()
@@ -303,10 +384,7 @@ def main() -> int:
     artefact = audit(variant, args)
 
     if not args.no_write:
-        args.out.mkdir(parents=True, exist_ok=True)
-        path = args.out / f"exp002-pv-audit-{variant.name}.json"
-        path.write_text(json.dumps(artefact, indent=2))
-        print(f"\n    artefact -> {path}")
+        print(f"\n    artefact -> {partial_path(args, variant)}")
     return 0 if artefact["passed"] else 1
 
 
