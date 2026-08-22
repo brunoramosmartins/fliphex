@@ -337,6 +337,27 @@ def audit(variant: Variant, args) -> dict:
     print(f"  principal variation, {len(line)} plies:")
     print(f"    {' '.join(encode_move(board, m) for m in line)}\n", flush=True)
 
+    moves = legal_moves(board, root)
+
+    # Rows carried over from an earlier session live in these dicts from the
+    # start; they are **not** appended as the loops reach them. A checkpoint
+    # written mid-loop serialises whatever the dict holds, so a run that dies
+    # early no longer takes the earlier session's proofs down with it. The
+    # 2026-08-20 resume did exactly that: it carried thirteen decided plies,
+    # spent 21 h proving ply 0, saved — and that save wrote a single row,
+    # because plies 2-14 had not been re-appended yet. Thirteen proofs gone,
+    # silently, at the one moment the checkpoint was supposed to be earning
+    # its keep.
+    pv_done = dict(done_pv)
+    first_done = dict(done_first)
+
+    def pv_snapshot() -> list:
+        return [pv_done[k] for k in sorted(pv_done)]
+
+    def first_snapshot() -> list:
+        ordered = (encode_move(board, m) for m in moves)
+        return [first_done[n] for n in ordered if n in first_done]
+
     # -- part 1: every position on the PV -----------------------------------
     # Each PV position gets its **own** table, deliberately, even though sharing
     # one would make eight of these nine searches return in a single node: every
@@ -347,10 +368,8 @@ def audit(variant: Variant, args) -> dict:
     # amendment was exactly that) would corrupt all of them together. A fresh
     # table per position costs ~200 ms each and removes the table as a shared
     # failure mode across the line the whole claim rests on.
-    pv_rows = []
     if args.parts == "first":
-        pv_rows = [done_pv[k] for k in sorted(done_pv)]
-        print(f"  part 1 — SKIPPED (--parts first); {len(pv_rows)} rows carried over")
+        print(f"  part 1 — SKIPPED (--parts first); {len(pv_done)} rows carried over")
     else:
         print("  part 1 — re-deriving every position on the PV by forward search")
         print("    (independent table per position — see the comment in the source)")
@@ -361,8 +380,7 @@ def audit(variant: Variant, args) -> dict:
             if state.is_terminal():
                 break
             expected = db.value(state)
-            if ply in done_pv:
-                pv_rows.append(done_pv[ply])
+            if ply in pv_done:
                 print(f"    ply {ply:2d}  (from a previous session)", flush=True)
                 continue
             fresh = TranspositionTable(1 << args.tt_bits, verify=True)
@@ -374,42 +392,56 @@ def audit(variant: Variant, args) -> dict:
                 if got is None
                 else ("agree" if got == expected else "DISAGREE")
             )
-            pv_rows.append(
-                {
-                    "ply": ply,
-                    "expected": expected,
-                    "got": got,
-                    "nodes": nodes,
-                    # Rows can outlive the run that made them, and a resume may
-                    # use a different budget, so each row carries its own.
-                    "budget": args.budget,
-                }
-            )
+            pv_done[ply] = {
+                "ply": ply,
+                "expected": expected,
+                "got": got,
+                "nodes": nodes,
+                # Rows can outlive the run that made them, and a resume may use
+                # a different budget or table size, so each row carries its own.
+                # The node count is only interpretable against both.
+                "budget": args.budget,
+                "tt_bits": args.tt_bits,
+            }
             print(
                 f"    ply {ply:2d}  sweep={'WIN ' if expected == WIN else 'LOSS'}  "
                 f"{status:9s}  {nodes:>12,} nodes",
                 flush=True,
             )
-            _save(args, variant, db, root, line, pv_rows, [], started, board)
+            _save(
+                args,
+                variant,
+                db,
+                root,
+                line,
+                pv_snapshot(),
+                first_snapshot(),
+                started,
+                board,
+            )
 
     # -- part 2: every distinct first move ----------------------------------
-    moves = legal_moves(board, root)
-    first_rows = []
     if args.parts == "pv":
-        first_rows = [done_first[k] for k in done_first]
         print(
             f"\n  part 2 — SKIPPED (--parts pv); "
-            f"{len(first_rows)}/{len(moves):,} rows carried over"
+            f"{len(first_done)}/{len(moves):,} rows carried over"
         )
         return _finish(
-            variant, args, db, root, line, pv_rows, first_rows, started, board
+            variant,
+            args,
+            db,
+            root,
+            line,
+            pv_snapshot(),
+            first_snapshot(),
+            started,
+            board,
         )
 
     print(f"\n  part 2 — re-deriving the root under each of {len(moves):,} first moves")
     for i, move in enumerate(moves):
         name = encode_move(board, move)
-        if name in done_first:
-            first_rows.append(done_first[name])
+        if name in first_done:
             continue
         child = apply_move(board, root, move)
         expected = db.value(child)
@@ -418,28 +450,48 @@ def audit(variant: Variant, args) -> dict:
         # them — prints nothing at all, and only a stalled one becomes visible.
         label = f"first {i + 1}/{len(moves)} {name}"
         got, nodes = rederive(board, child, tt, args.budget, label, args.heartbeat)
-        first_rows.append(
-            {
-                "move": name,
-                "expected": expected,
-                "got": got,
-                "nodes": nodes,
-                "budget": args.budget,
-            }
+        first_done[name] = {
+            "move": name,
+            "expected": expected,
+            "got": got,
+            "nodes": nodes,
+            "budget": args.budget,
+            "tt_bits": args.tt_bits,
+        }
+        _save(
+            args,
+            variant,
+            db,
+            root,
+            line,
+            pv_snapshot(),
+            first_snapshot(),
+            started,
+            board,
         )
-        _save(args, variant, db, root, line, pv_rows, first_rows, started, board)
         if got is not None and got != expected:
             print(f"    DISAGREE on {encode_move(board, move)}", flush=True)
         if (i + 1) % args.report_every == 0:
-            done = sum(1 for r in first_rows if r["got"] is not None)
-            bad = sum(1 for r in first_rows if r["got"] not in (None, r["expected"]))
+            rows = first_snapshot()
+            done = sum(1 for r in rows if r["got"] is not None)
+            bad = sum(1 for r in rows if r["got"] not in (None, r["expected"]))
             print(
                 f"    {i + 1:>6,}/{len(moves):,}  proven {done:,}  disagree {bad}  "
                 f"{time.perf_counter() - started:,.0f}s",
                 flush=True,
             )
 
-    return _finish(variant, args, db, root, line, pv_rows, first_rows, started, board)
+    return _finish(
+        variant,
+        args,
+        db,
+        root,
+        line,
+        pv_snapshot(),
+        first_snapshot(),
+        started,
+        board,
+    )
 
 
 def _finish(variant, args, db, root, line, pv_rows, first_rows, started, board) -> dict:
