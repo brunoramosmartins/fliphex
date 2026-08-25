@@ -300,6 +300,91 @@ only outside the regime that dominates the cost.** One data point in the cheap
 regime admitted totals from 7.9 h to 21.8 h, and the answer was 32.4 h. A range,
 or a refusal, was the honest output.
 
+### The PV audit's four lost runs — a table that never could have fit
+
+Between 2026-08-17 and 2026-08-23 the 5×3 PV audit was launched four times and
+killed four times. It is worth recording in full because none of the four was a
+bug in the solver, all four were losses in the *instrument*, and the root cause
+was a number nobody had measured.
+
+**What was actually wrong.** The transposition table stored a
+`list[Entry | None]` of namedtuples, each holding a `StateKey` holding a colours
+tuple. That is **331 bytes per filled entry**, measured afterwards. So the
+`--tt-bits 26` everyone had been using needs **21.2 GiB when full**, on a VM with
+15.5 GiB. The table was never *capable* of filling. That was not bad luck; it was
+arithmetic, and the arithmetic had never been done.
+
+**Why it took four runs to see it.** The failure mode is close to the worst
+available:
+
+- The slot list allocates as pointers and materialises only as entries are
+  written, so an impossible table starts fine and stays fine for hours.
+- It then dies to the kernel's OOM killer, which writes no checkpoint and leaves
+  no traceback — from the log the run simply stops mid-sentence.
+- The first proof, ply 0, *succeeded* at 2²⁶ — because in 21 hours it never
+  filled the table, topping out near 12.9 GiB. Success at the size that cannot
+  work is what made the size look validated.
+
+**The four runs, and what each one actually cost.**
+
+| when | what happened | cost |
+|---|---|---|
+| 08-17 | ran 68.8 h and printed nothing; no way to tell progress from death | 68.8 h, no output |
+| 08-21 | proved ply 0, then ply 2's table was allocated on top of ply 1's | 21 h kept, run lost |
+| 08-23 | `--tt-bits 27` (42.4 GiB when full) OOM-killed at 504M nodes | 4.8 h CPU |
+| 08-23 | `--tt-bits 26`, guard fired but could not free memory, cascaded | 374M nodes |
+
+**Three compounding defects, all in the harness.**
+
+1. *Silence.* A search that prints nothing cannot be distinguished from a dead
+   one. Fixed by a `Heartbeat` thread reporting nodes, rate, resident size and
+   suspended time — and it must read the counter *through* the solver, because
+   `solve()` rebinds `solver.stats`.
+2. *Double allocation.* `fresh = TranspositionTable(...)` evaluates the
+   right-hand side while `fresh` still names the previous position's table, so
+   part 1 held two at once and doubled the peak. The old table is now released
+   and collected first.
+3. *A guard that could not act.* An RSS ceiling that aborts the *position* does
+   not give the memory back, so every later position began already over the
+   line and died in seconds — plies 2 through 7 were marked `unproven` in
+   moments and the process was OOM-killed regardless. Past the ceiling the only
+   useful action is to end the run.
+
+**The fix that removes the class, not the instance.** `Entry` objects are gone;
+slots are five parallel `array` buffers of fixed-width integers — **28 bytes**
+verified, 12 unverified, an 11.8× reduction. The same 2²⁶ table is now 1.75 GiB
+and 2²⁸ fits in 7.0 GiB, four times the entries that proved ply 0.
+
+Verification is **not** weakened to buy this, which mattered: with 1.75 × 10¹⁰
+states against a 2³² birthday bound, Zobrist collisions on this board are
+expected rather than hypothetical. The whole `StateKey` is a bounded bit-field —
+`n_cells × 2` bits of colour, two 13-bit hands, one bit of side to move, 55 bits
+on the 5×3 and 77 on the 5×5 — so it packs losslessly into two 63-bit words and
+compares exactly. A test pins the *iff*: two states pack alike if and only if
+their keys are equal.
+
+Because the buffers are now allocated up front, resident size reaches its
+ceiling in **minutes rather than hours**. An oversized table reveals itself
+immediately instead of at hour four. And `--tt-bits` is checked against
+`max_capacity_for()` before any search starts, so an impossible configuration is
+refused in the first second, naming the size that would fit.
+
+**The transferable rule.** *A resource ceiling that has never been measured is
+not a configuration choice, it is an assumption.* Four runs died to a per-entry
+cost that took two minutes to measure and that nobody had measured, while
+attention went to node budgets and table sizes — the dials in front of us. The
+second rule is narrower and cost the fourth run on its own: **a guard must be
+able to act on what it detects.** Detecting an over-ceiling condition it cannot
+remedy converted a slow failure into a fast cascade, which is strictly worse
+than no guard at all, because it also destroyed the run's remaining work.
+
+A related near-miss, worth recording because it is the same shape: the run's
+suspended-time counter is *cumulative*, and reading one sample of it as a
+per-interval figure produced a confident claim that the VM was suspended 72% of
+the time and that a 4 h job would take 34 h. Five more samples showed the number
+had never grown past its first step. **One sample of a cumulative counter is not
+a rate.**
+
 ## `solver/retrograde.py` — endgame on 5×5 (EXP-003)
 
 The roadmap's `k ≤ 5` target is ~1.2 × 10¹⁵ positions, ~150 TB at one bit. Per
@@ -520,6 +605,16 @@ questions and the trade-offs.
      - A micro-benchmark measures an operation; a decision needs the system.
      - Pre-registration caught the 4x4 (even cells) and forced EXP-007 to be a
        new ID rather than a redefinition.
+     - A resource ceiling nobody has measured is an assumption, not a setting.
+       Four runs died to a 331-byte-per-entry cost that took two minutes to
+       measure, while attention stayed on the dials in front of us.
+     - A guard must be able to *act* on what it detects. One that only detects
+       is worse than none: it turned a slow failure into a fast cascade that
+       also destroyed the run's remaining work.
+     - Succeeding at an impossible setting is how the setting looks validated —
+       ply 0 proved fine at a table size that could never have filled.
+     - The best checkpoint granularity is the one that bounds the loss. Position
+       -level checkpoints meant four crashes cost at most the position in flight.
 -->
 
 ## Failed Attempts
@@ -538,4 +633,21 @@ questions and the trade-offs.
      - RSS was presented as a real progress signal for the 5x3 sweep; it fell
        when the model said it would rise.
      - A ruff SIM108 fix made a lazy branch eager and broke 10 tests.
+     - Recommended `--tt-bits 27` for the PV audit by doubling an RSS reading
+       taken while the table was still filling. It needed 42.4 GiB on a 15 GiB
+       box and OOM-killed the run at 4.8 h of CPU.
+     - Then recommended falling back to 26 "which survived 30 hours". It had
+       survived only by never filling; 26 needs 21.2 GiB and died too.
+     - Read one sample of a *cumulative* suspended-time counter as a per-interval
+       rate, and reported that the VM was idle 72% of the time and a 4 h job
+       would take 34 h. Five more samples showed it had never moved past its
+       first step. Retracted the same day.
+     - Wrote a throwaway probe that accumulated the search frontier in a `set` of
+       `GameState`. `history` is in the dataclass's `__eq__`, so identical
+       positions reached by different move orders never deduplicated and the
+       probe grew with the number of *paths*. It reached 12.5 GiB before I
+       killed it — nearly a fifth OOM, caused by the measurement itself.
+     - Claimed the 540 first moves collapse to 240 distinct positions, inferred
+       from the layer-1 file size. Measured: 120. The other factor of two is the
+       reachability gap EXP-005 already documents at layer 1.
 -->

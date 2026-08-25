@@ -598,6 +598,102 @@ orbits where `JOKER` has 1 — so h2 carries **2.9% more branching** on every
 even-`t` layer. Same direction, same order of magnitude. The clock is explained
 by the deck, not by the machine.
 
+#### Amendment (2026-08-23) — the PV audit's first result, and four runs lost to an unmeasured ceiling
+
+**Part 1 complete, h2 arm: all fifteen PV positions re-derived and agreeing.**
+Every position on the sweep's own principal variation was proved by forward
+search through `solver/minimax.py`, which shares no code with the packed sweep,
+and **all fifteen agree — zero disagreements, zero unproven**. This is the first
+evidence the registered PV audit has produced on either arm, and it targets
+exactly the position the amendment of 2026-08-09 says the reported number lives
+at. Artefact
+[`results/exp002-pv-audit-5x3-h2.json`](../results/exp002-pv-audit-5x3-h2.json).
+
+| ply | sweep | forward | nodes | | ply | sweep | forward | nodes |
+|---|---|---|---|---|---|---|---|---|
+| 0 | WIN | agree | 1,400,240,037 | | 8 | WIN | agree | 65,711 |
+| 1 | LOSS | agree | 611,392,685 | | 9 | LOSS | agree | 49,895 |
+| 2 | WIN | agree | 69,261,302 | | 10 | WIN | agree | 3,403 |
+| 3 | LOSS | agree | 69,261,301 | | 11 | LOSS | agree | 1,315 |
+| 4 | WIN | agree | 9,532,471 | | 12 | WIN | agree | 54 |
+| 5 | LOSS | agree | 9,532,470 | | 13 | LOSS | agree | 24 |
+| 6 | WIN | agree | 995,743 | | 14 | WIN | agree | 2 |
+| 7 | LOSS | agree | 995,742 | | | | | |
+
+**What the fifteen checks actually cover, stated precisely.** Each WIN ply costs
+its LOSS child's proof **plus exactly one node** — 69,261,302 against 69,261,301,
+9,532,471 against 9,532,470, and so on down the line. A winning node is proved by
+trying the PV move first and cutting, so its search subsumes the next ply's. The
+line therefore rests on **eight distinct proofs** (the odd plies) with seven
+one-node confirmations on top. Each still ran under its own fresh table, so they
+remain independent *executions* — but the cost, and the evidence, is concentrated
+in the LOSS positions.
+
+**It does not discharge the gate.** Part 2 (every distinct first move) has not
+run, so the artefact records `complete: false`, `passed: false` — a partial audit
+does not report as passing. `P1 wins the 5×3-h2` remains reportable with the
+2026-08-09 qualification attached and **not yet citable as an H1 input**.
+
+**Four runs were lost to a harness defect, not to the search.** The
+transposition table stored one Python object per slot at **331 bytes per filled
+entry**, measured only after the fourth failure. `--tt-bits 26` therefore needs
+**21.2 GiB when full** on a 15.5 GiB VM: the table was never capable of filling.
+The slots materialise lazily, so an impossible size runs for hours before the
+OOM killer takes it — writing no checkpoint and leaving no traceback. Ply 0
+*succeeded* at that size only because in 21 h it never filled the table, which
+is what made the size appear validated.
+
+| run | outcome | cost |
+|---|---|---|
+| 2026-08-17 | 68.8 h with no output at all; progress indistinguishable from death | 68.8 h |
+| 2026-08-21 | ply 0 proved, then ply 2's table allocated on top of ply 1's | run lost, ply 0 kept |
+| 2026-08-23 | `--tt-bits 27` (42.4 GiB full) OOM-killed at 504M nodes | 4.8 h CPU |
+| 2026-08-23 | `--tt-bits 26`, ceiling guard fired but could not free memory | 374M nodes |
+
+**Instrument changes, none of which touch what the audit measures.** The table
+is now five parallel fixed-width `array` buffers — **28 bytes per slot**
+verified, an 11.8× reduction — so 2²⁸ slots fit in 7.0 GiB. Verification is
+**not** weakened: the `StateKey` is a bounded bit-field (55 bits on the 5×3, 77
+on the 5×5) that packs losslessly into two 63-bit words and compares exactly,
+with a test pinning that two states pack alike *iff* their keys are equal. This
+matters here because with 1.75 × 10¹⁰ states against a 2³² birthday bound,
+Zobrist collisions on this board are expected rather than hypothetical, and a
+weakened key would have silently converted a detected collision into a wrong
+value — the exact defect class adr-010 exists to catch.
+
+The audit also gained a heartbeat, a memory ceiling that ends the run rather
+than cascading through the remaining positions, per-row provenance recording
+whether a row stopped on budget or on memory, and a startup check that refuses
+an oversized `--tt-bits` in the first second rather than at hour four.
+
+**The registered method is unchanged.** No decision rule, budget, seed or
+comparison was altered — only the instrument's memory layout and its failure
+handling. Node counts across sessions are not comparable without their table
+size, so each row now records its own `budget` and `tt_bits`.
+
+**The packed table is what made part 1 finish, and the margin is measured.**
+Plies 1 through 14 took **4,807 s** at ~160,400 nodes/s. The same ply 1 under
+the old table reached 504M nodes in 4.79 h at a *decaying* 29,256 nodes/s and
+never finished. That is **5.5×**, well beyond the 1.3× penalty the packing
+micro-benchmark predicted — the larger table stopped the thrashing, which is an
+effect that only appears deep in a run and was deliberately not claimed before
+it was observed.
+
+**Open: part 2's cost is now plausible rather than hopeless, and unmeasured.**
+It is 540 legal first moves over 120 distinct positions (the factor-two gap
+between 240 layer-1 configurations and 120 reachable ones is the EXP-005
+reachability identity at layer 1). Every one leads to a position the sweep calls
+a loss for P2 — so P1 wins under *every* opening, and each is therefore a full
+refutation, the expensive case, comparable to ply 1's 611M nodes.
+
+The naive bound is 120 × 611M ≈ 7.3 × 10¹⁰ nodes, about **127 h** at the
+observed rate. But part 2 shares one table across all 120, and sibling openings
+transpose heavily, so the real figure is bounded above by that and unknown below
+it. Yesterday's reading of "beyond any budget this project has" was made against
+the old table's cost and is **withdrawn**. The honest next step is to run it with
+the heartbeat reporting progress and let the first hours give the slope, rather
+than to estimate it again.
+
 ### EXP-003 — endgame subtree cost: does searching beat storing?
 
 - **Objective.** Find the crossover `k*` at which materialising an endgame

@@ -1,0 +1,178 @@
+{
+  "experiment": "EXP-002",
+  "audit": "principal-variation",
+  "variant": "5x3-h2",
+  "root_value": "P1",
+  "principal_variation": [
+    "A1:P1:0",
+    "E3:P6:0",
+    "A2:P2-adj:0",
+    "E2:P3-y:5",
+    "A3:P2-skip:0",
+    "E1:P3-fan:5",
+    "B1:P2-opp:0",
+    "D3:P2-opp:2",
+    "B2:P3-fan:3",
+    "D2:P2-skip:5",
+    "B3:P6:0",
+    "D1:P2-adj:5",
+    "C1:P3-y:2",
+    "C3:P1:5",
+    "C2:P3-tri:0"
+  ],
+  "node_budget_this_session": 5000000000,
+  "tt_bits": 28,
+  "pv": {
+    "agree": 15,
+    "disagree": 0,
+    "unproven": 0,
+    "rows": [
+      {
+        "ply": 0,
+        "expected": 1,
+        "got": 1,
+        "nodes": 1400240037,
+        "budget": 5000000000
+      },
+      {
+        "ply": 1,
+        "expected": -1,
+        "got": -1,
+        "nodes": 611392685,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "ply": 2,
+        "expected": 1,
+        "got": 1,
+        "nodes": 69261302,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "ply": 3,
+        "expected": -1,
+        "got": -1,
+        "nodes": 69261301,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "ply": 4,
+        "expected": 1,
+        "got": 1,
+        "nodes": 9532471,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "ply": 5,
+        "expected": -1,
+        "got": -1,
+        "nodes": 9532470,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "ply": 6,
+        "expected": 1,
+        "got": 1,
+        "nodes": 995743,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "ply": 7,
+        "expected": -1,
+        "got": -1,
+        "nodes": 995742,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "ply": 8,
+        "expected": 1,
+        "got": 1,
+        "nodes": 65711,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "ply": 9,
+        "expected": -1,
+        "got": -1,
+        "nodes": 49895,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "ply": 10,
+        "expected": 1,
+        "got": 1,
+        "nodes": 3403,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "ply": 11,
+        "expected": -1,
+        "got": -1,
+        "nodes": 1315,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "ply": 12,
+        "expected": 1,
+        "got": 1,
+        "nodes": 54,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "ply": 13,
+        "expected": -1,
+        "got": -1,
+        "nodes": 24,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "ply": 14,
+        "expected": 1,
+        "got": 1,
+        "nodes": 2,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      }
+    ]
+  },
+  "first_moves": {
+    "agree": 0,
+    "disagree": 0,
+    "unproven": 0,
+    "settled": 0,
+    "total": 540,
+    "rows": [],
+    "disagreements": []
+  },
+  "complete": false,
+  "passed": false,
+  "interpreter": "pypy 3.11.15",
+  "seconds": 4807.050982539001
+}
