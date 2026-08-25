@@ -209,7 +209,7 @@ def test_principal_variation_of_a_terminal_position_is_empty(tiny):
 
 
 def _stored(tt):
-    return [e for e in tt._slots if e is not None and e.key is not None]  # noqa: SLF001
+    return [e for e in tt.entries() if e.key is not None]
 
 
 def test_unpruned_stores_only_extremal_bounds(tiny):

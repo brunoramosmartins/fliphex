@@ -55,19 +55,61 @@ exhaustion, and R3 requires every artefact to record that. Prose cannot be
 checked, so :attr:`TranspositionTable.truncated` latches the moment any
 depth-limited entry is stored. An artefact writer reads it instead of asserting
 ``termination: exhausted`` on trust.
+
+Why the slots are five arrays and not a list of objects
+------------------------------------------------------
+A ``list[Entry | None]`` of namedtuples, each holding a ``StateKey`` that holds
+a colours tuple, measured **331 bytes per filled entry** — so a 2²⁶-slot table
+needs 21.2 GiB. That is larger than the machine this project runs on, and it
+failed in the worst possible way: the table fills lazily, so an impossible
+configuration does not fail at startup, it runs for hours and then dies to the
+OOM killer with no checkpoint. Two 5×3 audit runs were lost that way on
+2026-08-23, one of them 4.8 h of CPU.
+
+The entry is now five parallel ``array`` buffers of fixed-width machine
+integers: **28 bytes** with verification, 12 without — the same 2²⁶ table in
+1.8 GiB. This is the trick ``solver.packed_sweep`` already uses on the layer
+files, and its finding carries over: under PyPy the shift-and-mask is free
+(0.97× a byte read), because the JIT folds it into native instructions.
+
+Verification is **not** weakened to buy this. The whole ``StateKey`` is a
+bounded bit-field — ``n_cells × 2`` bits of colour, two 13-bit hands, one bit
+of side to move: 55 bits on the 5×3 and 77 on the 5×5 — so it packs losslessly
+into two 63-bit words and compares exactly, as before. Packing and comparing a
+key costs 87 ns against 68 ns for the old tuple compare (measured, PyPy 3.11).
+That 1.3× on the probe path buys a table an order of magnitude larger, which is
+the trade the hit rate cares about.
 """
 
 from __future__ import annotations
 
+from array import array
+from collections.abc import Iterator
 from enum import IntEnum
 from typing import NamedTuple
 
 from fliphex.moves import Move
+from fliphex.piece import DECK
 from fliphex.state import Colour, GameState
 
 #: The full search key: colours, both hands, side to move. What
 #: :meth:`fliphex.state.GameState.key` returns.
 StateKey = tuple[tuple[Colour, ...], int, int, Colour]
+
+#: Bits per hand bitmask: one per archetype plus the joker.
+_HAND_BITS = len(DECK) + 1
+_HAND_MASK = (1 << _HAND_BITS) - 1
+
+#: The packed key is split across two signed 64-bit words at this boundary.
+_WORD_BITS = 63
+_WORD_MASK = (1 << _WORD_BITS) - 1
+
+#: ``_meta`` layout: bit 0 marks the slot occupied, bits 1-2 hold the
+#: :class:`Flag`, and the rest holds the depth. Zero therefore means *empty*,
+#: which is what makes a freshly zeroed buffer a valid empty table.
+_OCCUPIED = 1
+_FLAG_SHIFT = 1
+_DEPTH_SHIFT = 3
 
 
 class Flag(IntEnum):
@@ -82,7 +124,12 @@ class Flag(IntEnum):
 
 
 class Entry(NamedTuple):
-    """One table slot.
+    """One table slot, as a **view**.
+
+    The table does not store these — it stores parallel arrays of machine
+    integers (see the module docstring). :meth:`TranspositionTable.entries`
+    rebuilds an ``Entry`` per occupied slot for the consumers that read the
+    table as evidence, which is adr-010 V3's whole method.
 
     Attributes:
         value: The score or bound, from the perspective of the side to move.
@@ -98,6 +145,53 @@ class Entry(NamedTuple):
     depth: int
     best: Move | None
     key: StateKey | None
+
+
+def pack_key(state: GameState) -> tuple[int, int]:
+    """Pack the search key into two 63-bit words, losslessly.
+
+    Layout, most significant first: ``n_cells`` two-bit colours, the first
+    hand, the second hand, one bit of side to move. The width is bounded by
+    the variant, so this is a bijection onto the integers it produces — a
+    packed comparison is exactly as strong as comparing ``state.key()``.
+    """
+    v = 0
+    for colour in state.colours:
+        v = (v << 2) | colour
+    v = (v << _HAND_BITS) | state.hands[0]
+    v = (v << _HAND_BITS) | state.hands[1]
+    v = (v << 1) | (state.to_move - 1)
+    return v & _WORD_MASK, v >> _WORD_BITS
+
+
+def unpack_key(lo: int, hi: int, n_cells: int) -> StateKey:
+    """Invert :func:`pack_key`. ``n_cells`` is not recoverable from the bits."""
+    v = (hi << _WORD_BITS) | lo
+    to_move = Colour((v & 1) + 1)
+    v >>= 1
+    second = v & _HAND_MASK
+    v >>= _HAND_BITS
+    first = v & _HAND_MASK
+    v >>= _HAND_BITS
+    colours = []
+    for _ in range(n_cells):
+        colours.append(Colour(v & 3))
+        v >>= 2
+    colours.reverse()
+    return (tuple(colours), first, second, to_move)
+
+
+def _pack_move(move: Move | None) -> int:
+    """``-1`` for ``None``; otherwise cell, tile and rotation in 12 bits."""
+    if move is None:
+        return -1
+    return move.cell | (move.tile << 5) | (move.rotation << 9)
+
+
+def _unpack_move(packed: int) -> Move | None:
+    if packed < 0:
+        return None
+    return Move(packed & 31, (packed >> 5) & 15, packed >> 9)
 
 
 class TranspositionTable:
@@ -118,13 +212,19 @@ class TranspositionTable:
             did not reach the end of the game (adr-004 R1).
     """
 
+    #: Bytes of buffer per slot, verified and unverified. Callers sizing a
+    #: table against real memory need this to be arithmetic rather than folklore
+    #: — see :func:`max_capacity_for`.
+    BYTES_PER_SLOT = 28
+    BYTES_PER_SLOT_UNVERIFIED = 12
+
     def __init__(self, capacity: int = 1 << 20, verify: bool = True) -> None:
         if capacity <= 0 or capacity & (capacity - 1):
             raise ValueError(f"capacity must be a power of two, got {capacity}")
         self.capacity = capacity
         self.verify = verify
         self._mask = capacity - 1
-        self._slots: list[Entry | None] = [None] * capacity
+        self._allocate()
 
         self.hits = 0
         self.misses = 0
@@ -133,14 +233,39 @@ class TranspositionTable:
         self.replacements = 0
         self.truncated = False
 
+    def _allocate(self) -> None:
+        """(Re)allocate the slot buffers, zeroed.
+
+        ``array * n`` allocates the whole buffer once, which matters at the
+        sizes this table is used at: building it by repeated append would spend
+        the run's first minutes resizing.
+        """
+        n = self.capacity
+        self._meta = array("i", [0]) * n
+        self._value = array("i", [0]) * n
+        self._best = array("i", [-1]) * n
+        if self.verify:
+            self._key_lo = array("q", [0]) * n
+            self._key_hi = array("q", [0]) * n
+        else:
+            self._key_lo = self._key_hi = None
+        self._occupied = 0
+        #: Learned from the first stored state; needed only to decode keys back
+        #: out in :meth:`entries`, since the width is not in the bits.
+        self._n_cells = 0
+
     def __len__(self) -> int:
-        """Return the number of occupied slots."""
-        return sum(1 for slot in self._slots if slot is not None)
+        """Return the number of occupied slots.
+
+        Counted incrementally rather than by scanning: at 2²⁶ slots a scan per
+        ``stats()`` call is seconds of pure bookkeeping.
+        """
+        return self._occupied
 
     @property
     def load(self) -> float:
         """Occupied fraction, ``0.0`` to ``1.0``."""
-        return len(self) / self.capacity
+        return self._occupied / self.capacity
 
     def clear(self) -> None:
         """Empty the table and reset the counters.
@@ -149,9 +274,31 @@ class TranspositionTable:
         not about the table's current contents, and clearing the table does not
         un-truncate a search that already happened.
         """
-        self._slots = [None] * self.capacity
+        self._allocate()
         self.hits = self.misses = self.collisions = 0
         self.stores = self.replacements = 0
+
+    def entries(self) -> Iterator[Entry]:
+        """Yield one :class:`Entry` per occupied slot.
+
+        This is how adr-010 V3 reads the table as evidence. Keys come back
+        decoded, so a consumer sees exactly what the old object-per-slot table
+        handed it.
+        """
+        for i in range(self.capacity):
+            meta = self._meta[i]
+            if not meta:
+                continue
+            key = None
+            if self.verify:
+                key = unpack_key(self._key_lo[i], self._key_hi[i], self._n_cells)
+            yield Entry(
+                value=self._value[i],
+                flag=Flag((meta >> _FLAG_SHIFT) & 3),
+                depth=meta >> _DEPTH_SHIFT,
+                best=_unpack_move(self._best[i]),
+                key=key,
+            )
 
     # -- probe / store --------------------------------------------------------
 
@@ -168,25 +315,31 @@ class TranspositionTable:
             but still the first move worth trying, which is what makes
             TT-move-first ordering pay.
         """
-        entry = self._slots[state.zobrist & self._mask]
-        if entry is None:
+        index = state.zobrist & self._mask
+        meta = self._meta[index]
+        if not meta:
             self.misses += 1
             return None, None
-        if self.verify and entry.key != state.key():
-            self.collisions += 1
-            self.misses += 1
-            return None, None
+        if self.verify:
+            lo, hi = pack_key(state)
+            if self._key_lo[index] != lo or self._key_hi[index] != hi:
+                self.collisions += 1
+                self.misses += 1
+                return None, None
 
         self.hits += 1
-        if entry.depth < depth:
-            return None, entry.best
-        if entry.flag is Flag.EXACT:
-            return entry.value, entry.best
-        if entry.flag is Flag.LOWER and entry.value >= beta:
-            return entry.value, entry.best
-        if entry.flag is Flag.UPPER and entry.value <= alpha:
-            return entry.value, entry.best
-        return None, entry.best
+        best = _unpack_move(self._best[index])
+        if (meta >> _DEPTH_SHIFT) < depth:
+            return None, best
+        flag = (meta >> _FLAG_SHIFT) & 3
+        value = self._value[index]
+        if flag == Flag.EXACT:
+            return value, best
+        if flag == Flag.LOWER and value >= beta:
+            return value, best
+        if flag == Flag.UPPER and value <= alpha:
+            return value, best
+        return None, best
 
     def store(
         self,
@@ -215,19 +368,23 @@ class TranspositionTable:
             self.truncated = True
 
         index = state.zobrist & self._mask
-        current = self._slots[index]
-        if current is not None:
-            if current.depth > depth:
+        meta = self._meta[index]
+        if meta:
+            if (meta >> _DEPTH_SHIFT) > depth:
                 return
             self.replacements += 1
+        else:
+            self._occupied += 1
+        if not self._n_cells:
+            self._n_cells = len(state.colours)
 
-        self._slots[index] = Entry(
-            value=value,
-            flag=flag,
-            depth=depth,
-            best=best,
-            key=state.key() if self.verify else None,
+        self._meta[index] = (
+            _OCCUPIED | (int(flag) << _FLAG_SHIFT) | (depth << _DEPTH_SHIFT)
         )
+        self._value[index] = value
+        self._best[index] = _pack_move(best)
+        if self.verify:
+            self._key_lo[index], self._key_hi[index] = pack_key(state)
         self.stores += 1
 
     # -- reporting ------------------------------------------------------------
@@ -255,6 +412,23 @@ class TranspositionTable:
             f"TranspositionTable(capacity={self.capacity}, verify={self.verify}, "
             f"load={self.load:.3f}, collisions={self.collisions})"
         )
+
+
+def max_capacity_for(budget_bytes: int, verify: bool = True) -> int:
+    """Largest power-of-two capacity whose buffers fit in ``budget_bytes``.
+
+    Exists so a caller can refuse an impossible table **at startup**. The
+    buffers fill lazily, so an oversized table does not fail when it is built —
+    it fails hours later under the OOM killer, having written no checkpoint.
+    Both 5×3 audit runs lost on 2026-08-23 died that way.
+    """
+    per = (
+        TranspositionTable.BYTES_PER_SLOT
+        if verify
+        else TranspositionTable.BYTES_PER_SLOT_UNVERIFIED
+    )
+    slots = budget_bytes // per
+    return 1 << (slots.bit_length() - 1) if slots >= 1 else 0
 
 
 class NullTable(TranspositionTable):

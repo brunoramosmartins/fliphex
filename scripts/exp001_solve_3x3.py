@@ -92,8 +92,8 @@ def check_v3(
     indices = {t: LayerIndex(variant, t) for t in tables}
     compared, problems = 0, []
 
-    for entry in tt._slots:  # noqa: SLF001 — reading the table *is* the check
-        if entry is None or entry.key is None:
+    for entry in tt.entries():  # reading the table *is* the check
+        if entry.key is None:
             continue
         colours, purple, green, to_move = entry.key
 

@@ -14,7 +14,14 @@ import pytest
 from fliphex.moves import apply_move, legal_moves
 from fliphex.state import GameState
 from fliphex.variant import FIVE_BY_THREE, THREE_BY_THREE
-from solver.transposition import Flag, NullTable, TranspositionTable
+from solver.transposition import (
+    Flag,
+    NullTable,
+    TranspositionTable,
+    max_capacity_for,
+    pack_key,
+    unpack_key,
+)
 
 
 @pytest.fixture
@@ -307,3 +314,134 @@ def test_a_position_is_found_by_any_state_with_the_same_key():
     tt.store(walked, 1, Flag.EXACT, depth=12)
     assert tt.probe(rebuilt, 12, -100, 100)[0] == 1
     assert tt.collisions == 0
+
+
+# -- the packed key: exactly as strong as the tuple it replaced ---------------
+
+
+def _walk_states(variant, depth=3, width=40):
+    """A spread of real positions: every first move, then a few plies deep."""
+    board = variant.board()
+    states = [variant.initial_state()]
+    frontier = [variant.initial_state()]
+    for _ in range(depth):
+        nxt = []
+        for state in frontier[:width]:
+            if state.is_terminal():
+                continue
+            for move in legal_moves(board, state)[:width]:
+                child = apply_move(board, state, move)
+                states.append(child)
+                nxt.append(child)
+        frontier = nxt
+    return states
+
+
+@pytest.mark.parametrize("variant", [THREE_BY_THREE, FIVE_BY_THREE])
+def test_packed_key_round_trips(variant):
+    for state in _walk_states(variant):
+        lo, hi = pack_key(state)
+        assert unpack_key(lo, hi, state.n_cells) == state.key()
+
+
+@pytest.mark.parametrize("variant", [THREE_BY_THREE, FIVE_BY_THREE])
+def test_packed_comparison_is_exactly_the_tuple_comparison(variant):
+    """The property the whole memory saving rests on.
+
+    Verification may only get cheaper, never weaker: two states must pack alike
+    **iff** their keys are equal. A packing that merged two distinct positions
+    would turn a detected collision back into a silent wrong value, which is the
+    one failure mode this module exists to prevent.
+    """
+    states = _walk_states(variant)
+    packed = {}
+    for state in states:
+        packed.setdefault(pack_key(state), set()).add(state.key())
+    for keys in packed.values():
+        assert len(keys) == 1, "distinct keys packed to the same bits"
+    assert len({s.key() for s in states}) == len(packed)
+
+
+def test_packed_words_fit_signed_64_bit():
+    """Both halves must be storable in ``array('q')`` without overflowing."""
+    for variant in (THREE_BY_THREE, FIVE_BY_THREE):
+        for state in _walk_states(variant, depth=2):
+            for word in pack_key(state):
+                assert 0 <= word < 1 << 63
+
+
+# -- entries(): how adr-010 V3 reads the table --------------------------------
+
+
+def test_entries_yields_every_occupied_slot_decoded(states):
+    root, child = states
+    board = THREE_BY_THREE.board()
+    move = legal_moves(board, root)[0]
+    tt = TranspositionTable(64)
+    tt.store(root, 1, Flag.EXACT, depth=9, best=move)
+    tt.store(child, -1, Flag.LOWER, depth=4)
+
+    got = sorted(tt.entries(), key=lambda e: e.value)
+    assert len(got) == 2
+    assert [e.value for e in got] == [-1, 1]
+
+    exact = next(e for e in got if e.flag is Flag.EXACT)
+    assert exact.key == root.key()
+    assert exact.depth == 9
+    assert exact.best == move
+
+    lower = next(e for e in got if e.flag is Flag.LOWER)
+    assert lower.key == child.key()
+    assert lower.best is None
+
+
+def test_entries_is_empty_without_verification():
+    """No key is stored, so V3 has nothing to compare — and must see that."""
+    root = THREE_BY_THREE.initial_state()
+    tt = TranspositionTable(16, verify=False)
+    tt.store(root, 1, Flag.EXACT, depth=9)
+    assert [e.key for e in tt.entries()] == [None]
+
+
+# -- sizing: the arithmetic that must not be folklore -------------------------
+
+
+def test_bytes_per_slot_matches_the_buffers_actually_allocated():
+    """Pins the constant a caller sizes a table against.
+
+    Adding a sixth array and forgetting this constant would make
+    ``max_capacity_for`` under-count, and an under-counted table does not fail
+    on construction — it fills over hours and dies to the OOM killer with no
+    checkpoint written. That happened twice on 2026-08-23.
+    """
+    n = 1 << 8
+    verified = TranspositionTable(n, verify=True)
+    buffers = (
+        verified._meta,  # noqa: SLF001 — measuring the layout *is* the test
+        verified._value,  # noqa: SLF001
+        verified._best,  # noqa: SLF001
+        verified._key_lo,  # noqa: SLF001
+        verified._key_hi,  # noqa: SLF001
+    )
+    total = sum(b.buffer_info()[1] * b.itemsize for b in buffers)
+    assert total / n == TranspositionTable.BYTES_PER_SLOT
+
+    plain = TranspositionTable(n, verify=False)
+    bare = (plain._meta, plain._value, plain._best)  # noqa: SLF001
+    assert sum(b.buffer_info()[1] * b.itemsize for b in bare) / n == (
+        TranspositionTable.BYTES_PER_SLOT_UNVERIFIED
+    )
+
+
+def test_max_capacity_never_exceeds_its_budget():
+    for budget in (0, 27, 28, 1 << 20, 3 * 1024**3, 12 * 1024**3):
+        capacity = max_capacity_for(budget)
+        assert capacity * TranspositionTable.BYTES_PER_SLOT <= budget
+        if capacity:
+            assert capacity & (capacity - 1) == 0
+            assert 2 * capacity * TranspositionTable.BYTES_PER_SLOT > budget
+
+
+def test_max_capacity_is_zero_when_nothing_fits():
+    assert max_capacity_for(0) == 0
+    assert max_capacity_for(TranspositionTable.BYTES_PER_SLOT - 1) == 0
