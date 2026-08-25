@@ -50,6 +50,7 @@ non-negotiable.
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import sys
 import threading
@@ -66,7 +67,10 @@ from solver.checkpoint import Checkpoint, atomic_write  # noqa: E402
 from solver.minimax import LOSS, WIN, BudgetExceededError, Solver  # noqa: E402
 from solver.packed_sweep import PackedSweep  # noqa: E402
 from solver.retrograde import SLOT_LOSS, SLOT_WIN, LayerIndex  # noqa: E402
-from solver.transposition import TranspositionTable  # noqa: E402
+from solver.transposition import (  # noqa: E402
+    TranspositionTable,
+    max_capacity_for,
+)
 
 
 class Database:
@@ -164,6 +168,42 @@ class Database:
         return line
 
 
+#: Memory the run needs for things that are not the transposition table, held
+#: back when sizing it. :class:`Database` keeps three sweep layers resident and
+#: the 5×3's largest three total ~3.2 GB; the rest is the interpreter and the
+#: search's own frames.
+NON_TABLE_RESERVE = 4 * 1024**3
+
+
+def rss_bytes() -> int:
+    """Resident set size of this process, or 0 where /proc is unavailable."""
+    try:
+        with open("/proc/self/statm", "rb") as fh:
+            return int(fh.read().split()[1]) * 4096
+    except (OSError, IndexError, ValueError):
+        return 0
+
+
+def default_rss_ceiling() -> int:
+    """80% of physical memory, the point past which this run should give up.
+
+    The table fills lazily, so an oversized ``--tt-bits`` does not fail at
+    startup — it fails hours in, when the slots finally populate. On
+    2026-08-23 a 2²⁷-slot table reached 15.1 GiB on a 15 GiB machine and the
+    kernel's OOM killer took the process at 504M nodes and 4.8 h of CPU. An
+    OOM kill writes no checkpoint, so all of it was lost. Stopping ourselves
+    first turns that into a saved ``unproven`` row.
+    """
+    try:
+        with open("/proc/meminfo", "rb") as fh:
+            for raw in fh:
+                if raw.startswith(b"MemTotal:"):
+                    return int(int(raw.split()[1]) * 1024 * 0.80)
+    except (OSError, IndexError, ValueError):
+        pass
+    return 0
+
+
 class Heartbeat:
     """Print progress from *inside* one opaque proof, on a background thread.
 
@@ -189,11 +229,27 @@ class Heartbeat:
     it, and the row's node count still comes from the search itself.
     """
 
-    def __init__(self, solver, label: str, every: float, budget: int) -> None:
+    def __init__(
+        self,
+        solver,
+        label: str,
+        every: float,
+        budget: int,
+        rss_ceiling: int = 0,
+    ) -> None:
         self.solver = solver
         self.label = label
         self.every = every
         self.budget = budget
+        # Breaching this sets ``max_nodes`` to 0, which the solver checks on
+        # every node, so the next one raises BudgetExceededError and the search
+        # unwinds through the path that already exists for an exhausted budget.
+        # ``tripped`` is how the caller tells the two apart afterwards: an
+        # unproven row must say whether it ran out of nodes or out of memory,
+        # or the next person reads it as "budget too small" and raises the
+        # wrong dial.
+        self.rss_ceiling = rss_ceiling
+        self.tripped: str | None = None
         # Two clocks on purpose. ``perf_counter`` is CLOCK_MONOTONIC, which does
         # not advance while the machine is suspended; ``time.time`` does. This
         # laptop's lid gets closed mid-run, so the gap between them *is* the
@@ -222,20 +278,45 @@ class Heartbeat:
             nodes = self.solver.stats.nodes
             rate = nodes / elapsed if elapsed > 0 else 0.0
             suspended = max(0.0, wall - elapsed)
+            rss = rss_bytes()
             line = (
                 f"      [{time.strftime('%m-%d %H:%M')}] {self.label}  "
                 f"{nodes:>14,} nodes  {rate:>9,.0f}/s  {elapsed / 3600:5.2f} h cpu"
                 f"  {100 * nodes / self.budget:5.1f}% of budget"
+                f"  {rss / 1024**3:5.1f} GiB"
             )
             if suspended > 60:
                 line += f"  (+{suspended / 3600:.2f} h suspended)"
             print(line, flush=True)
 
+            if self.rss_ceiling and rss > self.rss_ceiling and not self.tripped:
+                self.tripped = "rss-ceiling"
+                self.solver.max_nodes = 0
+                print(
+                    f"      [{self.label}] STOPPING: {rss / 1024**3:.1f} GiB "
+                    f"resident is past the {self.rss_ceiling / 1024**3:.1f} GiB "
+                    f"ceiling. Lower --tt-bits and resume; this position will "
+                    f"be recorded unproven.",
+                    flush=True,
+                )
+                return
+
 
 def rederive(
-    board, state, tt, budget: int, label: str = "", every: float = 0.0
-) -> tuple[int | None, int]:
-    """Prove ``state`` by forward search. ``None`` means the budget ran out.
+    board,
+    state,
+    tt,
+    budget: int,
+    label: str = "",
+    every: float = 0.0,
+    rss_ceiling: int = 0,
+) -> tuple[int | None, int, str | None]:
+    """Prove ``state`` by forward search.
+
+    Returns ``(value, nodes, stopped)``. ``value`` is ``None`` when the search
+    did not finish, and ``stopped`` then says why — ``"budget"`` or
+    ``"rss-ceiling"``. The guard only runs when the heartbeat does, since it is
+    the heartbeat thread that watches memory.
 
     ``label`` and ``every`` drive a :class:`Heartbeat`; ``every <= 0`` disables
     it, which is what the cheap positions and the tests want.
@@ -252,12 +333,12 @@ def rederive(
     sweep relies on to index by layer.
     """
     solver = Solver(board, tt=tt, max_nodes=budget)
-    with Heartbeat(solver, label, every, budget):
+    with Heartbeat(solver, label, every, budget, rss_ceiling) as beat:
         try:
             result = solver.solve(state)
         except BudgetExceededError:
-            return None, solver.stats.nodes
-    return result.value, result.stats.nodes
+            return None, solver.stats.nodes, beat.tripped or "budget"
+    return result.value, result.stats.nodes, None
 
 
 def partial_path(args, variant: Variant) -> Path:
@@ -294,11 +375,44 @@ def audit(variant: Variant, args) -> dict:
     print(f"  root value from the sweep: {'P1' if db.value(root) == WIN else 'P2'}")
     print(f"  interpreter: {sys.implementation.name} {sys.version.split()[0]}")
     print(f"  node budget: {args.budget:,} per position")
+    table_bytes = (1 << args.tt_bits) * TranspositionTable.BYTES_PER_SLOT
+    print(
+        f"  transposition table: 2^{args.tt_bits} slots, "
+        f"{table_bytes / 1024**3:.2f} GiB when full"
+    )
     print(
         "  heartbeat: "
         + (f"every {args.heartbeat:g}s" if args.heartbeat > 0 else "disabled"),
         flush=True,
     )
+    rss_ceiling = (
+        default_rss_ceiling() if args.max_rss_gb < 0 else int(args.max_rss_gb * 1024**3)
+    )
+    if rss_ceiling and args.heartbeat > 0:
+        print(f"  memory ceiling: {rss_ceiling / 1024**3:.1f} GiB resident", flush=True)
+    else:
+        print(
+            "  memory ceiling: DISABLED — an OOM kill will lose this position",
+            flush=True,
+        )
+
+    # Refuse an impossible table *here*, not four hours in. The buffers fill
+    # lazily, so an oversized --tt-bits runs fine until the moment it doesn't,
+    # and an OOM kill writes no checkpoint.
+    if rss_ceiling:
+        budget = rss_ceiling - NON_TABLE_RESERVE
+        affordable = max_capacity_for(budget)
+        if (1 << args.tt_bits) > affordable:
+            bits = affordable.bit_length() - 1
+            raise SystemExit(
+                f"\n  --tt-bits {args.tt_bits} needs "
+                f"{table_bytes / 1024**3:.1f} GiB when full. Under the "
+                f"{rss_ceiling / 1024**3:.1f} GiB ceiling, less "
+                f"{NON_TABLE_RESERVE / 1024**3:.1f} GiB for the sweep's "
+                f"resident layers and the interpreter, the largest table that "
+                f"fits is 2^{bits}. Re-run with --tt-bits {bits}, or raise "
+                f"--max-rss-gb if this machine really has the memory."
+            )
 
     prior = load_partial(args, variant)
     prior_pv = prior.get("pv", {}).get("rows", [])
@@ -383,9 +497,23 @@ def audit(variant: Variant, args) -> dict:
             if ply in pv_done:
                 print(f"    ply {ply:2d}  (from a previous session)", flush=True)
                 continue
+            # Release the previous position's table **before** allocating the
+            # next. Rebinding alone is not enough: the right-hand side is
+            # evaluated while the old table is still referenced, so the two
+            # coexist for the duration of the allocation and the peak is
+            # doubled. That doubling is what killed the 2026-08-21 run — ply 0
+            # had filled its table, and ply 2's allocation landed on top of it.
+            fresh = None
+            gc.collect()
             fresh = TranspositionTable(1 << args.tt_bits, verify=True)
-            got, nodes = rederive(
-                board, state, fresh, args.budget, f"pv ply {ply}", args.heartbeat
+            got, nodes, stopped = rederive(
+                board,
+                state,
+                fresh,
+                args.budget,
+                f"pv ply {ply}",
+                args.heartbeat,
+                rss_ceiling,
             )
             status = (
                 "unproven"
@@ -402,6 +530,7 @@ def audit(variant: Variant, args) -> dict:
                 # The node count is only interpretable against both.
                 "budget": args.budget,
                 "tt_bits": args.tt_bits,
+                "stopped": stopped,
             }
             print(
                 f"    ply {ply:2d}  sweep={'WIN ' if expected == WIN else 'LOSS'}  "
@@ -419,6 +548,29 @@ def audit(variant: Variant, args) -> dict:
                 started,
                 board,
             )
+            if stopped == "rss-ceiling":
+                # Aborting the *position* does not give the memory back, so
+                # marching on to the next one just produces a cascade of
+                # instant "unproven" rows and still ends in an OOM kill. That
+                # is exactly what the 2026-08-23 run did to plies 2 through 7.
+                # Past the ceiling the only useful move is to stop the run.
+                print(
+                    "\n  ABORTING the run: the memory ceiling was reached and "
+                    "the table cannot be shrunk in place. Lower --tt-bits and "
+                    "resume — everything proved so far is in the artefact.",
+                    flush=True,
+                )
+                return _finish(
+                    variant,
+                    args,
+                    db,
+                    root,
+                    line,
+                    pv_snapshot(),
+                    first_snapshot(),
+                    started,
+                    board,
+                )
 
     # -- part 2: every distinct first move ----------------------------------
     if args.parts == "pv":
@@ -449,7 +601,9 @@ def audit(variant: Variant, args) -> dict:
         # interval in, so a position that proves quickly — which is most of
         # them — prints nothing at all, and only a stalled one becomes visible.
         label = f"first {i + 1}/{len(moves)} {name}"
-        got, nodes = rederive(board, child, tt, args.budget, label, args.heartbeat)
+        got, nodes, stopped = rederive(
+            board, child, tt, args.budget, label, args.heartbeat, rss_ceiling
+        )
         first_done[name] = {
             "move": name,
             "expected": expected,
@@ -457,6 +611,7 @@ def audit(variant: Variant, args) -> dict:
             "nodes": nodes,
             "budget": args.budget,
             "tt_bits": args.tt_bits,
+            "stopped": stopped,
         }
         _save(
             args,
@@ -469,6 +624,13 @@ def audit(variant: Variant, args) -> dict:
             started,
             board,
         )
+        if stopped == "rss-ceiling":
+            print(
+                "\n  ABORTING the run: the memory ceiling was reached. Lower "
+                "--tt-bits and resume.",
+                flush=True,
+            )
+            break
         if got is not None and got != expected:
             print(f"    DISAGREE on {encode_move(board, move)}", flush=True)
         if (i + 1) % args.report_every == 0:
@@ -606,6 +768,17 @@ def main() -> int:
             "which halves to run. 'pv' is the one that targets the reported "
             "value and is far cheaper; 'first' is the coverage half over every "
             "distinct opening."
+        ),
+    )
+    p.add_argument(
+        "--max-rss-gb",
+        type=float,
+        default=-1.0,
+        help=(
+            "Stop the current search when resident memory passes this, record "
+            "the position unproven and checkpoint. Default -1 means 80%% of "
+            "physical memory. 0 disables the guard, which is how the 2026-08-23 "
+            "run lost 4.8 h of CPU to the OOM killer. Needs --heartbeat on."
         ),
     )
     p.add_argument("--report-every", type=int, default=25)
