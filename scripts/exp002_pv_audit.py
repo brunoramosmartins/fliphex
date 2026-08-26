@@ -124,6 +124,19 @@ class Database:
             del self._resident[self._order.pop(0)]
         return values
 
+    def release(self) -> None:
+        """Drop every cached layer.
+
+        The PV walk touches all sixteen layers and leaves the most recent of
+        them resident — **5.87 GiB** on the 5×3, measured. Part 2 needs only
+        layer 1 (240 configurations, 60 bytes), so carrying that is pure cost,
+        and it is what put the first part-2 launch 1.4 GiB over the memory
+        ceiling 97 seconds in. Freeing really does return the memory to the OS
+        here: the same measurement shows 5.87 GiB fall to 0.12 GiB.
+        """
+        self._resident.clear()
+        self._order.clear()
+
     def slot(self, state) -> int:
         """The database's verdict for ``state``, relative to the side to move."""
         t = sum(1 for c in state.colours if c != Colour.EMPTY)
@@ -590,7 +603,13 @@ def audit(variant: Variant, args) -> dict:
             board,
         )
 
+    # Part 2 reads layer 1 and nothing else, so the layers the PV walk left
+    # cached are dead weight sitting underneath a 7 GiB table.
+    db.release()
+    gc.collect()
+
     print(f"\n  part 2 — re-deriving the root under each of {len(moves):,} first moves")
+    print(f"    (layer cache released; {rss_bytes() / 1024**3:.1f} GiB resident)")
     for i, move in enumerate(moves):
         name = encode_move(board, move)
         if name in first_done:

@@ -115,6 +115,36 @@ def test_default_ceiling_leaves_headroom():
     assert 0 < ceiling < total, "a ceiling at or above RAM protects nothing"
 
 
+# -- the layer cache ---------------------------------------------------------
+
+
+def test_release_drops_every_cached_layer():
+    """Part 2 reads layer 1 and nothing else; the PV walk leaves 5.87 GiB.
+
+    Measured on the 5×3: walking the principal variation touches all sixteen
+    layers and leaves the most recent resident, which put the first part-2
+    launch over the memory ceiling 97 seconds in — underneath a 7 GiB table
+    that was not the problem. Constructed through ``__new__`` because a real
+    ``Database`` needs the 4.1 GB checkpoint on disk.
+    """
+    db = audit.Database.__new__(audit.Database)
+    db._resident = {7: bytearray(8), 8: bytearray(8), 9: bytearray(8)}
+    db._order = [7, 8, 9]
+
+    db.release()
+
+    assert db._resident == {}
+    assert db._order == []
+
+
+def test_release_is_idempotent():
+    db = audit.Database.__new__(audit.Database)
+    db._resident = {}
+    db._order = []
+    db.release()
+    assert db._resident == {}
+
+
 # -- reading the counter through the solver ---------------------------------
 
 
