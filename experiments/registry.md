@@ -694,6 +694,80 @@ the old table's cost and is **withdrawn**. The honest next step is to run it wit
 the heartbeat reporting progress and let the first hours give the slope, rather
 than to estimate it again.
 
+#### Amendment (2026-08-26) — part 2 stopped on its measured slope, and a linear instrument registered in its place
+
+**Part 2 ran and was stopped at opening 34 of 540.** It is registered here
+before the replacement runs, as the working agreements require.
+
+*What it produced.* **30 openings proved, 0 disagreements**, in 9.7 h of CPU.
+That evidence stands and is kept in the artefact. The machine behaved perfectly
+throughout — memory flat at 7.1 GiB, throughput steady at ~175,500 nodes/s with
+no decay across 1.2 × 10⁹ nodes, which is the packed table doing exactly what it
+was built for.
+
+*Why it was stopped.* The marginal cost is rising by orders of magnitude, and
+the progress line measures it directly:
+
+| milestone | elapsed | marginal |
+|---|---|---|
+| 10 / 540 | 3,702 s | — |
+| 20 / 540 | 4,917 s | 1,215 s per ten |
+| 30 / 540 | 34,839 s | **29,922 s per ten** |
+
+Opening 34 alone then ran 1.86 h to reach 23.5% of its node budget; carried to
+the budget it would cost ~7.9 h and be recorded `unproven`. At the last block's
+rate the remaining 510 openings are **~424 h of CPU**, and the trend is upward
+because the expensive openings are not front-loaded. The elapsed figures come
+from `perf_counter`, so they exclude suspend time and are not inflated by the
+machine being closed overnight. **This supersedes the 127 h estimate above,
+which was an upper bound whose floor turned out to be higher.**
+
+*What is not being claimed.* Stopping is a **budget decision, not a finding**.
+Part 2 produced no disagreement in the 30 openings it covered, and the remaining
+510 are simply unmeasured. The artefact keeps `complete: false, passed: false`.
+
+**The replacement, pre-registered.** `scripts/exp002_recurrence_check.py`
+verifies the sweep's layers against *each other* rather than against a fresh
+search: for every reachable position at layer `t`, the stored value must satisfy
+`value(s) == WIN` **iff** some child of `s` is stored `LOSS`. No search is
+involved, so the cost is linear in (positions × branching).
+
+- **Scope.** Exhaustive over the **reachable** set of layers 0..`--max-layer`,
+  not sampled. Layers 0-3 hold 737,204 configurations by the closed form, so the
+  opening can be covered entirely. `--max-layer` is raised one step at a time
+  with the measured cost read before each increase; layer sizes grow ~18× per
+  level.
+- **Decision rule, fixed before the run.** The check **passes** only with zero
+  problems of either kind: a `recurrence` problem (a stored value that does not
+  follow from the layer below) or a `roundtrip` problem
+  (`decode(encode(s)) != s`). Any problem is a **finding about the sweep** and
+  is reported, not re-run. Partial coverage is reported as the layer range
+  actually checked and never as a pass over more.
+- **Expected result.** Zero problems. A non-zero count is the informative
+  outcome — it would mean the h2 database is internally inconsistent, which no
+  gate so far is positioned to see.
+
+**What it covers that part 2 did not, and what it does not.** Part 2 asks
+whether the sweep is right about each opening, one full subgame proof at a time.
+This asks whether the sweep is self-consistent across a layer boundary, over
+every reachable opening position at once. It therefore covers **more positions
+and a different bug class** — ranking, indexing, packing, checkpoint I/O,
+aggregation — for a fraction of the cost.
+
+It is **weaker in one specific way** and that is why it supplements rather than
+replaces part 1: it shares `LayerIndex` with the sweep, which the PV audit's
+forward searcher does not, so a ranking bug could in principle appear on both
+sides. Two things bound it — the check reaches positions by walking *forward*
+and encoding, where the sweep *decoded* rank indices, so the bijection is
+exercised in both directions and asserted position by position; and part 1,
+which shares no ranking code at all, already passes 15 of 15 on this arm.
+Neither instrument is sufficient alone and neither is claimed to be.
+
+**Not a numbered adr-010 gate.** adr-010 defines V0–V6; this is registered under
+EXP-002 as a replacement for part 2's coverage role. Promoting it to a `V7`
+requires an adr-010 amendment and is deliberately not done here — a gate is not
+added to the standard in the middle of the run it was written for.
+
 ### EXP-003 — endgame subtree cost: does searching beat storing?
 
 - **Objective.** Find the crossover `k*` at which materialising an endgame
