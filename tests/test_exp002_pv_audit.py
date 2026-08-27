@@ -27,6 +27,8 @@ import sys
 import time
 from pathlib import Path
 
+from solver.sweep_reader import SweepReader
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -125,9 +127,9 @@ def test_release_drops_every_cached_layer():
     layers and leaves the most recent resident, which put the first part-2
     launch over the memory ceiling 97 seconds in — underneath a 7 GiB table
     that was not the problem. Constructed through ``__new__`` because a real
-    ``Database`` needs the 4.1 GB checkpoint on disk.
+    :class:`SweepReader` needs the 4.1 GB checkpoint on disk.
     """
-    db = audit.Database.__new__(audit.Database)
+    db = SweepReader.__new__(SweepReader)
     db._resident = {7: bytearray(8), 8: bytearray(8), 9: bytearray(8)}
     db._order = [7, 8, 9]
 
@@ -138,7 +140,7 @@ def test_release_drops_every_cached_layer():
 
 
 def test_release_is_idempotent():
-    db = audit.Database.__new__(audit.Database)
+    db = SweepReader.__new__(SweepReader)
     db._resident = {}
     db._order = []
     db.release()

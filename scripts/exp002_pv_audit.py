@@ -61,125 +61,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fliphex.moves import apply_move, legal_moves  # noqa: E402
 from fliphex.notation import encode_move  # noqa: E402
-from fliphex.state import Colour  # noqa: E402
 from fliphex.variant import Arm, Variant  # noqa: E402
 from solver.checkpoint import Checkpoint, atomic_write  # noqa: E402
-from solver.minimax import LOSS, WIN, BudgetExceededError, Solver  # noqa: E402
-from solver.packed_sweep import PackedSweep  # noqa: E402
-from solver.retrograde import SLOT_LOSS, SLOT_WIN, LayerIndex  # noqa: E402
+from solver.minimax import WIN, BudgetExceededError, Solver  # noqa: E402
+from solver.sweep_reader import SweepReader  # noqa: E402
 from solver.transposition import (  # noqa: E402
     TranspositionTable,
     max_capacity_for,
 )
-
-
-class Database:
-    """Read-only view of a sweep's layers, as written by ``solver.checkpoint``.
-
-    Layers are loaded **on demand and evicted**, never all at once. Holding all
-    sixteen costs 4.1 GB on the 5×3, and the first attempt at this audit did
-    exactly that: 12.9 GB resident on a 15 GB machine, with the transposition
-    table on top, and it began paging before it finished 7 of 540 positions.
-
-    A small cache suffices because every consumer walks `t` monotonically: the
-    PV walk needs layer `t` and `t + 1` together, part 1 needs one at a time,
-    and part 2 only ever touches layer 1 (240 configurations on the 5×3).
-    """
-
-    #: Enough for the PV walk's ``t``/``t+1`` pair, with one spare.
-    MAX_RESIDENT = 3
-
-    def __init__(self, variant: Variant, checkpoint: Checkpoint) -> None:
-        self.variant = variant
-        self.checkpoint = checkpoint
-        self.sweep = PackedSweep(variant, variant.board(), 2)
-        manifest = checkpoint.load_manifest()
-        if manifest is None:
-            raise SystemExit(
-                f"no checkpoint at {checkpoint.root} — the PV audit reads the "
-                f"sweep's own layers, so the arm must have been run with "
-                f"--checkpoint. h1 predates crash resume and must be re-run."
-            )
-        missing = set(range(variant.n_cells + 1)) - set(manifest["complete_layers"])
-        if missing:
-            raise SystemExit(
-                f"checkpoint at {checkpoint.root} is incomplete: layers "
-                f"{sorted(missing)} are absent. A partial database cannot be "
-                f"audited — the sweep must have finished."
-            )
-        self._resident: dict[int, bytearray] = {}
-        self._order: list[int] = []
-        self.index = {t: LayerIndex(variant, t) for t in range(variant.n_cells + 1)}
-
-    def layer(self, t: int) -> bytearray:
-        cached = self._resident.get(t)
-        if cached is not None:
-            self._order.remove(t)
-            self._order.append(t)
-            return cached
-        values = self.checkpoint.load_layer(t)
-        self._resident[t] = values
-        self._order.append(t)
-        while len(self._order) > self.MAX_RESIDENT:
-            del self._resident[self._order.pop(0)]
-        return values
-
-    def release(self) -> None:
-        """Drop every cached layer.
-
-        The PV walk touches all sixteen layers and leaves the most recent of
-        them resident — **5.87 GiB** on the 5×3, measured. Part 2 needs only
-        layer 1 (240 configurations, 60 bytes), so carrying that is pure cost,
-        and it is what put the first part-2 launch 1.4 GiB over the memory
-        ceiling 97 seconds in. Freeing really does return the memory to the OS
-        here: the same measurement shows 5.87 GiB fall to 0.12 GiB.
-        """
-        self._resident.clear()
-        self._order.clear()
-
-    def slot(self, state) -> int:
-        """The database's verdict for ``state``, relative to the side to move."""
-        t = sum(1 for c in state.colours if c != Colour.EMPTY)
-        return self.sweep.get(self.layer(t), self.index[t].encode(state))
-
-    def value(self, state) -> int:
-        slot = self.slot(state)
-        if slot == SLOT_WIN:
-            return WIN
-        if slot == SLOT_LOSS:
-            return LOSS
-        raise AssertionError(
-            f"database holds no value for a reachable position: {slot}"
-        )
-
-    def principal_variation(self, board, state) -> list:
-        """Walk the database's own optimal line from ``state`` to a terminal.
-
-        At a winning node the mover must have a child the database calls a loss
-        for the opponent; if none exists the database contradicts itself, and
-        that is a finding rather than an exception to swallow.
-        """
-        line = []
-        current = state
-        while not current.is_terminal():
-            want = SLOT_LOSS if self.slot(current) == SLOT_WIN else None
-            chosen = None
-            for move in legal_moves(board, current):
-                child = apply_move(board, current, move)
-                slot = self.slot(child)
-                if want is None or slot == want:
-                    chosen = (move, child)
-                    if want is not None:
-                        break
-            if chosen is None:
-                raise AssertionError(
-                    f"database calls a position a win but no child is a loss "
-                    f"— it is internally inconsistent at ply {len(line)}"
-                )
-            move, current = chosen
-            line.append(move)
-        return line
-
 
 #: Memory the run needs for things that are not the transposition table, held
 #: back when sizing it. :class:`Database` keeps three sweep layers resident and
@@ -380,7 +269,7 @@ def load_partial(args, variant: Variant) -> dict:
 def audit(variant: Variant, args) -> dict:
     board = variant.board()
     ckpt = Checkpoint(args.checkpoint / variant.name)
-    db = Database(variant, ckpt)
+    db = SweepReader(variant, ckpt)
     root = variant.initial_state()
 
     print(f"\n  === EXP-002 PV audit — {variant.name} ===")
