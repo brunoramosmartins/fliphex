@@ -1320,6 +1320,7 @@ registration, not here.
 | 4 | AZ training run, seed 1, to 1M self-play positions | H3 |
 | 4 | AZ training run, seed 2 (convergence replication) | H3 |
 | 4 | Factored vs flat policy head (adr-005 risk R5) | — |
+| 4 | **Transposition-aware MCTS** — children expanded by position vs by action, against risk R13's measured 4.46× root aliasing (adr-005 Phase 3 amendment) | — |
 | 5 | First-player win rate, 20 seeds × 1000 games, Wilson CI | H1 |
 | 5 | Joker-less variant, matched protocol | H2 |
 | 5 | AZ vs solver at matched depth caps | H3 |

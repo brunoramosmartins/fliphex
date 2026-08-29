@@ -185,6 +185,71 @@ direction, and the general form is stated there: *neither axis may be used to
 select or terminate the other along the dimension on which they are later
 compared.*
 
+## Amendment — Phase 3 (2026-08-28): the action space is 4.46× redundant at the root
+
+**The network does not change. Two Phase 4 checks become mandatory, and one
+number used above is wrong.**
+
+Placed tiles are inert and arrows fire only at *occupied* neighbours
+([adr-003](adr-003-piece-representation.md),
+[adr-006](adr-006-no-chain-reaction.md)). So two rotations of the same tile on
+the same cell reach the **same position** whenever their arrow sets meet the
+occupied neighbours identically — and on an empty neighbourhood every rotation
+does, the tile landing inert and indistinguishable from the joker. The collapse
+does not cross tiles: a different tile leaves a different hand.
+
+`fliphex.moves.legal_moves` deduplicates rotations only *statically*, from each
+tile's rotation orbit. Measured per position by
+`scripts/measure_move_collapse.py` (seed 11, 12 random games on the 5×5):
+
+| ply | actions | distinct positions | collapse |
+|---|---|---|---|
+| 0 | 1,450 | **325** | 4.46× |
+| 4 | 992 | 375 | 2.65× |
+| 8 | 633 | 347 | 1.83× |
+| 20 | 47 | 41 | 1.16× |
+| whole game | 148,740 | 65,126 | **2.28×** |
+
+325 is exactly 25 cells × 13 tiles. The redundancy is worst at the root and
+decays monotonically as the board fills.
+
+**1. The Phase 2 amendment's point 3 overstates prior-free UCT's cost.** It says
+UCB1 "must visit all 1450 opening children before it distinguishes any of them".
+There are only **325 distinct opening positions**; 1,450 is the action count. The
+argument for PUCT survives unharmed — 325 prior-free visits before any
+discrimination is still far past a laptop's budget — but the figure should be
+quoted as 325 wherever the *positions* are meant.
+
+**2. MCTS must deduplicate children, and this is a search-quality decision, not
+an optimisation.** Expanding aliased actions as separate nodes splits the visit
+counts of one position across up to six labels. Two effects compound and point
+the same way: the factored head assigns each alias its own prior, so a position
+reachable by six rotations collects roughly six times the prior mass of one
+reachable by a single rotation — a bias with no basis in the position's merit;
+and split visit counts make each alias look under-explored, which PUCT answers by
+exploring it further. The training target `π` is then read off those split
+counts, teaching the network to spread mass across rotations and closing the
+loop. The distortion is largest near the root, which is where search quality
+matters most.
+
+The fix is transposition-aware child expansion — index children by position, not
+by action — and it is not free: it turns the tree into a DAG, and backup over a
+DAG has known subtleties this ADR does not pre-decide. **Phase 4 must implement
+deduplicated expansion and report the measured effect against the naive tree**,
+on the same footing as the R5 check below.
+
+**3. R5 gains a concrete failure mode.** The recorded risk is that cell, tile and
+rotation are not conditionally independent. This adds a second, sharper one: a
+sizeable share of the rotation factor's output is not modelling a choice at all,
+because the rotation frequently does not change the resulting position. The
+fallbacks in the Consequences section are unchanged and both still apply —
+conditioning rotation on cell, then the flat 1950-logit head — but note the flat
+head does **not** fix this: 1,950 logits over 1,450 actions is the same aliasing
+with more parameters. Only deduplication addresses it.
+
+**Not evidence about the game.** The collapse was measured on reachable positions
+by random playout. It says nothing about H1, H2 or H3.
+
 ## Related
 
 - [adr-003](adr-003-piece-representation.md) — why no orientation planes
