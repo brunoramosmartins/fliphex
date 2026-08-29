@@ -1475,3 +1475,184 @@ nohup: ignoring input
   principal variation, 15 plies:
     A1:P1:0 E3:P6:0 A2:P2-adj:0 E2:P3-y:5 A3:P2-skip:0 E1:P3-fan:5 B1:P2-opp:0 D3:P2-opp:2 B2:P3-fan:3 D2:P2-skip:5 B3:P6:0 D1:P2-adj:5 C1:P3-y:2 C3:P1:5 C2:P3-tri:0
 
+  part 1 — SKIPPED (--parts first); 15 rows carried over
+
+  part 2 — re-deriving the root under each of 540 first moves
+      [08-25 08:35] first 1/540 A1:P1:0      13,866,248 nodes    173,735/s   0.02 h cpu    0.3% of budget   13.8 GiB  (+0.06 h suspended)
+      [first 1/540 A1:P1:0] STOPPING: 13.8 GiB resident is past the 12.4 GiB ceiling. Lower --tt-bits and resume; this position will be recorded unproven.
+
+  ABORTING the run: the memory ceiling was reached. Lower --tt-bits and resume.
+
+    PV positions .......... 15 agree, 0 disagree, 0 unproven
+    first moves ........... 0 agree, 0 disagree, 1 unproven
+    coverage (first moves)  0.0%
+    elapsed ............... 97.7s
+
+    5x3-h2: INCOMPLETE — no disagreement, but not full cover
+
+    artefact -> results/exp002-pv-audit-5x3-h2.json
+nohup: ignoring input
+
+  === EXP-002 PV audit — 5x3-h2 ===
+  database: data/checkpoints/5x3-h2
+  root value from the sweep: P1
+  interpreter: pypy 3.11.15
+  node budget: 5,000,000,000 per position
+  transposition table: 2^28 slots, 7.00 GiB when full
+  heartbeat: every 300s
+  memory ceiling: 12.4 GiB resident
+  RESUMING from results/exp002-pv-audit-5x3-h2.json: 15 PV positions and 0 first moves decided
+  retrying 0 PV positions and 1 first moves that ran out of budget last time
+
+  principal variation, 15 plies:
+    A1:P1:0 E3:P6:0 A2:P2-adj:0 E2:P3-y:5 A3:P2-skip:0 E1:P3-fan:5 B1:P2-opp:0 D3:P2-opp:2 B2:P3-fan:3 D2:P2-skip:5 B3:P6:0 D1:P2-adj:5 C1:P3-y:2 C3:P1:5 C2:P3-tri:0
+
+  part 1 — SKIPPED (--parts first); 15 rows carried over
+
+  part 2 — re-deriving the root under each of 540 first moves
+    (layer cache released; 1.1 GiB resident)
+      [08-25 23:02] first 1/540 A1:P1:0      12,139,407 nodes    146,759/s   0.02 h cpu    0.2% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-25 23:07] first 1/540 A1:P1:0      64,933,276 nodes    169,435/s   0.11 h cpu    1.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-25 23:12] first 1/540 A1:P1:0     114,726,967 nodes    167,782/s   0.19 h cpu    2.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-25 23:17] first 1/540 A1:P1:0     161,433,117 nodes    164,010/s   0.27 h cpu    3.2% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-25 23:22] first 1/540 A1:P1:0     200,311,375 nodes    155,906/s   0.36 h cpu    4.0% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-25 23:27] first 1/540 A1:P1:0     247,221,837 nodes    155,928/s   0.44 h cpu    4.9% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-25 23:32] first 1/540 A1:P1:0     294,674,040 nodes    156,150/s   0.52 h cpu    5.9% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-25 23:37] first 1/540 A1:P1:0     339,680,769 nodes    155,275/s   0.61 h cpu    6.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-25 23:42] first 1/540 A1:P1:0     388,129,244 nodes    155,983/s   0.69 h cpu    7.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-25 23:47] first 1/540 A1:P1:0     443,274,484 nodes    158,956/s   0.77 h cpu    8.9% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-25 23:52] first 1/540 A1:P1:0     499,909,123 nodes    161,815/s   0.86 h cpu   10.0% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-25 23:57] first 1/540 A1:P1:0     556,581,100 nodes    164,193/s   0.94 h cpu   11.1% of budget    7.1 GiB  (+0.06 h suspended)
+        10/540  proven 10  disagree 0  3,702s
+      [08-26 00:03] first 13/540 A1:P2-skip:0      15,778,581 nodes    189,976/s   0.02 h cpu    0.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 00:05] first 19/540 A1:P2-opp:0      16,371,600 nodes    197,926/s   0.02 h cpu    0.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 00:11] first 19/540 A1:P2-opp:0      71,661,014 nodes    186,999/s   0.11 h cpu    1.4% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 00:16] first 19/540 A1:P2-opp:0     128,067,850 nodes    187,326/s   0.19 h cpu    2.6% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 00:21] first 19/540 A1:P2-opp:0     183,345,605 nodes    186,292/s   0.27 h cpu    3.7% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 09:08] first 19/540 A1:P2-opp:0     186,357,379 nodes    186,108/s   0.28 h cpu    3.7% of budget    7.1 GiB  (+8.85 h suspended)
+        20/540  proven 20  disagree 0  4,917s
+      [08-26 09:10] first 22/540 A1:P3-fan:0      15,061,869 nodes    179,784/s   0.02 h cpu    0.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 09:15] first 22/540 A1:P3-fan:0      70,375,100 nodes    183,169/s   0.11 h cpu    1.4% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 09:20] first 22/540 A1:P3-fan:0     122,902,090 nodes    179,531/s   0.19 h cpu    2.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 09:26] first 22/540 A1:P3-fan:0     173,327,791 nodes    175,959/s   0.27 h cpu    3.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 09:31] first 22/540 A1:P3-fan:0     224,784,279 nodes    174,861/s   0.36 h cpu    4.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 09:36] first 22/540 A1:P3-fan:0     276,789,312 nodes    174,530/s   0.44 h cpu    5.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 09:41] first 22/540 A1:P3-fan:0     330,851,467 nodes    175,372/s   0.52 h cpu    6.6% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 09:46] first 22/540 A1:P3-fan:0     384,989,958 nodes    176,034/s   0.61 h cpu    7.7% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 09:51] first 22/540 A1:P3-fan:0     439,119,693 nodes    176,533/s   0.69 h cpu    8.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 09:56] first 22/540 A1:P3-fan:0     493,941,306 nodes    177,168/s   0.77 h cpu    9.9% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 10:01] first 22/540 A1:P3-fan:0     547,118,991 nodes    177,151/s   0.86 h cpu   10.9% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 10:06] first 22/540 A1:P3-fan:0     599,557,162 nodes    176,922/s   0.94 h cpu   12.0% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 10:11] first 22/540 A1:P3-fan:0     652,972,159 nodes    176,990/s   1.02 h cpu   13.1% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 10:16] first 22/540 A1:P3-fan:0     707,046,651 nodes    177,214/s   1.11 h cpu   14.1% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 10:21] first 22/540 A1:P3-fan:0     760,378,626 nodes    177,233/s   1.19 h cpu   15.2% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 10:26] first 22/540 A1:P3-fan:0     814,088,596 nodes    177,336/s   1.28 h cpu   16.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 10:31] first 22/540 A1:P3-fan:0     867,489,379 nodes    177,361/s   1.36 h cpu   17.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 10:36] first 22/540 A1:P3-fan:0     921,098,183 nodes    177,423/s   1.44 h cpu   18.4% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 10:41] first 22/540 A1:P3-fan:0     974,075,412 nodes    177,355/s   1.53 h cpu   19.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 10:46] first 22/540 A1:P3-fan:0   1,028,228,213 nodes    177,506/s   1.61 h cpu   20.6% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 10:51] first 22/540 A1:P3-fan:0   1,081,713,667 nodes    177,531/s   1.69 h cpu   21.6% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 10:56] first 22/540 A1:P3-fan:0   1,135,923,353 nodes    177,666/s   1.78 h cpu   22.7% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 11:01] first 22/540 A1:P3-fan:0   1,187,878,197 nodes    177,453/s   1.86 h cpu   23.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 11:06] first 22/540 A1:P3-fan:0   1,239,838,184 nodes    177,259/s   1.94 h cpu   24.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 11:11] first 22/540 A1:P3-fan:0   1,293,828,699 nodes    177,358/s   2.03 h cpu   25.9% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 11:16] first 22/540 A1:P3-fan:0   1,346,626,851 nodes    177,295/s   2.11 h cpu   26.9% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 11:21] first 22/540 A1:P3-fan:0   1,398,318,402 nodes    177,095/s   2.19 h cpu   28.0% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 11:26] first 22/540 A1:P3-fan:0   1,448,431,786 nodes    176,716/s   2.28 h cpu   29.0% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 11:31] first 22/540 A1:P3-fan:0   1,500,646,083 nodes    176,603/s   2.36 h cpu   30.0% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 11:36] first 22/540 A1:P3-fan:0   1,553,462,624 nodes    176,576/s   2.44 h cpu   31.1% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 11:41] first 22/540 A1:P3-fan:0   1,605,079,130 nodes    176,417/s   2.53 h cpu   32.1% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 11:46] first 22/540 A1:P3-fan:0   1,658,436,854 nodes    176,455/s   2.61 h cpu   33.2% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 11:51] first 22/540 A1:P3-fan:0   1,711,252,837 nodes    176,434/s   2.69 h cpu   34.2% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 11:56] first 22/540 A1:P3-fan:0   1,764,398,542 nodes    176,448/s   2.78 h cpu   35.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 12:00] first 28/540 A1:P3-y:0      14,621,286 nodes    184,195/s   0.02 h cpu    0.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 12:05] first 28/540 A1:P3-y:0      68,585,046 nodes    180,555/s   0.11 h cpu    1.4% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 12:11] first 28/540 A1:P3-y:0     123,813,667 nodes    181,998/s   0.19 h cpu    2.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 12:16] first 28/540 A1:P3-y:0     178,633,019 nodes    182,133/s   0.27 h cpu    3.6% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 12:21] first 28/540 A1:P3-y:0     231,610,608 nodes    180,773/s   0.36 h cpu    4.6% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 12:26] first 28/540 A1:P3-y:0     285,471,357 nodes    180,487/s   0.44 h cpu    5.7% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 12:31] first 28/540 A1:P3-y:0     338,733,535 nodes    179,928/s   0.52 h cpu    6.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 12:36] first 28/540 A1:P3-y:0     391,060,141 nodes    179,139/s   0.61 h cpu    7.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 12:41] first 28/540 A1:P3-y:0     441,793,622 nodes    177,894/s   0.69 h cpu    8.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 12:46] first 28/540 A1:P3-y:0     493,400,075 nodes    177,233/s   0.77 h cpu    9.9% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 12:51] first 28/540 A1:P3-y:0     546,532,440 nodes    177,194/s   0.86 h cpu   10.9% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 12:56] first 28/540 A1:P3-y:0     600,663,094 nodes    177,460/s   0.94 h cpu   12.0% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 13:01] first 28/540 A1:P3-y:0     653,045,554 nodes    177,201/s   1.02 h cpu   13.1% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 13:06] first 28/540 A1:P3-y:0     707,604,801 nodes    177,532/s   1.11 h cpu   14.2% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 13:11] first 28/540 A1:P3-y:0     760,772,198 nodes    177,486/s   1.19 h cpu   15.2% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 13:16] first 28/540 A1:P3-y:0     815,120,817 nodes    177,703/s   1.27 h cpu   16.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 13:21] first 28/540 A1:P3-y:0     869,635,303 nodes    177,934/s   1.36 h cpu   17.4% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 13:26] first 28/540 A1:P3-y:0     924,477,895 nodes    178,190/s   1.44 h cpu   18.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 13:31] first 28/540 A1:P3-y:0     978,150,064 nodes    178,218/s   1.52 h cpu   19.6% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 13:36] first 28/540 A1:P3-y:0   1,031,589,300 nodes    178,200/s   1.61 h cpu   20.6% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 13:41] first 28/540 A1:P3-y:0   1,084,298,481 nodes    178,063/s   1.69 h cpu   21.7% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 13:46] first 28/540 A1:P3-y:0   1,138,391,723 nodes    178,154/s   1.77 h cpu   22.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 13:51] first 28/540 A1:P3-y:0   1,191,104,592 nodes    178,033/s   1.86 h cpu   23.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 13:56] first 28/540 A1:P3-y:0   1,244,196,177 nodes    177,975/s   1.94 h cpu   24.9% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 14:01] first 28/540 A1:P3-y:0   1,297,283,598 nodes    177,921/s   2.03 h cpu   25.9% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 14:06] first 28/540 A1:P3-y:0   1,350,723,524 nodes    177,919/s   2.11 h cpu   27.0% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 14:11] first 28/540 A1:P3-y:0   1,403,443,180 nodes    177,826/s   2.19 h cpu   28.1% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 14:16] first 28/540 A1:P3-y:0   1,455,675,271 nodes    177,680/s   2.28 h cpu   29.1% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 14:21] first 28/540 A1:P3-y:0   1,509,793,207 nodes    177,766/s   2.36 h cpu   30.2% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 14:26] first 28/540 A1:P3-y:0   1,564,070,692 nodes    177,864/s   2.44 h cpu   31.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 14:31] first 28/540 A1:P3-y:0   1,617,790,727 nodes    177,895/s   2.53 h cpu   32.4% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 14:36] first 28/540 A1:P3-y:0   1,671,075,709 nodes    177,878/s   2.61 h cpu   33.4% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 14:41] first 28/540 A1:P3-y:0   1,724,285,314 nodes    177,855/s   2.69 h cpu   34.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 14:46] first 28/540 A1:P3-y:0   1,775,881,554 nodes    177,671/s   2.78 h cpu   35.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 14:51] first 28/540 A1:P3-y:0   1,827,373,405 nodes    177,489/s   2.86 h cpu   36.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 14:56] first 28/540 A1:P3-y:0   1,878,755,174 nodes    177,304/s   2.94 h cpu   37.6% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 15:01] first 28/540 A1:P3-y:0   1,931,815,763 nodes    177,286/s   3.03 h cpu   38.6% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 15:06] first 28/540 A1:P3-y:0   1,984,690,352 nodes    177,254/s   3.11 h cpu   39.7% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 15:11] first 28/540 A1:P3-y:0   2,037,631,855 nodes    177,220/s   3.19 h cpu   40.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 15:16] first 28/540 A1:P3-y:0   2,090,614,355 nodes    177,197/s   3.28 h cpu   41.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 15:21] first 28/540 A1:P3-y:0   2,144,152,464 nodes    177,222/s   3.36 h cpu   42.9% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 15:26] first 28/540 A1:P3-y:0   2,196,402,658 nodes    177,141/s   3.44 h cpu   43.9% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 15:31] first 28/540 A1:P3-y:0   2,249,574,905 nodes    177,137/s   3.53 h cpu   45.0% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 15:36] first 28/540 A1:P3-y:0   2,302,612,036 nodes    177,117/s   3.61 h cpu   46.1% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 15:41] first 28/540 A1:P3-y:0   2,355,159,934 nodes    177,066/s   3.69 h cpu   47.1% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 15:46] first 28/540 A1:P3-y:0   2,408,877,854 nodes    177,098/s   3.78 h cpu   48.2% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 15:51] first 28/540 A1:P3-y:0   2,459,724,160 nodes    176,928/s   3.86 h cpu   49.2% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 15:56] first 28/540 A1:P3-y:0   2,511,936,316 nodes    176,856/s   3.95 h cpu   50.2% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 16:01] first 28/540 A1:P3-y:0   2,563,343,692 nodes    176,737/s   4.03 h cpu   51.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 16:06] first 28/540 A1:P3-y:0   2,615,784,158 nodes    176,692/s   4.11 h cpu   52.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 16:11] first 28/540 A1:P3-y:0   2,667,806,379 nodes    176,622/s   4.20 h cpu   53.4% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 16:16] first 28/540 A1:P3-y:0   2,720,841,120 nodes    176,620/s   4.28 h cpu   54.4% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 16:21] first 28/540 A1:P3-y:0   2,772,423,860 nodes    176,525/s   4.36 h cpu   55.4% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 16:26] first 28/540 A1:P3-y:0   2,823,445,179 nodes    176,399/s   4.45 h cpu   56.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 16:31] first 28/540 A1:P3-y:0   2,874,912,508 nodes    176,305/s   4.53 h cpu   57.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 16:36] first 28/540 A1:P3-y:0   2,925,793,738 nodes    176,176/s   4.61 h cpu   58.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 16:41] first 28/540 A1:P3-y:0   2,976,496,695 nodes    176,044/s   4.70 h cpu   59.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 16:46] first 28/540 A1:P3-y:0   3,028,665,640 nodes    176,002/s   4.78 h cpu   60.6% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 16:51] first 28/540 A1:P3-y:0   3,080,334,458 nodes    175,931/s   4.86 h cpu   61.6% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 16:56] first 28/540 A1:P3-y:0   3,131,833,905 nodes    175,854/s   4.95 h cpu   62.6% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 17:01] first 28/540 A1:P3-y:0   3,183,091,645 nodes    175,768/s   5.03 h cpu   63.7% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 17:06] first 28/540 A1:P3-y:0   3,236,152,215 nodes    175,777/s   5.11 h cpu   64.7% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 17:11] first 28/540 A1:P3-y:0   3,288,688,782 nodes    175,762/s   5.20 h cpu   65.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 17:16] first 28/540 A1:P3-y:0   3,341,004,223 nodes    175,737/s   5.28 h cpu   66.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 17:21] first 28/540 A1:P3-y:0   3,391,932,273 nodes    175,640/s   5.36 h cpu   67.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 17:26] first 28/540 A1:P3-y:0   3,444,645,215 nodes    175,637/s   5.45 h cpu   68.9% of budget    7.1 GiB  (+0.06 h suspended)
+        30/540  proven 30  disagree 0  34,839s
+      [08-26 17:29] first 34/540 A1:P3-tri:0      14,448,398 nodes    178,259/s   0.02 h cpu    0.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 17:34] first 34/540 A1:P3-tri:0      66,884,666 nodes    175,330/s   0.11 h cpu    1.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 17:39] first 34/540 A1:P3-tri:0     120,348,670 nodes    176,598/s   0.19 h cpu    2.4% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 17:44] first 34/540 A1:P3-tri:0     173,448,179 nodes    176,560/s   0.27 h cpu    3.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 17:49] first 34/540 A1:P3-tri:0     226,727,943 nodes    176,746/s   0.36 h cpu    4.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 17:54] first 34/540 A1:P3-tri:0     279,987,459 nodes    176,840/s   0.44 h cpu    5.6% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 17:59] first 34/540 A1:P3-tri:0     332,297,944 nodes    176,407/s   0.52 h cpu    6.6% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 18:04] first 34/540 A1:P3-tri:0     385,095,138 nodes    176,312/s   0.61 h cpu    7.7% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 18:09] first 34/540 A1:P3-tri:0     437,341,931 nodes    176,018/s   0.69 h cpu    8.7% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 18:14] first 34/540 A1:P3-tri:0     489,368,713 nodes    175,710/s   0.77 h cpu    9.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 18:19] first 34/540 A1:P3-tri:0     541,560,633 nodes    175,514/s   0.86 h cpu   10.8% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 18:24] first 34/540 A1:P3-tri:0     593,193,256 nodes    175,188/s   0.94 h cpu   11.9% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 18:29] first 34/540 A1:P3-tri:0     645,482,107 nodes    175,096/s   1.02 h cpu   12.9% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 18:34] first 34/540 A1:P3-tri:0     698,396,484 nodes    175,176/s   1.11 h cpu   14.0% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 18:39] first 34/540 A1:P3-tri:0     750,527,682 nodes    175,057/s   1.19 h cpu   15.0% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 18:44] first 34/540 A1:P3-tri:0     803,851,663 nodes    175,214/s   1.27 h cpu   16.1% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 18:49] first 34/540 A1:P3-tri:0     855,642,737 nodes    175,041/s   1.36 h cpu   17.1% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 18:54] first 34/540 A1:P3-tri:0     909,580,393 nodes    175,298/s   1.44 h cpu   18.2% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 18:59] first 34/540 A1:P3-tri:0     962,081,037 nodes    175,268/s   1.52 h cpu   19.2% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 19:04] first 34/540 A1:P3-tri:0   1,015,908,937 nodes    175,472/s   1.61 h cpu   20.3% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 19:09] first 34/540 A1:P3-tri:0   1,068,847,418 nodes    175,503/s   1.69 h cpu   21.4% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 19:14] first 34/540 A1:P3-tri:0   1,121,819,859 nodes    175,534/s   1.78 h cpu   22.4% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 19:19] first 34/540 A1:P3-tri:0   1,174,953,953 nodes    175,593/s   1.86 h cpu   23.5% of budget    7.1 GiB  (+0.06 h suspended)
+      [08-26 19:24] first 34/540 A1:P3-tri:0   1,227,060,879 nodes    175,499/s   1.94 h cpu   24.5% of budget    7.1 GiB  (+0.06 h suspended)

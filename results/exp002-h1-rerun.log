@@ -1,0 +1,11 @@
+nohup: ignoring input
+  === EXP-002 — 5x3-h1, 15 cells, hands 8+7 ===
+  17,506,580,337 configurations, 2 bits/entry, seed 3
+  interpreter: pypy 3.11.15
+  checkpoint: data/checkpoints/5x3-h1 (fresh start)
+    layer 15           32,768 configs      0.1s  (0s total)
+    layer 14        1,966,080 configs      1.2s  (1s total)
+    layer 13       48,168,960 configs     58.9s  (60s total)
+    layer 12      365,281,280 configs    429.7s  (490s total)
+    layer 11    1,643,765,760 configs   6654.4s  (7,144s total)
+    layer 10    3,616,284,672 configs   5762.1s  (12,906s total)

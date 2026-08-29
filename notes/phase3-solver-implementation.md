@@ -147,6 +147,77 @@ Ordering is an *agent* concern and a *proof* concern, and adr-004 splits them:
 ordering that makes the agent strong is free to use anything; ordering inside a
 run that will be cited as a proof is constrained by R1–R3.
 
+## Rotations collapse dynamically, and nothing exploits it (2026-08-28)
+
+`legal_moves` deduplicates rotations **statically** — once per tile, from its
+rotation orbit (`P6` has 1, `P3-tri` 2, the opposite-pair tiles 3), giving 58
+distinct `(tile, rotation)` pairs and 1,450 moves on ply 1. It never
+deduplicates *per position*, and per position there is much more to collapse.
+
+A tile's arrows only ever flip **occupied** neighbours — `apply_move` skips
+`OFF_BOARD` and `EMPTY` targets. So two rotations of the same tile on the same
+cell produce the same child whenever their arrow sets meet the occupied
+neighbours identically, and on an empty neighbourhood *every* rotation does:
+the tile lands inert, indistinguishable from the joker.
+
+This does **not** extend across tiles. Spending a different tile leaves a
+different hand, so the children differ however alike the board looks. Only
+rotations collapse.
+
+**Measured** by `scripts/measure_move_collapse.py` — random playouts, seed 11,
+12 games on the 5×5 and 40 on the 5×3; children keyed by colours + hands + mover,
+with `history` excluded because it is part of `GameState.__eq__` but not of the
+position, and keying on it would report no collapse at all:
+
+| ply | 5×5 generated | distinct | collapse |
+|---|---|---|---|
+| 0 | 1,450 | 325 | **4.46×** |
+| 4 | 992 | 375 | 2.65× |
+| 8 | 633 | 347 | 1.83× |
+| 12 | 356 | 248 | 1.44× |
+| 20 | 47 | 41 | 1.16× |
+| whole game | 148,740 | 65,126 | **2.28×** |
+
+325 is exactly 25 cells × 13 tiles: on an empty board the rotation is pure
+redundancy. The collapse decays monotonically as the board fills, which is the
+mechanism stated backwards — a fuller board gives the arrows more to bite on.
+
+**Where this would pay, and where it would not.**
+
+*Not the sweep, not now.* The retrograde inner loop is the ideal place —
+`_layer_configurations` holds `occupied` fixed across the whole inner nest
+(≈1.0 M configurations per `filled` subset at `t = 9`), so the distinct effective
+masks per (cell, tile) could be precomputed once per subset and amortised to
+nothing. Layers 7 and 9 are 83% of h2's sweep and collapse 1.58× and 1.32×,
+projecting to **~8 h off 34 h, near 25%**. Two caveats: the collapse is measured
+on *reachable* positions and the sweep enumerates the configuration space, most
+of which is unreachable; and the saving only lands on positions the sweep must
+enumerate exhaustively, which is the LOSS ones — the same set the parity finding
+identifies as the expensive half, so the direction is right and the magnitude is
+an estimate.
+
+None of it has a consumer. The 5×3 is solved twice over, the h1 re-run exists
+specifically to reproduce `ab2620e1707f983f…` and be comparable to h2 — changing
+the sweep would forfeit exactly that — and adr-012 already ruled out a 5×5
+database, where 4.887 × 10¹⁷ states make a 1.3× irrelevant.
+
+*Not the forward searcher, much.* The transposition table already absorbs the
+duplicates: a repeated child hits the table and returns. What is wasted is
+`apply_move` plus a probe, not a subtree — a constant factor, and concentrated
+in sparse positions, which are the rare ones. Possibly a real secondary effect
+on move ordering (a node can try four copies of the same losing child before
+reaching a winning one), unmeasured.
+
+***Axis 2, where it is not a constant factor at all.*** adr-005 gives the policy
+head 1,950 factored logits over cell × tile × rotation, and the decision journal
+already flags it as Phase 0's least-evidenced decision. At the root, 4.46 of
+every 5 of those actions are aliases: the network is asked to spread probability
+across 1,450 actions leading to 325 positions, and MCTS — unless it deduplicates
+children — expands them as separate nodes and **splits the visit counts of
+identical positions**. That degrades the search itself, not just its speed, and
+it is worst exactly where quality matters most, near the root. Carry into
+Phase 4 as a design input, not an optimisation.
+
 ## 3×3 — exhaustive solve (EXP-001)
 
 Correctness fixture, not a strategy microcosm — and the adr-010 V3 artefact: the
@@ -650,4 +721,9 @@ questions and the trade-offs.
      - Claimed the 540 first moves collapse to 240 distinct positions, inferred
        from the layer-1 file size. Measured: 120. The other factor of two is the
        reachability gap EXP-005 already documents at layer 1.
+     - Part 2 then hit the ceiling in 97 s and I assumed the table again. It was
+       the *layer cache*: the PV walk leaves 5.87 GiB of sweep layers resident
+       under a 7 GiB table, and part 2 reads only layer 1. The class of error
+       repeated even after the postmortem — I reached for the component that had
+       failed before instead of measuring which one was holding the memory.
 -->

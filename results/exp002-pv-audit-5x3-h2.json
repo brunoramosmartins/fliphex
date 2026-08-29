@@ -163,16 +163,314 @@
     ]
   },
   "first_moves": {
-    "agree": 0,
+    "agree": 33,
     "disagree": 0,
     "unproven": 0,
-    "settled": 0,
+    "settled": 33,
     "total": 540,
-    "rows": [],
+    "rows": [
+      {
+        "move": "A1:P1:0",
+        "expected": -1,
+        "got": -1,
+        "nodes": 611392685,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P1:1",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P1:2",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P1:3",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P1:4",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P1:5",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P2-adj:0",
+        "expected": -1,
+        "got": -1,
+        "nodes": 140266,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P2-adj:1",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P2-adj:2",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P2-adj:3",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P2-adj:4",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P2-adj:5",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P2-skip:0",
+        "expected": -1,
+        "got": -1,
+        "nodes": 26742431,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P2-skip:1",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P2-skip:2",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P2-skip:3",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P2-skip:4",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P2-skip:5",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P2-opp:0",
+        "expected": -1,
+        "got": -1,
+        "nodes": 196200261,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P2-opp:1",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P2-opp:2",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P3-fan:0",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1800669827,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P3-fan:1",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P3-fan:2",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P3-fan:3",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P3-fan:4",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P3-fan:5",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P3-y:0",
+        "expected": -1,
+        "got": -1,
+        "nodes": 3462969130,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P3-y:1",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P3-y:2",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P3-y:3",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P3-y:4",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      },
+      {
+        "move": "A1:P3-y:5",
+        "expected": -1,
+        "got": -1,
+        "nodes": 1,
+        "budget": 5000000000,
+        "tt_bits": 28,
+        "stopped": null
+      }
+    ],
     "disagreements": []
   },
   "complete": false,
   "passed": false,
   "interpreter": "pypy 3.11.15",
-  "seconds": 4807.050982539001
+  "seconds": 34839.076496393005
 }
