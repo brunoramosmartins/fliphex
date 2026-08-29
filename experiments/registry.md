@@ -768,6 +768,103 @@ EXP-002 as a replacement for part 2's coverage role. Promoting it to a `V7`
 requires an adr-010 amendment and is deliberately not done here — a gate is not
 added to the standard in the middle of the run it was written for.
 
+#### Amendment (2026-08-27) — V4 and V6 now report coverage, and V4 was dropping samples
+
+The 2026-08-09 amendment filed this for "the instrument's next revision, after
+h2 completes". h2 completed on 2026-08-13 and the PV audit's part 1 passed
+15 of 15 on 2026-08-26, so the revision lands now, **before the h1 re-run**, which
+is the last moment it can land without splitting the two arms across two
+instruments.
+
+**What changed.** Reporting only. `scripts/exp002_solve_5x3.py` gains a per-layer
+breakdown for both gates; no sampling rule, seed, budget or pass criterion moved.
+
+- **V4** reports `coverage`: samples drawn, how many produced evidence in either
+  direction, which layers were actually searched, and
+  `shallowest_layer_searched`. The aggregate percentage was never the
+  interesting number — *where* the gate had purchase is.
+- **V6** reports eligibility per layer, and separates **mirror-fixed pairs**: a
+  configuration the reflection maps to itself encodes to its own index, so the
+  comparison is a value against itself and cannot fail. On the 5×1 fixture 23 of
+  160 pairs (14%) are of this kind. Not previously distinguished, in either arm.
+
+**A gate was discarding evidence in silence.** V4 skipped terminal samples with a
+bare `continue`, counting them nowhere. On h2 that was **40 of 601 draws** — which
+is why that artefact's `agreed (349) + unaffordable (212) = 561` falls 40 short
+of its own sample size, with nothing in the artefact saying so. They are now
+re-derived instead, through `fliphex.rules.winner`. This is not circular: the
+sweep decides a terminal layer by counting set bits in a packed integer and
+taking the mover from layer parity, while this path decodes a `GameState` and
+counts its colours. A parity or colour-orientation error in either would surface
+here. The evidence is weaker than a search — it exercises no move generation —
+so it is counted separately and never folded into `agreed`.
+
+**h2's true V4 coverage was 58.1%, not the 61.3% previously recorded.** The
+earlier figure used the non-terminal count as its denominator, which flattered
+the gate by excluding exactly the samples it was throwing away. Against the 601
+draws actually made: 349 verified, 212 over budget, 40 discarded.
+
+**The independence defect is quantified, not fixed.** The 2026-08-09 amendment
+observed that both arms draw the same indices from seed 3 and therefore do not
+corroborate each other. Deriving the stream from `(seed, arm)` would fix it and
+is **deliberately not done**: h1 is about to be re-run specifically to be
+compared against h2, and a changed draw sequence would destroy that comparison to
+buy independence on a gate that has never once disagreed. Recorded as a known
+limitation of V6 on the 5×3, to be fixed on the next board rather than mid-arm.
+For the same reason mirror-fixed pairs are *counted* but left inside `checked` —
+excluding them would mean drawing replacements, which moves the stream.
+
+##### Instrument — `scripts/exp002_coverage_replay.py` (registered before running)
+
+- **Objective.** Recover the h2 arm's V4/V6 coverage breakdown without
+  re-sweeping it, so both arms carry the same numbers.
+- **Method.** The sampling is a pure function of the seed and the layer sizes,
+  and h2's 4.1 GB of layers survive on disk. The script constructs the **real**
+  `Checks` observer and calls it with the stored layers in sweep order — same
+  object, same RNG, same draw sequence. It does not reimplement the sampling. An
+  earlier draft did, and reproduced h2's 518 / 4,768 on the first attempt; that
+  was reassuring and it was the wrong design, because two implementations of one
+  rule drift and the one that drifts silently is the audit.
+- **Fidelity check, fixed before the run.** The replay must reproduce the arm's
+  **V5 checksum** exactly — a hash of every layer in sweep order, which fails if
+  the layers are visited in the wrong order, and that order is also what the RNG
+  stream depends on. For h2 that is `51192b4d403ac1cb…`. Verified end to end on a
+  5×1 fixture: identical digest, identical draws, identical verdicts.
+- **Scope.** Recovers what needs no search — per-layer V4 draws, the terminal
+  count, the full V6 breakdown, the V5 digest. Does **not** recover which
+  individual V4 samples were affordable; that is the ~20 h of forward search the
+  archived artefact already reports in aggregate. `--v4-budget` runs it anyway.
+- **Not a new gate.** It re-reads an existing arm and adds no criterion. Nothing
+  it reports can change the h2 verdict; it can only describe how much of the
+  sample that verdict rested on.
+
+##### Result — h2 (2026-08-27)
+
+Ran in **33.7 s** against the 4.1 GB checkpoint. Artefact
+[`results/exp002-coverage-5x3-h2.json`](../results/exp002-coverage-5x3-h2.json).
+The fidelity check passed: V5 came back `51192b4d403ac1cb…`, the arm's own
+checksum, so the replay visited every layer in sweep order and drew the arm's own
+samples. 601 V4 draws, 518 V6 pairs, 4,768 ineligible — the archived aggregates,
+reproduced.
+
+**V6's eligibility profile, measured for the first time.** Zero at `t = 0` and
+`t = 1`, then 15 and 23 pairs at `t = 2` and `t = 3` — both of which **exhausted
+the 800-attempt cap without finding 40**, so they are limited by the instrument,
+not by the layer — then the full 40 from `t = 4` up. Eligibility rises
+monotonically, 1.9% at `t = 2` to 100% at `t = 15`. The 9.8% aggregate was
+concealing a clean gradient: V6 is a strong check on the endgame, a weak one at
+mid-board, and no check at all on the opening.
+
+**Mirror-fixed pairs are negligible here: 2 of 518.** Worth having measured
+rather than assumed — the 5×1 fixture runs at 23 of 160 (14%), so vacuity is a
+real effect on small boards and simply is not one on the 5×3. Had it gone the
+other way, V6's 518 would have needed restating.
+
+**What this does not resolve.** Which V4 samples were affordable is still only
+known in aggregate for h2 (349 / 212), because that needs the searches. The h1
+re-run produces it natively per layer; if the two must be compared at that
+granularity, `--v4-budget 2000000` on this script recovers it for h2 at ~20 h.
+
 ### EXP-003 — endgame subtree cost: does searching beat storing?
 
 - **Objective.** Find the crossover `k*` at which materialising an endgame

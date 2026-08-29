@@ -1,0 +1,142 @@
+{
+  "experiment": "EXP-002",
+  "check": "V4/V6 coverage replay",
+  "variant": "5x3-h2",
+  "seed": 3,
+  "interpreter": "pypy 3.11.15",
+  "v5_checksum_sha256": "51192b4d403ac1cb45c22d92ce58bab215843f457f245e7aca6d18744f8a3f43",
+  "v1_problems": [],
+  "v4_samples_drawn": 601,
+  "v4_terminal_draws": 40,
+  "v4_per_layer_draws": {
+    "0": 1,
+    "1": 40,
+    "2": 40,
+    "3": 40,
+    "4": 40,
+    "5": 40,
+    "6": 40,
+    "7": 40,
+    "8": 40,
+    "9": 40,
+    "10": 40,
+    "11": 40,
+    "12": 40,
+    "13": 40,
+    "14": 40,
+    "15": 40
+  },
+  "V4_sampled_rederivation": null,
+  "V6_coverage": {
+    "attempts": 5286,
+    "eligible_fraction": 0.09799470298902763,
+    "pairs_checked": 518,
+    "self_mirror": 2,
+    "non_trivial": 516,
+    "layers_without_coverage": [
+      0,
+      1
+    ],
+    "per_layer": {
+      "0": {
+        "attempts": 800,
+        "ineligible": 800,
+        "checked": 0,
+        "self_mirror": 0
+      },
+      "1": {
+        "attempts": 800,
+        "ineligible": 800,
+        "checked": 0,
+        "self_mirror": 0
+      },
+      "2": {
+        "attempts": 800,
+        "ineligible": 785,
+        "checked": 15,
+        "self_mirror": 0
+      },
+      "3": {
+        "attempts": 800,
+        "ineligible": 777,
+        "checked": 23,
+        "self_mirror": 0
+      },
+      "4": {
+        "attempts": 643,
+        "ineligible": 603,
+        "checked": 40,
+        "self_mirror": 0
+      },
+      "5": {
+        "attempts": 415,
+        "ineligible": 375,
+        "checked": 40,
+        "self_mirror": 1
+      },
+      "6": {
+        "attempts": 257,
+        "ineligible": 217,
+        "checked": 40,
+        "self_mirror": 1
+      },
+      "7": {
+        "attempts": 134,
+        "ineligible": 94,
+        "checked": 40,
+        "self_mirror": 0
+      },
+      "8": {
+        "attempts": 148,
+        "ineligible": 108,
+        "checked": 40,
+        "self_mirror": 0
+      },
+      "9": {
+        "attempts": 107,
+        "ineligible": 67,
+        "checked": 40,
+        "self_mirror": 0
+      },
+      "10": {
+        "attempts": 94,
+        "ineligible": 54,
+        "checked": 40,
+        "self_mirror": 0
+      },
+      "11": {
+        "attempts": 88,
+        "ineligible": 48,
+        "checked": 40,
+        "self_mirror": 0
+      },
+      "12": {
+        "attempts": 57,
+        "ineligible": 17,
+        "checked": 40,
+        "self_mirror": 0
+      },
+      "13": {
+        "attempts": 59,
+        "ineligible": 19,
+        "checked": 40,
+        "self_mirror": 0
+      },
+      "14": {
+        "attempts": 44,
+        "ineligible": 4,
+        "checked": 40,
+        "self_mirror": 0
+      },
+      "15": {
+        "attempts": 40,
+        "ineligible": 0,
+        "checked": 40,
+        "self_mirror": 0
+      }
+    },
+    "rows_partial": false
+  },
+  "v6_problems": [],
+  "seconds": 33.661862875000224
+}

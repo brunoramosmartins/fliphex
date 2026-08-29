@@ -30,8 +30,10 @@ What this run checks
 * **V4** — sampled positions re-derived by **direct forward search that never
   consults the sweep**, with the sample size and seed fixed before the run.
   Honest limitation: only positions shallow enough to prove within the node
-  budget can be checked, so V4 covers the endgame and thins out going up. The
-  count of positions that were *not* affordable is reported, never hidden.
+  budget can be checked, so V4 covers the endgame and thins out going up. Since
+  2026-08-27 it reports *where* it succeeded — per layer, with the shallowest
+  layer it actually searched — and terminal draws are re-derived through
+  ``fliphex.rules`` instead of being skipped in silence.
 * **V5** — a running SHA-256 over every layer, in layer order.
 * **V6** — mirror consistency. The 5×3's automorphism is the same left-right
   reflection as the 5×5's, and `adr-008 <../docs/adr/adr-008-board-mirror-symmetry.md>`_
@@ -40,6 +42,9 @@ What this run checks
   reports how many were eligible — a mirror check run indiscriminately would
   pass or fail for the wrong reason. This is the first board where V6 applies
   at all: the withdrawn 4×4's automorphism was a rotation, which no tile breaks.
+  Since 2026-08-27 it also reports eligibility per layer and separates out the
+  pairs where a configuration is *fixed* by the reflection — those compare a
+  value with itself and are evidence of nothing.
 
     pypy scripts/exp002_solve_5x3.py --arm h1
     pypy scripts/exp002_solve_5x3.py --arm h1 --bits 2 --out data/subgame-solutions
@@ -62,6 +67,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from check_symmetry import board_automorphisms  # noqa: E402
 from layer_profile import layer as closed_form_layer  # noqa: E402
 
+from fliphex.rules import winner as terminal_winner  # noqa: E402
 from fliphex.state import TILE_INDEX, Colour  # noqa: E402
 from fliphex.variant import Arm, Variant  # noqa: E402
 from solver.checkpoint import Checkpoint  # noqa: E402
@@ -93,6 +99,13 @@ class Checks:
     v6_checked: int = 0
     v6_rejected: int = 0
     v6_problems: list[str] = field(default_factory=list)
+    #: Per-layer V6 accounting, keyed by ``t``. Aggregates alone cannot say
+    #: *where* the mirror was tested, and adr-008 guarantees the answer is
+    #: "only near the end" — see :meth:`_mirror_check`.
+    v6_rows: dict[int, dict[str, int]] = field(default_factory=dict)
+    #: True when this run resumed from a checkpoint predating the per-layer
+    #: rows, so the breakdown covers only the layers swept in this session.
+    v6_rows_partial: bool = False
 
     def __post_init__(self) -> None:
         self.rng = Random(self.seed)
@@ -136,10 +149,31 @@ class Checks:
         exactly when neither hand still holds ``P3-y``, because the chiral tile's
         reflection is not in the deck. Sampling without that filter would be
         measuring something else.
+
+        Two coverage numbers are recorded here that the 2026-08-09 registry
+        amendment asked for, and one it did not know to ask for.
+
+        ``ineligible`` was already counted in aggregate; it is now counted per
+        layer, which is what turns "V6 covered 9.8%" into the shape that figure
+        was hiding. Measured on h2: eligibility climbs monotonically from 0% at
+        ``t = 0`` and ``t = 1`` to 100% at ``t = 15``, and layers 2 and 3
+        exhausted the attempt cap without finding their 40 pairs.
+
+        ``self_mirror`` is new. A configuration fixed by the reflection encodes
+        to its own index, so the comparison is a value against itself: it cannot
+        fail, and counting it as a checked pair overstates the evidence. Such
+        pairs are counted separately and **left in** ``checked`` deliberately —
+        dropping them would mean drawing replacements, the RNG stream would
+        diverge from the h2 arm's, and the two arms could no longer be compared
+        on the samples the registry pins by seed. Report the difference; do not
+        silently change the draw.
         """
         if self.mirror is None:
             return
         layer = LayerIndex(self.variant, t)
+        row = self.v6_rows.setdefault(
+            t, {"attempts": 0, "ineligible": 0, "checked": 0, "self_mirror": 0}
+        )
         checked = 0
         # Bounded by attempts as well as by hits: in early layers almost nothing
         # is eligible, because both copies of P3-y are still in hand, and an
@@ -147,15 +181,20 @@ class Checks:
         for _ in range(20 * self.v6_per_layer):
             if checked >= self.v6_per_layer:
                 break
+            row["attempts"] += 1
             index = self.rng.randrange(size)
             state = layer.decode(index)
             if not self._chiral_spent(state):
                 self.v6_rejected += 1
+                row["ineligible"] += 1
                 continue
             mirrored = _mirror_state(state, self.mirror)
             other_index = layer.encode(mirrored)
             checked += 1
             self.v6_checked += 1
+            row["checked"] += 1
+            if other_index == index:
+                row["self_mirror"] += 1
             if sweep.get(values, index) != sweep.get(values, other_index):
                 self.v6_problems.append(
                     f"layer {t}: index {index} and its mirror {other_index} differ"
@@ -194,6 +233,7 @@ class Checks:
             "v6_checked": self.v6_checked,
             "v6_rejected": self.v6_rejected,
             "v6_problems": list(self.v6_problems),
+            "v6_rows": {str(k): dict(v) for k, v in self.v6_rows.items()},
         }
 
     def restore_checkpoint(self, state: dict, checkpoint) -> None:
@@ -212,6 +252,12 @@ class Checks:
         self.v6_checked = state["v6_checked"]
         self.v6_rejected = state["v6_rejected"]
         self.v6_problems = list(state["v6_problems"])
+        # ``.get`` because a checkpoint written before the coverage revision has
+        # no per-layer rows. Such a resume loses the breakdown for the layers it
+        # already passed, and the artefact says so via `v6_rows_partial` rather
+        # than presenting a hole as a zero.
+        self.v6_rows = {int(k): dict(v) for k, v in state.get("v6_rows", {}).items()}
+        self.v6_rows_partial = "v6_rows" not in state
 
         self.digest = hashlib.sha256()
         replayed = []
@@ -245,39 +291,150 @@ def _mirror_state(state, perm: tuple[int, ...]):
     return type(state).build(tuple(colours), state.hands, state.to_move)
 
 
+def v6_coverage(checks: Checks, variant: Variant) -> dict:
+    """Summarise where the mirror check actually had purchase.
+
+    ``non_trivial`` is the honest pair count: a configuration fixed by the
+    reflection is compared with itself and can never disagree, so it is evidence
+    of nothing. On the 5×3 the mirror fixes column C, which makes such
+    configurations common in sparse layers and rare in full ones.
+    """
+    rows = checks.v6_rows
+    attempts = sum(r["attempts"] for r in rows.values())
+    checked = sum(r["checked"] for r in rows.values())
+    self_mirror = sum(r["self_mirror"] for r in rows.values())
+    return {
+        "attempts": attempts,
+        "eligible_fraction": checked / attempts if attempts else 0.0,
+        "pairs_checked": checked,
+        "self_mirror": self_mirror,
+        "non_trivial": checked - self_mirror,
+        "layers_without_coverage": sorted(
+            t for t in range(variant.n_cells + 1) if not rows.get(t, {}).get("checked")
+        ),
+        "per_layer": {str(t): rows[t] for t in sorted(rows)},
+        "rows_partial": checks.v6_rows_partial,
+    }
+
+
 def run_v4(variant: Variant, checks: Checks, budget: int) -> dict:
-    """Re-derive sampled values by forward search, never consulting the sweep."""
+    """Re-derive sampled values by forward search, never consulting the sweep.
+
+    Reports **where** it succeeded, not just how often. The 2026-08-09 registry
+    amendment asked V4 to publish a coverage figure; measuring it exposed two
+    further things the aggregate had been hiding.
+
+    *Terminal samples were being dropped in silence.* The old loop skipped them
+    with a bare ``continue``, so they left no trace in any counter — 40 of the
+    601 draws on the h2 arm, which is why that run's `agreed + unaffordable`
+    fell 40 short of its own sample size and nothing said so. They are now
+    re-derived instead. This is cheap and it is not circular: the sweep decides
+    a terminal layer by counting set bits in a packed integer and taking the
+    mover from layer parity, while this path decodes a ``GameState`` and asks
+    ``fliphex.rules.winner``. A parity or colour-orientation error in either
+    would show up here. The evidence is weaker than a search — it exercises no
+    move generation — so it is counted separately and never folded into
+    ``agreed``.
+
+    *Coverage is not uniform, and the shape is the finding.* Search cost grows
+    with empty cells, so V4 buys the endgame and thins out going up. An
+    aggregate percentage hides that completely; ``shallowest_layer_searched``
+    is the number that says what the gate actually witnessed.
+    """
     board = variant.board()
-    agreed = disagreed = unaffordable = 0
+    rows: dict[int, dict[str, int]] = {}
     problems: list[str] = []
 
+    def row(t: int) -> dict[str, int]:
+        return rows.setdefault(
+            t,
+            {
+                "sampled": 0,
+                "agreed": 0,
+                "disagreed": 0,
+                "unaffordable": 0,
+                "terminal_agreed": 0,
+                "terminal_disagreed": 0,
+            },
+        )
+
     for t, index, slot in checks.v4_samples:
+        here = row(t)
+        here["sampled"] += 1
         state = LayerIndex(variant, t).decode(index)
+
         if state.is_terminal():
+            expected = (
+                SLOT_WIN if terminal_winner(state) == state.to_move else SLOT_LOSS
+            )
+            if expected == slot:
+                here["terminal_agreed"] += 1
+            else:
+                here["terminal_disagreed"] += 1
+                problems.append(
+                    f"layer {t} index {index} (terminal): sweep {slot}, "
+                    f"rules {expected}"
+                )
             continue
+
         try:
             forward = Solver(
                 board, tt=TranspositionTable(1 << 16), max_nodes=budget
             ).solve(state)
         except BudgetExceededError:
-            unaffordable += 1
+            here["unaffordable"] += 1
             continue
         expected = SLOT_WIN if forward.value == WIN else SLOT_LOSS
         if expected == slot:
-            agreed += 1
+            here["agreed"] += 1
         else:
-            disagreed += 1
+            here["disagreed"] += 1
             problems.append(
                 f"layer {t} index {index}: sweep {slot}, forward {expected}"
             )
 
+    def total(key: str) -> int:
+        return sum(r[key] for r in rows.values())
+
+    drawn = total("sampled")
+    searched = total("agreed") + total("disagreed")
+    at_terminal = total("terminal_agreed") + total("terminal_disagreed")
+    searchable = drawn - at_terminal
+    layers_searched = sorted(
+        t for t, r in rows.items() if r["agreed"] or r["disagreed"]
+    )
+    blind = sorted(
+        t
+        for t, r in rows.items()
+        if r["sampled"] and not (r["agreed"] or r["disagreed"] or r["terminal_agreed"])
+    )
+
     return {
-        "agreed": agreed,
-        "disagreed": disagreed,
-        "unaffordable": unaffordable,
+        "agreed": total("agreed"),
+        "disagreed": total("disagreed"),
+        "unaffordable": total("unaffordable"),
+        "terminal_agreed": total("terminal_agreed"),
+        "terminal_disagreed": total("terminal_disagreed"),
         "node_budget": budget,
-        "passed": disagreed == 0 and agreed > 0,
+        "passed": total("disagreed") == 0
+        and total("terminal_disagreed") == 0
+        and total("agreed") > 0,
         "problems": problems[:20],
+        "coverage": {
+            # Denominator is every sample DRAWN. The 2026-08-09 amendment quoted
+            # 61.3% against the non-terminal count, which flattered the gate by
+            # excluding the samples it was silently discarding.
+            "samples_drawn": drawn,
+            "verified": searched + at_terminal,
+            "verified_fraction": (searched + at_terminal) / drawn if drawn else 0.0,
+            "search_fraction": searched / searchable if searchable else 0.0,
+            "layers_searched": layers_searched,
+            "shallowest_layer_searched": layers_searched[0]
+            if layers_searched
+            else None,
+            "layers_without_evidence": blind,
+            "per_layer": {str(t): rows[t] for t in sorted(rows)},
+        },
     }
 
 
@@ -375,21 +532,60 @@ def main() -> int:
     for problem in checks.v1_problems:
         print(f"       {problem}")
     print("    V2 no-draw ............ asserted on every terminal")
+    cov = v4["coverage"]
     print(
         f"    V4 sampled re-derive .. {v4['agreed']:,} agree, "
-        f"{v4['disagreed']} disagree, {v4['unaffordable']} over budget"
+        f"{v4['disagreed']} disagree, {v4['unaffordable']} over budget, "
+        f"{v4['terminal_agreed']} terminal"
     )
+    print(
+        f"       coverage ........... {cov['verified']:,} of "
+        f"{cov['samples_drawn']:,} drawn ({100 * cov['verified_fraction']:.1f}%); "
+        f"search reached {100 * cov['search_fraction']:.1f}% of the rest"
+    )
+    shallowest = cov["shallowest_layer_searched"]
+    if shallowest is None:
+        print("       searched layers .... NONE — V4 witnessed no search evidence")
+    else:
+        print(
+            f"       searched layers .... {len(cov['layers_searched'])} of "
+            f"{variant.n_cells + 1}, shallowest t = {shallowest}"
+        )
+    if cov["layers_without_evidence"]:
+        print(
+            "       no evidence at ..... t = "
+            + ", ".join(str(t) for t in cov["layers_without_evidence"])
+        )
     for problem in v4["problems"][:5]:
         print(f"       {problem}")
     print(f"    V5 checksum ........... {checksum[:16]}...")
     if checks.mirror is None:
         print("    V6 mirror ............. N/A — this board has no reflection")
     else:
+        v6_cov = v6_coverage(checks, variant)
         print(
             f"    V6 mirror ............. {checks.v6_checked:,} eligible pairs "
             f"checked, {len(checks.v6_problems)} differ "
             f"({checks.v6_rejected:,} sampled but ineligible — P3-y still in hand)"
         )
+        print(
+            f"       eligibility ........ {100 * v6_cov['eligible_fraction']:.1f}% "
+            f"of {v6_cov['attempts']:,} draws"
+        )
+        print(
+            f"       non-trivial pairs .. {v6_cov['non_trivial']:,} "
+            f"({v6_cov['self_mirror']:,} were mirror-fixed, comparing a value "
+            f"with itself)"
+        )
+        if v6_cov["layers_without_coverage"]:
+            print(
+                "       no coverage at ..... t = "
+                + ", ".join(str(t) for t in v6_cov["layers_without_coverage"])
+            )
+        if checks.v6_rows_partial:
+            print(
+                "       (per-layer rows are partial — resumed from an old checkpoint)"
+            )
     for problem in checks.v6_problems[:5]:
         print(f"       {problem}")
 
@@ -439,6 +635,9 @@ def main() -> int:
                 "sampled_but_ineligible": checks.v6_rejected,
                 "problems": checks.v6_problems[:20],
                 "passed": not checks.v6_problems,
+                "coverage": (
+                    v6_coverage(checks, variant) if checks.mirror is not None else None
+                ),
             },
         },
         "layer_counts": dict(sorted(checks.layer_counts.items())),

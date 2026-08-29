@@ -9,6 +9,48 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-08-28 — Interim peek at the h1 re-run, and what the clock is made of
+
+**No decision is taken here.** The h1 sweep is 13.7 h in and unfinished; this
+records what was looked at so a later reader can see the peek happened and that
+nothing was conditioned on it. EXP-002's registered measures — the digest replay
+and the H2 criticality — need the complete sweep and are untouched.
+
+**What was read: wall-clock only.** Six layers done (15 down to 10) in 12,906 s,
+against h2's 13,245 s at the same point — h1 running 2.6% ahead. Layer 9, the
+largest at 5.02 × 10⁹ configurations, has been running 10.1 h; h2 spent 16.4 h
+there. Process CPU time equals elapsed time to the second, so nothing has been
+suspended. No outcome data was read: both arms' root values were published on
+2026-08-09 and 2026-08-13, and criticality is not visible until the sweep ends.
+
+**The timing profile is a parity signature, not noise.** h2's per-layer
+throughput alternates violently — 785k cfg/s at `t = 10` against 84.9k at
+`t = 9`, 1,055k at `t = 8` against 46.8k at `t = 7`, and the gap widens going up:
+9.2×, 22.5×, 66.8×, then 166× between `t = 4` and `t = 3`. Every slow layer is
+odd, every fast one even.
+
+The mechanism is in `solver/packed_sweep.py:385` — the child scan is
+`while remaining and slot == SLOT_LOSS`, breaking out of all three nested loops
+the moment a losing child appears. A position that is a **win** stops at its
+first winning move; a position that is a **loss** must enumerate every
+(cell × tile × rotation) before it can say so. Cost per configuration is
+therefore a direct read-out of the win/loss mix, and odd `t` is P2 to move. The
+sweep is slow exactly where the mover is mostly lost.
+
+Two things this is **not**. It is not evidence for H1: it describes the
+enumerated configuration space, most of which is unreachable, not the game. And
+it is not evidence for H2 — criticality is a position-by-position comparison
+between the arms and the clock says nothing about it. The residual 18% gap
+between the arms at `t = 11`, where both hands are identical, is the deck showing
+through the *values* rather than through the branching, which is the same
+mechanism seen from the other side.
+
+Worth keeping because it makes the runtime predictable for the first time: the
+5×3's cost is not "17.5 × 10⁹ configurations" but "however many of them are
+losses", and that is a property of the game, not of the machine.
+
+---
+
 ## 2026-08-05 — The endgame database is cancelled, and H3 comes out better
 
 `EXP-003` ran the full registered sweep and the answer is not close. Median nodes
