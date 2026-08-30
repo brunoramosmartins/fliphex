@@ -9,6 +9,45 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-08-30 — Phase 3 closing: three exit criteria the phase outgrew
+
+**The roadmap asked for H1/H2 partial verdicts; they are not being written.**
+`docs/research.md` says the Verdicts table stays empty until Phase 5, and
+`experiments/registry.md` says H2 is reported from criticality rather than from
+two roots agreeing. Both were written before any 5×3 arm ran; the roadmap's
+request was written in Phase 0, before the hypotheses locked. **The earlier and
+more specific rule wins** — that is the whole point of pre-registration, and a
+verdict entered now would be entered by someone who already knows the answer.
+What Phase 3 delivers instead is the *inputs*: an exact value on a 15-cell board
+verified six ways, a criticality of 17.07%, and 10.26 × 10⁹ cross-arm positions
+agreeing. Phase 5 reads them.
+
+**Two exit criteria named an artefact that adr-012 deliberately did not build.**
+"Retrograde database covers at least positions with ≤ 5 pieces remaining on 5×5"
+and "alpha-beta agent + endgame database beats random and heuristic ≥ 90%" both
+assume the endgame database. `EXP-003` measured the cost of searching instead of
+storing — 480 nodes at `k = 5`, against a database of ~1.2 × 10¹⁵ positions and
+~150 TB — and adr-012 took Option B. The first criterion is therefore
+**consciously dropped**, with a measurement behind it rather than a shrug.
+
+The second is not dropped, because the half of it that survives is worth
+knowing: how strong *is* an exact agent with no database? That is `EXP-008`,
+registered at this close and run. Recording it as unmet-and-measured is more
+useful than recording it as inapplicable.
+
+**Three deliverables are deferred rather than dropped**: TIL #2 and #3, and
+`notebooks/02_solver_debugging.ipynb`. Skeletons exist; the content is
+first-person and is not being ghost-written.
+
+**`EXP-004` ran, and its decision rule is moot.** It was registered to choose
+between adr-012's Options A and C. adr-012 chose **B**, so there is no longer a
+decision for it to inform. It is kept as a measurement — 2.00 bits/position raw,
+3.04× under block-RLE, 9.10× under a general-purpose block coder — and reported
+as descriptive, with the dead rule stated rather than quietly reinterpreted into
+something the numbers could satisfy.
+
+---
+
 ## 2026-08-28 — Interim peek at the h1 re-run, and what the clock is made of
 
 **No decision is taken here.** The h1 sweep is 13.7 h in and unfinished; this
@@ -34,8 +73,34 @@ The mechanism is in `solver/packed_sweep.py:385` — the child scan is
 the moment a losing child appears. A position that is a **win** stops at its
 first winning move; a position that is a **loss** must enumerate every
 (cell × tile × rotation) before it can say so. Cost per configuration is
-therefore a direct read-out of the win/loss mix, and odd `t` is P2 to move. The
-sweep is slow exactly where the mover is mostly lost.
+therefore a direct read-out of the win/loss mix, and odd `t` is P2 to move.
+
+**Measured 2026-08-30, and the guessing stops here.** This entry first said "the
+sweep is slow exactly where the mover is mostly lost", then a same-day correction
+replaced that with "odd layers are mixed". Both were inferences from side
+effects. `EXP-009` counts the values directly:
+
+| t | 0 | 1 | 2 | 3 | 4 | 5 | 7 | 9 | 11 | 13 | 15 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| WIN % for the mover | 100 | 0 | 100 | 0 | 100 | 4.75 | 24.92 | 46.36 | 57.01 | 59.57 | 50.00 |
+
+**Layers 0 through 4 are uniform.** Not "mostly" — every one of the 12,841,920
+configurations at `t = 4` is a win for P1, and every one of the 713,440 at
+`t = 3` is a loss for P2. Uniformity breaks at `t = 5` and the two parities then
+converge monotonically toward 50/50 as the board fills.
+
+So the first version was right about the shallow layers and the correction was
+right about the deep ones, and neither was right as stated. The lesson is not
+about the game: **four instruments circled this for two days and the direct
+measurement took 70 seconds.** Runtime, criticality, and compression ratios are
+all downstream of the value mix, and reading a cause off three different
+downstream effects produced two wrong statements before anyone counted.
+
+Two things fall out for free. Criticality is exactly zero on layers 0–4 and first
+becomes non-zero at `t = 5` — the same boundary, from an instrument that shares
+no code with this one. And block-RLE gets 120× at `t = 3` and `t = 4` and 11.64×
+at `t = 5`: compression tracks uniformity precisely, which is what it was
+measuring all along.
 
 Two things this is **not**. It is not evidence for H1: it describes the
 enumerated configuration space, most of which is unreachable, not the game. And

@@ -36,7 +36,7 @@ from agents.base import Agent
 from agents.heuristic_agent import HeuristicAgent
 from fliphex.board import Board
 from fliphex.moves import Move, apply_move, legal_moves
-from fliphex.state import GameState
+from fliphex.state import Colour, GameState
 from solver.minimax import LOSS, BudgetExceededError, Solver
 from solver.sweep_reader import SweepReader
 from solver.transposition import TranspositionTable
@@ -75,14 +75,22 @@ class SolverAgent(Agent):
         fallback: Agent | None = None,
         tt_bits: int = 22,
         seed: int | None = None,
+        search_below_k: int | None = None,
     ) -> None:
         self.reader = reader
         self.max_nodes = max_nodes
+        self.search_below_k = search_below_k
         self.fallback = fallback if fallback is not None else HeuristicAgent(seed=seed)
         self._rng = random.Random(seed)
         self._tt = None if reader is not None else TranspositionTable(1 << tt_bits)
         self.proved = 0
-        self.delegated = 0
+        self.over_budget = 0
+        self.unattempted = 0
+
+    @property
+    def delegated(self) -> int:
+        """Moves the fallback made, for whichever reason."""
+        return self.over_budget + self.unattempted
 
     # -- backends -------------------------------------------------------------
 
@@ -115,14 +123,30 @@ class SolverAgent(Agent):
 
     # -- Agent ---------------------------------------------------------------
 
+    def _empty_cells(self, state: GameState) -> int:
+        return sum(1 for colour in state.colours if colour == Colour.EMPTY)
+
     def select(self, board: Board, state: GameState) -> Move:
         if self.reader is not None:
             self.proved += 1
             return self._from_database(board, state)
 
+        # A search that will exceed its budget costs the *whole* budget before
+        # saying so, and on the 5x5 that is most of the game: EXP-003 measured a
+        # median of 806,474 nodes to prove k = 8 and the cost climbs steeply
+        # above it. Attempting all 25 plies at a 2M budget spends ~34M nodes per
+        # game learning nothing. `search_below_k` declines the attempt instead,
+        # and the declines are counted apart from the failures — "we did not
+        # try" and "we tried and could not" are different facts about a run.
+        if self.search_below_k is not None and (
+            self._empty_cells(state) > self.search_below_k
+        ):
+            self.unattempted += 1
+            return self.fallback.select(board, state)
+
         move = self._from_search(board, state)
         if move is None:
-            self.delegated += 1
+            self.over_budget += 1
             return self.fallback.select(board, state)
         self.proved += 1
         return move
@@ -137,8 +161,11 @@ class SolverAgent(Agent):
             "moves": total,
             "proved": self.proved,
             "delegated": self.delegated,
+            "delegated_over_budget": self.over_budget,
+            "delegated_unattempted": self.unattempted,
             "proved_rate": self.proved / total if total else 0.0,
             "max_nodes": self.max_nodes,
+            "search_below_k": self.search_below_k,
             "fallback": str(self.fallback),
         }
 

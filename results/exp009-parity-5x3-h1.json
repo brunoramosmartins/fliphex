@@ -1,0 +1,159 @@
+{
+  "experiment": "EXP-009",
+  "variant": "5x3-h1",
+  "interpreter": "pypy 3.11.15",
+  "layers": [
+    {
+      "layer": 0,
+      "size": 1,
+      "wins": 1,
+      "losses": 0,
+      "win_fraction": 1.0,
+      "mover": "P1",
+      "uniform": true
+    },
+    {
+      "layer": 1,
+      "size": 240,
+      "wins": 0,
+      "losses": 240,
+      "win_fraction": 0.0,
+      "mover": "P2",
+      "uniform": true
+    },
+    {
+      "layer": 2,
+      "size": 23520,
+      "wins": 23520,
+      "losses": 0,
+      "win_fraction": 1.0,
+      "mover": "P1",
+      "uniform": true
+    },
+    {
+      "layer": 3,
+      "size": 713440,
+      "wins": 0,
+      "losses": 713440,
+      "win_fraction": 0.0,
+      "mover": "P2",
+      "uniform": true
+    },
+    {
+      "layer": 4,
+      "size": 12841920,
+      "wins": 12841920,
+      "losses": 0,
+      "win_fraction": 1.0,
+      "mover": "P1",
+      "uniform": true
+    },
+    {
+      "layer": 5,
+      "size": 113008896,
+      "wins": 5369654,
+      "losses": 107639242,
+      "win_fraction": 0.04751532127169882,
+      "mover": "P2",
+      "uniform": false
+    },
+    {
+      "layer": 6,
+      "size": 627827200,
+      "wins": 626810272,
+      "losses": 1016928,
+      "win_fraction": 0.9983802422067728,
+      "mover": "P1",
+      "uniform": false
+    },
+    {
+      "layer": 7,
+      "size": 2018016000,
+      "wins": 502933621,
+      "losses": 1515082379,
+      "win_fraction": 0.24922182034235604,
+      "mover": "P2",
+      "uniform": false
+    },
+    {
+      "layer": 8,
+      "size": 4036032000,
+      "wins": 3960958036,
+      "losses": 75073964,
+      "win_fraction": 0.9813990662115663,
+      "mover": "P1",
+      "uniform": false
+    },
+    {
+      "layer": 9,
+      "size": 5022617600,
+      "wins": 2328606286,
+      "losses": 2694011314,
+      "win_fraction": 0.46362404456194317,
+      "mover": "P2",
+      "uniform": false
+    },
+    {
+      "layer": 10,
+      "size": 3616284672,
+      "wins": 3386403185,
+      "losses": 229881487,
+      "win_fraction": 0.9364315843882768,
+      "mover": "P1",
+      "uniform": false
+    },
+    {
+      "layer": 11,
+      "size": 1643765760,
+      "wins": 937063853,
+      "losses": 706701907,
+      "win_fraction": 0.5700714029960083,
+      "mover": "P2",
+      "uniform": false
+    },
+    {
+      "layer": 12,
+      "size": 365281280,
+      "wins": 320746167,
+      "losses": 44535113,
+      "win_fraction": 0.8780799470479298,
+      "mover": "P1",
+      "uniform": false
+    },
+    {
+      "layer": 13,
+      "size": 48168960,
+      "wins": 28695117,
+      "losses": 19473843,
+      "win_fraction": 0.5957180101044324,
+      "mover": "P2",
+      "uniform": false
+    },
+    {
+      "layer": 14,
+      "size": 1966080,
+      "wins": 1525830,
+      "losses": 440250,
+      "win_fraction": 0.7760772705078125,
+      "mover": "P1",
+      "uniform": false
+    },
+    {
+      "layer": 15,
+      "size": 32768,
+      "wins": 16384,
+      "losses": 16384,
+      "win_fraction": 0.5,
+      "mover": "P2",
+      "uniform": false
+    }
+  ],
+  "uniform_layers": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "seconds": 70.7608846059884
+}

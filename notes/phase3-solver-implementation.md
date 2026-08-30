@@ -664,8 +664,24 @@ questions and the trade-offs.
 
 ## Lessons Learned
 
+> **PENDING — the phase does not close until this is written.** First person,
+> your words. The comment below is raw material to select from, not an outline
+> to fill in, and it is deliberately not being drafted for you.
+
 <!-- First person, in your own words. Raw material from the phase, for you to
      select from — not an outline to fill in:
+
+     - Four instruments circled the parity split for two days — sweep runtime,
+       criticality, block-RLE ratios, a notebook cell — and each time it was
+       explained by inferring the value mix from a side effect. Two of those
+       inferences were wrong. Counting the values directly took 70 seconds
+       (EXP-009). Runtime, criticality and compressibility are all downstream of
+       one number nobody had measured.
+     - The index correspondence between the two arms is a permutation, not
+       identity, because LayerIndex sorts a hand by tile index. Comparing index
+       to index would have reported a criticality manufactured by the encoding.
+       Checking the premise cost one command; not checking it would have cost
+       the H2 measure.
 
      - Three defects this phase were in *instruments*, not in the solver, and
        each produced a plausible number that was read as a fact about the game.
@@ -690,7 +706,19 @@ questions and the trade-offs.
 
 ## Failed Attempts
 
+> **PENDING — the phase does not close until this is written.** First person,
+> your words. The comment below is raw material, not a draft.
+
 <!-- First person. What actually went wrong, in order:
+
+     - Said the sweep is slow "where the mover is mostly lost", then corrected it
+       to "odd layers are mixed". Both were inferences from side effects and both
+       were wrong as stated: layers 0-4 are uniform, and it breaks at t = 5.
+     - Nearly compared the two arms index against index, on the reasoning that
+       "both index the same object". They do — but LayerIndex sorts hands by tile
+       index, so P1's extra tile is at position 7 in h1 and 6 in h2, and the
+       shared P6 moves with it. Caught before the run, by checking rather than
+       deriving.
 
      - The 4x4 was never a legal FLIPHEX board — even cell count, so draws are
        possible and no tie-break exists. Caught by red-teaming before the run,

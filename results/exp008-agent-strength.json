@@ -1,0 +1,104 @@
+{
+  "experiment": "EXP-008",
+  "variant": "5x5-h1",
+  "cells": 25,
+  "max_nodes": 2000000,
+  "search_below_k": 8,
+  "seed": 5,
+  "interpreter": "pypy 3.11.15",
+  "per_seat": [
+    {
+      "opponent": "random",
+      "exact_seat": "P1",
+      "games": 250,
+      "wins": 248,
+      "win_rate": 0.992,
+      "wilson_low": 0.9713048854232084,
+      "wilson_high": 0.9978034088831621,
+      "moves": 3250,
+      "proved": 1000,
+      "delegated_over_budget": 0,
+      "delegated_unattempted": 2250,
+      "proved_rate": 0.3076923076923077,
+      "seconds": 50.079272019007476
+    },
+    {
+      "opponent": "random",
+      "exact_seat": "P2",
+      "games": 250,
+      "wins": 242,
+      "win_rate": 0.968,
+      "wilson_low": 0.9381368887054249,
+      "wilson_high": 0.9836978302689277,
+      "moves": 3000,
+      "proved": 987,
+      "delegated_over_budget": 13,
+      "delegated_unattempted": 2000,
+      "proved_rate": 0.329,
+      "seconds": 1019.7294906190073
+    },
+    {
+      "opponent": "heuristic",
+      "exact_seat": "P1",
+      "games": 250,
+      "wins": 178,
+      "win_rate": 0.712,
+      "wilson_low": 0.6529921633129403,
+      "wilson_high": 0.7645910854532194,
+      "moves": 3250,
+      "proved": 1000,
+      "delegated_over_budget": 0,
+      "delegated_unattempted": 2250,
+      "proved_rate": 0.3076923076923077,
+      "seconds": 75.12771494800108
+    },
+    {
+      "opponent": "heuristic",
+      "exact_seat": "P2",
+      "games": 250,
+      "wins": 127,
+      "win_rate": 0.508,
+      "wilson_low": 0.4463768324746957,
+      "wilson_high": 0.5693810259693104,
+      "moves": 3000,
+      "proved": 1000,
+      "delegated_over_budget": 0,
+      "delegated_unattempted": 2000,
+      "proved_rate": 0.3333333333333333,
+      "seconds": 500.3501081180002
+    }
+  ],
+  "pooled": {
+    "random": {
+      "games": 500,
+      "wins": 490,
+      "win_rate": 0.98,
+      "wilson_low": 0.9635794314459021,
+      "wilson_high": 0.9891009347644306,
+      "proved_rate": 0.31792,
+      "clears_90_percent": true
+    },
+    "heuristic": {
+      "games": 500,
+      "wins": 305,
+      "win_rate": 0.61,
+      "wilson_low": 0.566563167828306,
+      "wilson_high": 0.6517594160948953,
+      "proved_rate": 0.32,
+      "clears_90_percent": false
+    }
+  },
+  "control": {
+    "pairing": "heuristic vs heuristic",
+    "measures": "first-seat advantage with no solver involved",
+    "post_hoc": true,
+    "games": 250,
+    "first_seat_wins": 100,
+    "first_seat_rate": 0.4,
+    "wilson_low": 0.34122728621763343,
+    "wilson_high": 0.46179948323229125,
+    "seconds": 1.6706706309923902
+  },
+  "exit_criterion_met": false,
+  "seconds": 1646.9588410730066
+}

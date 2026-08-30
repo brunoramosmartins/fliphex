@@ -18,11 +18,14 @@ Freely editable (append-only in practice).
 | ID | Date | Hypothesis | Axis | Description | Config / commit | Seed | Status | Result |
 |---|---|---|---|---|---|---|---|---|
 | EXP-001 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 3×3, both H2 arms; adr-010 V3 double-solve | 9 cells (3×3), hands 5 + 4, commit `4a081d8`+ | — | **complete** | **P1 wins in both arms.** 711,963 configurations enumerated, matching the closed form **exactly at every layer** (V1). V0 512 ✓, V2 asserted on every terminal ✓, V5 checksummed ✓. V3: both methods agree on every position compared (24,460 h1 / 15,376 h2) — **but that is 2–3% of the space, not "every position"; see the V3 caveat below.** [`data/subgame-solutions/3x3-h1.json`](../data/subgame-solutions/3x3-h1.json), [`3x3-h2.json`](../data/subgame-solutions/3x3-h2.json) |
-| EXP-002 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 5×3, both H2 arms | 15 cells (5 cols × 3), hands 8 + 7, commit `17aac45` (h1) / crash-resume build (h2) | — | **both arms complete** | **P1 wins in both arms.** V0–V6 pass on both; V1 exact on all 16 layers. Sweeps 32.38 h / 34.25 h. **The registered PV audit has not run on either arm**, and V4/V6 report no coverage (~61% / ~10%) — see the amendments of 2026-08-09 and the h2 result. **Not yet citable as an H1 input, and H2's registered measure is criticality, not two roots agreeing** — that needs h1 re-run with checkpointing. [`5x3-h1.json`](../data/subgame-solutions/5x3-h1.json), [`5x3-h2.json`](../data/subgame-solutions/5x3-h2.json) |
+| EXP-002 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 5×3, both H2 arms | 15 cells (5 cols × 3), hands 8 + 7, commit `17aac45` (h1, superseded) / h1 re-run `2432572` / crash-resume build (h2) | — | **both arms complete** | **P1 wins in both arms.** V0–V6 pass on both; V1 exact on all 16 layers. Sweeps 30.95 h (h1 re-run) / 34.25 h. **PV audit part 1: 15 of 15 agree, 0 unproven**; part 2 stopped at opening 34/540 on its measured slope and replaced by the layer-to-layer recurrence check (layers 0–3, 515,229 positions, 0 problems). V4/V6 now report coverage — V4 has **no search evidence at `t = 0..5`**; V6 covers `t ≥ 2` only. h1's re-run reproduced its V5 digest `ab2620e1707f983f…` bit-for-bit, discharging the adr-010 2026-08-07 replay. **H2's registered measure is computed: criticality 17.07%**, with 10,258,229,474 cross-arm positions compared and **0 mismatches**. [`5x3-h1.json`](../data/subgame-solutions/5x3-h1.json), [`5x3-h2.json`](../data/subgame-solutions/5x3-h2.json), [`criticality`](../results/exp002-criticality-5x3.json) |
 | EXP-003 | 2026-08-05 | — | 1 | Endgame subtree cost at `k = 3…8` on the 5×5: does searching beat storing? | 25 cells, hands 13 + 12; 200 sampled positions per `k`, with and without TT; commit `4a081d8` | 1 | **complete** | **`k* > 8`.** Median nodes to prove one position: k=5 **480**, k=8 **806,474** — against a `k ≤ 5` database of ~1.2 × 10¹⁵ positions (~150 TB). Rule fires "build no database" at every registered `k`. Prediction `k* ≥ 6` **held**. → adr-012 **Option B**. [`results/exp003.json`](../results/exp003.json), [`results/exp003-tail.json`](../results/exp003-tail.json), analysis `scripts/exp003_analysis.py` |
-| EXP-004 | 2026-08-05 | — | 1 | Real compressibility of a solved layer: raw / block-RLE / block-Zstd / logic-minimized | 3×3 and 5×3 layers from EXP-001/EXP-002 | — | blocked on EXP-001 | |
-| EXP-005 | 2026-08-05 | — | 1 | Don't-care yield and adr-010 V1 reachability gap, per layer | 5×3, 15 cells, hands 8 + 7 | — | registered | |
+| EXP-004 | 2026-08-05 | — | 1 | Real compressibility of a solved layer: raw / block-RLE / block-Zstd / logic-minimized | 5×3-h2, all 16 layers, 4,096-byte blocks | — | **complete (rule moot)** | **2.00 bits/position raw; block-RLE 3.04×, block coder 9.10×**, logic-minimised absent (needs EXP-007's closure). The registered rule chose between adr-012 Options A and C; adr-012 chose **B**, so it is recorded as moot rather than reinterpreted. zlib substituted for zstd (absent), flagged in the artefact. [`exp004-compressibility-5x3.json`](../results/exp004-compressibility-5x3.json) |
+| EXP-005 | 2026-08-05 | — | 1 | Don't-care yield and adr-010 V1 reachability gap, per layer | 5×3, 15 cells, hands 8 + 7 | — | registered; 3×3 pilot run | **The registered rule runs on the 5×3** and has not. The 3×3 pilot returned **3.28%** orphans (23,371 of 711,963) and is superseded on its own terms by EXP-007's exact closure: [`exp005-3x3-h1.json`](../results/exp005-3x3-h1.json), [`exp005-3x3-h2.json`](../results/exp005-3x3-h2.json). |
 | EXP-006 | 2026-08-05 | H3 | 1 + 2 | Exact ground truth on the **shipped 5×5**: 500 endgame positions at `k ≤ 8`, solved on demand, as H3's third comparison-set member | 25 cells, hands 13 + 12; `k ∈ {6, 7, 8}`, 500 positions | 2 | registered (blocked on Axis 2) | |
+| EXP-008 | 2026-08-30 | — | 1 | Exact agent strength on the shipped 5×5 with no endgame database | 25 cells, hands 13 + 12; 2M-node budget, `search_below_k = 8`; 250 games per opponent × seat | 5 | **complete** | **Exit criterion NOT met.** vs random **98.0%** [96.4, 98.9] ✅; vs heuristic **61.0%** [56.7, 65.2] ❌. `proved_rate` **32%** — no rate may be quoted without it. Post-hoc control: between two heuristics the **first** seat wins only 40.0%, a property of the greedy agent and **not** an H1 input; it does not baseline the P2 arm (seeds unmatched by seat). [`exp008-agent-strength.json`](../results/exp008-agent-strength.json) |
+| EXP-009 | 2026-08-30 | — | 1 | WIN/LOSS mix per layer: the parity split, measured instead of inferred | 5×3-h1, all 16 layers, exhaustive | — | **complete** | **Uniformity breaks at `t = 5`.** Layers 0–4 are uniform — every one of the 12,841,920 configurations at `t = 4` is a P1 win, every one of the 713,440 at `t = 3` a P2 loss — then the parities converge monotonically to 50/50. Confirms EXP-002's criticality boundary and EXP-004's compression ratios from a third direction, and retires the parity question. 70.8 s. [`exp009-parity-5x3-h1.json`](../results/exp009-parity-5x3-h1.json) |
+| EXP-007 | 2026-08-07 | — | 1 | True reachable closure per layer, and what one-step-back predecessor counting misses | 5×3, 15 cells, hands 8 + 7, both arms | — | registered; 3×3 pilot run | **The registered rule runs on the complete 5×3 only** and has not. The 3×3 pilot is instrument shakedown, not the result: [`exp007-3x3-h1.json`](../results/exp007-3x3-h1.json), [`exp007-3x3-h2.json`](../results/exp007-3x3-h2.json). Row added retrospectively on 2026-08-30 — the experiment was registered in full below but never listed here. |
 
 **Registration basis.** EXP-001 through EXP-005 are registered against the H1/H2
 text at tag `v0.3-hypotheses`. Any post-lock amendment to that text is recorded
@@ -1206,6 +1209,40 @@ The same files already paid for themselves once: the WIN/LOSS-per-layer counts
 behind the parity finding in EXP-002 were read straight out of them, which is a
 measurement nobody could have made while the layers were transient.
 
+#### Result (2026-08-30) — 81.6 s over the h2 arm, and the decision rule is dead
+
+Artefact [`results/exp004-compressibility-5x3.json`](../results/exp004-compressibility-5x3.json),
+block size 4,096 bytes (16,384 positions per probe).
+
+| encoding | size | ratio |
+|---|---|---|
+| raw (2 bits/position) | 4.08 GiB | 1.00× |
+| block-RLE | 1.34 GiB | 3.04× |
+| block general-purpose coder | 0.45 GiB | 9.10× |
+| logic-minimised | **absent** | — |
+
+**The registered decision rule no longer has anything to decide.** It was written
+to choose between adr-012 Options A and C. adr-012 chose **B** — no database —
+on EXP-003's measurement. The rule is recorded as moot rather than reinterpreted
+into something these numbers could satisfy, and the experiment stands as a
+measurement.
+
+**Two deviations from the registered configuration, both recorded rather than
+absorbed.** `zstandard` is installed in neither interpreter here, so **zlib
+stands in** for block-Zstd; the artefact carries `coder_is_registered_zstd:
+false`. The two answer the same question and differ by a few percent at this
+block size, well below anything a decision would turn on. And **logic-minimised
+is absent, not estimated**: it needs the reachable closure, which is EXP-007 and
+has not run on the 5×3.
+
+**The parity split appears for the fourth time, and corrects the journal.**
+Block-RLE compresses even layers 120×, 88×, 33× at `t = 4, 6, 8` and odd layers
+3.2×, 1.6×, 1.2× at `t = 7, 9, 11`. A *mostly*-LOSS layer would be as homogeneous
+as a mostly-WIN one and would compress just as well — it does not. So even layers
+are near-uniformly WIN and **odd layers are mixed**, which is what makes them
+both slow to sweep and incompressible. The 2026-08-28 journal entry said "the
+mover is mostly lost"; that overstated it and is corrected there.
+
 ### EXP-005 — don't-care yield and the V1 reachability gap
 
 - **Objective.** Two things at once: the fraction of the closed-form bound that
@@ -1452,6 +1489,153 @@ direction.
 250 more positions is well under an hour. It is not a reason to skip it, and it
 was not free to *decide*: the decision had to be made before the run, which is
 why it is here and dated.
+
+### EXP-008 — how strong is an exact agent with no endgame database?
+
+- **Registered.** 2026-08-30, before the instrument existed, at the Phase 3
+  close.
+- **Objective.** Phase 3's third exit criterion reads *"on the 5×5 game,
+  alpha-beta agent + endgame database beats random and heuristic agents ≥ 90%."*
+  [adr-012](../docs/adr/adr-012-endgame-database-storage.md) cancelled the
+  database on `EXP-003`'s measurement, so the criterion names an artefact that
+  was deliberately not built. This runs the half that survives — the exact agent
+  without a database — rather than dropping a strength number from the phase
+  entirely.
+- **Hypothesis.** — (exploratory; it supplies a Phase 4 baseline, and no H3
+  comparison is made here).
+- **Configuration.** Shipped 5×5, 25 cells, hands 13 + 12.
+  `agents/solver_agent.py` with `max_nodes = 2,000,000` — the same budget adr-010
+  V4 uses — and `search_below_k = 8`, against `RandomAgent` and `HeuristicAgent`.
+  **250 games per (opponent × seat) = 500 per opponent, 1,000 total.** Both seats
+  in equal number, because H1 says the seat itself carries an advantage and
+  pooling unbalanced seats would measure that instead. **Seed: 5.**
+- **Why `search_below_k = 8`.** A search that will exceed its budget spends the
+  *whole* budget before saying so. `EXP-003` puts the median proof at `k = 8` at
+  806,474 nodes and rising steeply above it, so attempting all 25 plies would
+  burn ~34 M nodes per game to learn nothing. Declining the attempt above `k = 8`
+  is the same threshold `EXP-003` already established, reused rather than
+  reinvented.
+- **Decision rule, fixed before the run.** The win rate is reported with a Wilson
+  95% interval, **and never without `proved_rate` beside it.** At `k ≤ 8` on 25
+  cells the agent can prove at most the last eight plies, so a strength number
+  quoted alone would be largely a fact about `HeuristicAgent`, which is the
+  instrument defect `agents/solver_agent.py` was written to make impossible to
+  hide. The exit criterion counts as met only if the interval's **lower bound**
+  clears 90% against both opponents; anything else is reported as the number it
+  is, and the criterion is recorded as unmet rather than reinterpreted.
+- **Expected result, recorded before the run.** ≥ 90% against `RandomAgent`.
+  **Against `HeuristicAgent`, unknown and quite possibly below 90%** — the agent
+  plays the heuristic's own moves for roughly the first seventeen plies and
+  differs only in the endgame, so this is close to asking how much perfect
+  endgame play is worth on top of the heuristic. A result under 90% there is
+  informative, not a failure, and may not be re-run at a larger budget to chase
+  the threshold.
+- **Artefact.** `results/exp008-agent-strength.json`.
+
+#### Result (2026-08-30) — 1,647 s, criterion not met, and a control that surprised
+
+Artefact [`results/exp008-agent-strength.json`](../results/exp008-agent-strength.json),
+log [`results/exp008.log`](../results/exp008.log).
+
+| pairing | exact seat | wins | rate | Wilson 95% | proved |
+|---|---|---|---|---|---|
+| vs random | P1 | 248/250 | 99.2% | [97.1, 99.8] | 30.8% |
+| vs random | P2 | 242/250 | 96.8% | [93.8, 98.4] | 32.9% |
+| **vs random** | **pooled** | **490/500** | **98.0%** | **[96.4, 98.9]** | 31.8% |
+| vs heuristic | P1 | 178/250 | 71.2% | [65.3, 76.5] | 30.8% |
+| vs heuristic | P2 | 127/250 | 50.8% | [44.6, 56.9] | 33.3% |
+| **vs heuristic** | **pooled** | **305/500** | **61.0%** | **[56.7, 65.2]** | 32.0% |
+
+**The exit criterion is not met**, and both halves were pre-registered. Against
+random the lower bound clears 90% comfortably. Against the heuristic it does not,
+and the registration said to expect exactly that: the agent plays its fallback's
+moves for the first seventeen plies and differs only in the endgame, so 61% is
+close to asking what perfect endgame play is worth on top of the heuristic. It is
+**not re-run at a larger budget to chase the threshold**, as registered.
+
+**`proved_rate` is 32%** — eight of twenty-five plies, which is what
+`search_below_k = 8` buys. No rate above may be quoted without it.
+
+**The control, added post hoc, returned 40.0%** [34.1, 46.2] for the *first* seat
+between two `HeuristicAgent`s. Between two greedy heuristics on the 5×5, moving
+first is a **disadvantage** of about ten points. That is a fact about the
+heuristic pair, not about FLIPHEX — a greedy agent's pieces sit on the board
+longer when it moves first and are flipped more often — and it is emphatically
+**not** an H1 input.
+
+**The control does not baseline the P2 arm, and the tempting subtraction is
+wrong.** Seeds are assigned by construction order, not by seat: the control runs
+`seed+game` first and `seed+10000+game` second, while the treatment-as-P2 gives
+`seed+10000+game` to the *first* seat. With many tied moves for a greedy
+heuristic to break, those are not the same opponent. So "71.2% against a 40.0%
+baseline is +31 points" is defensible for the P1 arm and "50.8% against 60.0% is
+−9 points" is **not** — the second reading would have perfect endgame play making
+an agent worse, which is implausible enough to point at the instrument rather
+than the game. A seat-matched control is the fix and is not run here.
+
+### EXP-009 — the WIN/LOSS mix per layer
+
+- **Registered.** 2026-08-30, before the instrument existed, at the Phase 3
+  close.
+- **Objective.** Measure, rather than infer, the fraction of configurations in
+  each layer that are a win for the side to move. Four Phase 3 measurements split
+  on the parity of `t` — sweep runtime, criticality, block-RLE ratio, and a
+  notebook cell — and each was explained by a guess at the value mix.
+- **Why it is needed, stated as a contradiction.** The compressibility result
+  reads odd layers as *mixed*: block-RLE gets 1.2–3.2× at `t = 7, 9, 11` against
+  120× at `t = 4`. A notebook cell reads layers 1 and 3 as **100% LOSS** — every
+  configuration, not most. Both cannot describe the same thing: a uniformly-LOSS
+  layer is as homogeneous as a uniformly-WIN one and would compress just as well.
+  Uniformity must therefore break somewhere between `t = 3` and `t = 7`, and no
+  instrument so far can say where.
+- **Hypothesis.** — (exploratory; it is a structural description of the solved
+  object, and links to no registered hypothesis).
+- **Configuration.** 5×3, both arms available; h1 by default. All 16 layers,
+  exhaustive, from the checkpointed databases. Deterministic: no seed, no
+  sampling.
+- **Decision rule.** None — this is a measurement, not a test, and no threshold
+  is pre-declared. The instrument reports `uniform: true` for any layer whose
+  configurations all share a value. **It does not explain the split**; the
+  mechanism is a separate question and deliberately not speculated about here,
+  after three earlier attempts to explain the parity from the side rather than
+  measure it.
+- **Integrity check.** Every 2-bit field must be `SLOT_WIN` or `SLOT_LOSS`; a
+  `SLOT_UNSET` halts the run rather than being counted as a loss.
+- **Expected result, recorded before the run.** Uniformity at the shallow
+  layers, breaking down somewhere in the middle game. **The layer where it breaks
+  is the number this exists to produce**, and no prediction is offered for it.
+- **Artefact.** `results/exp009-parity-5x3-h1.json`.
+
+#### Result (2026-08-30) — 70.8 s, and uniformity breaks at `t = 5`
+
+Artefact [`results/exp009-parity-5x3-h1.json`](../results/exp009-parity-5x3-h1.json).
+
+| t | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| WIN % | 100 | 0 | 100 | 0 | 100 | 4.75 | 99.84 | 24.92 | 98.14 | 46.36 | 93.64 | 57.01 | 87.81 | 59.57 | 77.61 | 50.00 |
+
+**Layers 0–4 are uniform**, which is what the experiment existed to locate. Every
+one of the 12,841,920 configurations at `t = 4` is a win for P1; every one of the
+713,440 at `t = 3` is a loss for P2. From `t = 5` the two parities converge
+monotonically toward 50/50 — even layers fall 100 → 77.61, odd layers rise
+0 → 59.57 — and the terminal layer sits at exactly 50%, which is forced: 2¹⁵
+colourings on an odd cell count split evenly.
+
+**This retires the parity question rather than adding to it.** Sweep runtime,
+criticality and block-RLE ratios are all downstream of this one number, and each
+was used to guess at it. Two of those guesses were wrong, and the direct count
+took 70 seconds — the note is in the 2026-08-28 journal entry.
+
+**Two independent confirmations fall out.** EXP-002's criticality is exactly zero
+on layers 0–4 and first becomes non-zero at `t = 5`; that instrument shares no
+code with this one and finds the same boundary. And EXP-004's block-RLE gets
+120× at `t = 3` and `t = 4` against 11.64× at `t = 5` — compression was tracking
+uniformity all along.
+
+**Not a claim about the game.** This describes the *configuration space* the
+sweep enumerates, most of which is unreachable in play. What it licenses is a
+statement about the artefact's structure, not about FLIPHEX strategy, and it
+links to no hypothesis.
 
 ## Planned
 
