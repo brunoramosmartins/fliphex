@@ -664,94 +664,42 @@ questions and the trade-offs.
 
 ## Lessons Learned
 
-> **PENDING — the phase does not close until this is written.** First person,
-> your words. The comment below is raw material to select from, not an outline
-> to fill in, and it is deliberately not being drafted for you.
+I learned that in an exact solver, correctness is not a property of the algorithm alone. It depends on the entire experimental apparatus: state representation, instrumentation, resource accounting, independent implementations, and verification. The strongest evidence I obtained came from making it possible for two different implementations to disagree and then showing that they did not.
 
-<!-- First person, in your own words. Raw material from the phase, for you to
-     select from — not an outline to fill in:
+I learned to measure the quantity that actually drives a decision instead of inferring it from secondary effects. Runtime, compression ratio, memory usage, and criticality all led me toward explanations that turned out to be incomplete or wrong. In one case, directly counting the values took 70 seconds and resolved a question that several indirect measurements had failed to answer.
 
-     - Four instruments circled the parity split for two days — sweep runtime,
-       criticality, block-RLE ratios, a notebook cell — and each time it was
-       explained by inferring the value mix from a side effect. Two of those
-       inferences were wrong. Counting the values directly took 70 seconds
-       (EXP-009). Runtime, criticality and compressibility are all downstream of
-       one number nobody had measured.
-     - The index correspondence between the two arms is a permutation, not
-       identity, because LayerIndex sorts a hand by tile index. Comparing index
-       to index would have reported a criticality manufactured by the encoding.
-       Checking the premise cost one command; not checking it would have cost
-       the H2 measure.
+I learned that performance models must be validated in the regime that dominates the computation. My initial runtime estimate for the 5×3 sweep was off by roughly 4× because I modeled cost per configuration while ignoring the strong dependence on branching and node value. The decisive variable was the probability of encountering a loss node, which caused adjacent layers to differ by orders of magnitude in cost.
 
-     - Three defects this phase were in *instruments*, not in the solver, and
-       each produced a plausible number that was read as a fact about the game.
-     - The strongest correctness argument here is that two implementations can
-       disagree — which is only true while neither restates the other's rules.
-     - Optimisation ordering: PyPy paid 8× *because* the loop was already
-       allocation-free. Reversed, it would have paid far less.
-     - A micro-benchmark measures an operation; a decision needs the system.
-     - Pre-registration caught the 4x4 (even cells) and forced EXP-007 to be a
-       new ID rather than a redefinition.
-     - A resource ceiling nobody has measured is an assumption, not a setting.
-       Four runs died to a 331-byte-per-entry cost that took two minutes to
-       measure, while attention stayed on the dials in front of us.
-     - A guard must be able to *act* on what it detects. One that only detects
-       is worse than none: it turned a slow failure into a fast cascade that
-       also destroyed the run's remaining work.
-     - Succeeding at an impossible setting is how the setting looks validated —
-       ply 0 proved fine at a table size that could never have filled.
-     - The best checkpoint granularity is the one that bounds the loss. Position
-       -level checkpoints meant four crashes cost at most the position in flight.
--->
+I learned that a compute budget has to cover the verification, not only the computation being verified. My thirteen-hour projection for the 5×3 sweep modelled the sweep and nothing else. The V4 re-derivation was not in the model at all, and it cost roughly twenty hours on its own — more than the entire original estimate for the whole run. The sweep produces a number and the verification is what makes that number citable, so leaving it out was not an inaccuracy in the estimate but a missing term in it. I now treat "how long to compute it" and "how long to establish it is right" as two line items, because on this phase the second was the larger one.
+
+I learned to treat resource limits as part of the algorithm rather than as deployment details. A transposition table configuration is not meaningful until its actual memory footprint has been measured. Four failed runs ultimately traced back to a per-entry cost that took minutes to measure. After replacing Python objects with fixed-width buffers, the same table became practical and oversized configurations could be rejected before the search started.
+
+I learned that instrumentation can fail in ways that produce plausible scientific results. Several measurements in this phase initially looked like facts about FLIPHEX when they were actually facts about the instrument. A guard that cannot act on the condition it detects, a cumulative counter interpreted as a rate, or a verification metric with undefined coverage can all produce misleading conclusions without crashing.
+
+I learned that independent verification must remain genuinely independent. Reimplementing the same rule twice would only reproduce the same mistake. The reference retrograde solver therefore remained deliberately different from the optimized packed implementation, allowing the two approaches to cross-check each other.
+
+I also learned to distinguish optimization from useful progress. Removing object allocation, hoisting invariant work, and tabulating small pure functions produced large gains before changing the runtime. Only after the hot loop was already allocation-free did PyPy provide its additional 8× improvement. Optimizing the wrong layer of the system would have produced much less value.
+
+Finally, I learned that knowing when not to continue is part of solving the problem. The 5×5 cannot be strongly solved with the current exhaustive approach: its state space and branching factor make the required computation and storage impractical. Rather than continuing to optimize a dead end, I now have a clear boundary for the exact-search approach and a concrete motivation for Phase 4: use a learned evaluator and move ordering to reduce the search problem itself.
 
 ## Failed Attempts
 
-> **PENDING — the phase does not close until this is written.** First person,
-> your words. The comment below is raw material, not a draft.
+I made several incorrect assumptions during this phase, and some of them cost substantial computation.
 
-<!-- First person. What actually went wrong, in order:
+The largest one cost nothing, and only because of when it was caught. I planned the whole phase around the 4×4 as the primary exact-solve target, and the 4×4 was never a legal FLIPHEX board: sixteen cells is an even count, so the two colours can tie, and the rules define no tie-break. By the time this surfaced the board had already shaped the roadmap, adr-004 and my own sequencing — but it surfaced while red-teaming the registry entry, before a single configuration had been enumerated. Pre-registration paid for itself here before it had produced any experimental result at all, which is not the argument I would have made for it in advance.
 
-     - Said the sweep is slow "where the mover is mostly lost", then corrected it
-       to "odd layers are mixed". Both were inferences from side effects and both
-       were wrong as stated: layers 0-4 are uniform, and it breaks at t = 5.
-     - Nearly compared the two arms index against index, on the reasoning that
-       "both index the same object". They do — but LayerIndex sorts hands by tile
-       index, so P1's extra tile is at position 7 in h1 and 6 in h2, and the
-       shared P6 moves with it. Caught before the run, by checking rather than
-       deriving.
+I repeatedly inferred causes from indirect evidence instead of measuring the underlying quantity. I initially attributed unexpected sweep timings to cache behavior and later to WSL clock behavior; both explanations were unsupported. The actual pattern was caused by the interaction between parity, branching factor, and the probability of encountering loss nodes.
 
-     - The 4x4 was never a legal FLIPHEX board — even cell count, so draws are
-       possible and no tie-break exists. Caught by red-teaming before the run,
-       not by the code.
-     - "The 15.1% V3 residue is unreachable configurations." Wrong: 3.28% was
-       unreachable, the rest was table retention.
-     - "True unreachability is >= 4.14%." Wrong: 3.91%, because the gap was
-       computed against the one-step ceiling instead of the closure.
-     - "The residue is bounded by replacements plus terminals." Wrong by 1,090,
-       because `store` refuses shallower entries without counting it.
-     - RSS was presented as a real progress signal for the 5x3 sweep; it fell
-       when the model said it would rise.
-     - A ruff SIM108 fix made a lazy branch eager and broke 10 tests.
-     - Recommended `--tt-bits 27` for the PV audit by doubling an RSS reading
-       taken while the table was still filling. It needed 42.4 GiB on a 15 GiB
-       box and OOM-killed the run at 4.8 h of CPU.
-     - Then recommended falling back to 26 "which survived 30 hours". It had
-       survived only by never filling; 26 needs 21.2 GiB and died too.
-     - Read one sample of a *cumulative* suspended-time counter as a per-interval
-       rate, and reported that the VM was idle 72% of the time and a 4 h job
-       would take 34 h. Five more samples showed it had never moved past its
-       first step. Retracted the same day.
-     - Wrote a throwaway probe that accumulated the search frontier in a `set` of
-       `GameState`. `history` is in the dataclass's `__eq__`, so identical
-       positions reached by different move orders never deduplicated and the
-       probe grew with the number of *paths*. It reached 12.5 GiB before I
-       killed it — nearly a fifth OOM, caused by the measurement itself.
-     - Claimed the 540 first moves collapse to 240 distinct positions, inferred
-       from the layer-1 file size. Measured: 120. The other factor of two is the
-       reachability gap EXP-005 already documents at layer 1.
-     - Part 2 then hit the ceiling in 97 s and I assumed the table again. It was
-       the *layer cache*: the PV walk leaves 5.87 GiB of sweep layers resident
-       under a 7 GiB table, and part 2 reads only layer 1. The class of error
-       repeated even after the postmortem — I reached for the component that had
-       failed before instead of measuring which one was holding the memory.
--->
+I underestimated the importance of memory accounting. I recommended transposition-table sizes based on observed RSS while the table was still filling. This led to multiple OOM failures, including a configuration that required 42.4 GiB on a 15 GiB machine. The underlying per-entry cost was only measured after the failed runs.
+
+I also designed safeguards that were unable to recover from the conditions they detected. An RSS guard could mark a position as unproven, but it could not release the memory responsible for the violation. Instead of protecting the experiment, it caused a cascade of failures. I subsequently changed the design so impossible configurations are rejected before the search begins.
+
+Several verification measurements were initially misinterpreted. I treated part of the V3 residue as unreachable states when most of it was actually transposition-table retention. I also initially computed reachability using a one-step criterion rather than transitive closure, producing the wrong estimate. These mistakes reinforced the need to define exactly what each metric measures before interpreting it.
+
+I introduced measurement code that was itself capable of distorting the experiment. One exploratory probe stored full GameState objects in a set, but included move history in equality, so it deduplicated paths rather than positions and consumed 12.5 GiB of memory. The measurement infrastructure had become part of the problem.
+
+I also made a premature refactoring based on a linter recommendation. A seemingly harmless change from a lazy branch to an eager expression broke ten tests. This reinforced that even mechanical code-quality changes must be validated against behavioral semantics.
+
+I also registered a verification I could not afford. The principal-variation audit's second part re-derives the root value under each distinct first move by direct forward search, which is a full subgame proof per opening. Thirty of the five hundred and forty openings consumed 9.7 hours of CPU, and the marginal cost was climbing steeply enough — ten openings in twenty minutes, then the next ten in 8.3 hours — that the remainder extrapolated past four hundred hours. I stopped it at opening 34 and replaced it with a layer-to-layer recurrence check that covers more positions for a small fraction of the cost. Registering a gate is not the same as establishing that the gate fits the budget, and I had never measured the difference.
+
+Most importantly, I learned that a successful run does not necessarily validate a configuration. A table size that successfully solved the first ply had never reached its actual capacity, so its apparent success said nothing about whether the configuration could survive a full search. The experiment was only meaningful once the resource envelope itself had been measured.
