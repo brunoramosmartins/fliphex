@@ -865,6 +865,69 @@ known in aggregate for h2 (349 / 212), because that needs the searches. The h1
 re-run produces it natively per layer; if the two must be compared at that
 granularity, `--v4-budget 2000000` on this script recovers it for h2 at ~20 h.
 
+#### Result — h1 re-run (2026-08-30): all three obligations discharged
+
+**`P1` wins the 5×3-h1**, unchanged. Artefact
+[`data/subgame-solutions/5x3-h1.json`](../data/subgame-solutions/5x3-h1.json),
+log [`results/exp002-h1-rerun.log`](../results/exp002-h1-rerun.log).
+`resumed_from_layer: null` — uninterrupted, so the timing is whole.
+
+The amendment of 2026-08-13 said re-running h1 with `--checkpoint` would
+discharge three registered obligations at once. It did, and each can be checked:
+
+1. **The layers the criticality measure needs.** All 16 on disk, 4.1 GB, matching
+   h2's 4.1 GB. H2's actual test is now computable — an XOR and a popcount
+   between two databases that index the same object.
+2. **The digest replay** the adr-010 amendment of 2026-08-07 requires before the
+   5×3 value may be cited. V5 returned **`ab2620e1707f983f…`**, bit-identical to
+   the 2026-08-09 run. 17.5 × 10⁹ values recomputed three weeks later, on a
+   different memory state, after four OOM kills and a rewritten transposition
+   table, agreeing on every one. That is the memory-integrity threat the
+   amendment raised, answered.
+3. **A clean end-to-end wall-clock**, which h1 had never had. **30.95 h at
+   157,140 cfg/s** — faster than both the old h1 (32.38 h) and h2 (34.25 h).
+
+**V4 returned `344 agree / 0 disagree / 217 over budget`, identical to
+2026-08-09.** That is the design working: the coverage revision moved no draw, so
+the arm reproduces its own sampling exactly. The 40 terminal draws are the
+newly-visible bucket; 344 + 217 + 40 = 601 now balances against the sample size.
+
+**V4's evidence begins at `t = 6`, and the cliff is sharp.** Newly visible:
+
+| t | 0–5 | 6 | 7 | 8–14 | 15 |
+|---|---|---|---|---|---|
+| searched & agreed | **0** | 30 | 34 | 40 | — |
+| over budget | all | 10 | 6 | 0 | — |
+| terminal | — | — | — | — | 40 |
+
+The gate reported `PASSED` in both arms while producing **no search evidence
+whatsoever about the first six plies** — the entire opening, and the only part of
+the tree the root value actually depends on. The 2026-08-09 amendment said V4
+"covers the endgame and thins out going up"; the truth is harder: it covers
+`t ≥ 8` completely, degrades across `t = 6..7`, and stops dead. This is not a new
+defect — it is the old one, finally legible. The PV audit's part 1 remains the
+only instrument that touched the opening, and it passed 15 of 15.
+
+**Correction to this registry's own arithmetic (2026-08-27 entry).** That
+amendment called 58.1% h2's "true" V4 coverage against 61.3%. Both are real and
+they measure different things; neither deserved the word *true*:
+
+| definition | h1 | h2 |
+|---|---|---|
+| searched ÷ non-terminal draws (the 2026-08-09 figure) | 61.3% | 62.2% |
+| searched ÷ all draws | 57.2% | 58.1% |
+| searched + terminal ÷ all draws (what the artefact now prints) | **63.9%** | 64.7%\* |
+
+\* h2 discarded its 40 terminal draws rather than re-deriving them, so its third
+row is what a re-run under the current instrument would report, not what it did.
+The two arms are within a point of each other on every definition. The figure to
+quote is the second — it has the honest denominator and makes no claim on the
+weaker terminal evidence.
+
+**V6 is identical across the arms again**: 518 pairs, 4,768 ineligible, 2
+mirror-fixed, no coverage at `t = 0, 1`. Expected, and still the known
+independence defect — same seed, same layer sizes, same indices drawn.
+
 ### EXP-003 — endgame subtree cost: does searching beat storing?
 
 - **Objective.** Find the crossover `k*` at which materialising an endgame
