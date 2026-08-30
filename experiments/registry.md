@@ -928,6 +928,92 @@ weaker terminal evidence.
 mirror-fixed, no coverage at `t = 0, 1`. Expected, and still the known
 independence defect — same seed, same layer sizes, same indices drawn.
 
+#### Instrument — `scripts/exp002_criticality.py` (registered 2026-08-30, before running)
+
+- **Objective.** Compute H2's registered measure — the fraction of solved
+  positions whose value changes when P1's extra tile is swapped (`JOKER` ↔
+  `P3-tri`) — and, as a by-product, an exhaustive cross-arm verification.
+- **Method.** Both arms' 4.1 GB databases index the same object. Deterministic
+  and exhaustive: no seed, no sampling, no search.
+- **The correspondence is a permutation, not index equality.** `LayerIndex`
+  orders a hand by **tile index**, and `P3-tri = 6`, `P6 = 11`, `JOKER = 12`, so
+  P1's positions are `(…, P6, JOKER)` in h1 and `(…, P3-tri, P6)` in h2. The
+  extra tile sits at a different position in each arm, and `P6` — *shared* by
+  both — moves with it. Comparing index against index would line "P6 spent" up
+  against "P3-tri spent" and report a criticality manufactured by the encoding.
+  The correspondence is the permutation carrying positions across by tile
+  identity, derived from the hands at run time and asserted against decoded hands
+  before use.
+- **The denominator is the positions where the extra tile is still in hand.**
+  Where it is already spent, both arms hold the same tiles on the same board with
+  the same mover — the same game position, since placed tiles are inert
+  (adr-003). Including those would dilute criticality with a subset identical by
+  construction and report a number too small for a reason unrelated to the game.
+- **Decision rule, fixed before the run.** Two separable outcomes:
+  1. **Verification.** Zero mismatches on the already-spent subset is required.
+     Any mismatch is a **finding about the solver**, not about the joker: it
+     halts the criticality reading, is reported with example indices, and the
+     5×3 value returns to *not citable* until explained. This is not a
+     numbered adr-010 gate; promoting it to one needs an adr-010 amendment.
+  2. **Criticality.** Reported as an exact fraction, overall and per layer.
+     **No H2 verdict is taken in Phase 3** — `docs/research.md`'s Verdicts table
+     stays empty until Phase 5, as registered. What Phase 3 delivers is the
+     measure and its shape.
+- **What the verification can and cannot catch.** Both arms ran the same code, so
+  a shared logic error survives it. It catches the deck leaking where it must not
+  — P1's hand consulted for P2's moves, a rotation-orbit count applied to the
+  wrong hand — and any non-determinism or memory corruption that differs between
+  two 30-hour runs. V4 sampled 601 positions and searched 344; this compares
+  billions.
+- **Expected result.** Pre-registered: **zero mismatches**, and criticality
+  **non-trivial** — strictly greater than zero and not vanishingly small. The
+  power caveat in EXP-001's registration is the reason this matters: if
+  criticality came back near zero, the two arms would be nearly the same game,
+  and their agreeing on the root value would carry no information about the
+  joker. A near-zero result is therefore an informative *negative* about the
+  instrument's power, not a confirmation of H2, and must be reported that way.
+- **Artefact.** `results/exp002-criticality-5x3.json`.
+
+##### Result (2026-08-30) — 164.5 s, and the largest verification the project has run
+
+Artefact [`results/exp002-criticality-5x3.json`](../results/exp002-criticality-5x3.json).
+The buckets partition the layer total exactly: 7,248,350,863 + 10,258,229,474 =
+17,506,580,337.
+
+**Verification: 10,258,229,474 positions compared, 0 mismatches.** Two
+independently executed 30-hour sweeps, on decks that differ, agree on every
+position where the swapped tile is already spent. For scale, V4 searched **344**
+positions; the PV audit's part 1 re-derived **15**. This does not verify the
+rules — both arms share `legal_moves` — but the deck does not leak where it must
+not, across ten billion opportunities.
+
+**Criticality: 1,237,229,498 of 7,248,350,863 = 17.07%.** Against all
+17.5 × 10⁹ indices it would read 7.07%; the larger figure is the honest one,
+since the diluting subset is identical by construction. The pre-registered
+expectation was "non-trivial, not vanishingly small", and it holds: the arms are
+genuinely different games, so their agreeing on the root value is informative
+rather than vacuous. **No H2 verdict is taken here** — that is Phase 5's, as
+registered.
+
+| t | 0–4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| criticality | **0.00%** | 3.22% | 0.13% | 22.86% | 2.61% | **35.37%** | 11.00% | 28.55% | 18.75% | 23.94% | 23.15% |
+
+**Two features of the shape, both unregistered and therefore descriptive only.**
+
+*The swap is inert for five plies.* Criticality is **exactly zero** at
+`t = 0..4` — not small, zero, across 10.2 million positions in which P1 holds a
+different tile. Whether P1's eighth tile is the arrowless joker or `P3-tri` does
+not change the value of a single position until the fifth ply. The root is one of
+those positions, which is why both arms report `P1 wins`.
+
+*It alternates with parity, like the runtime did.* Odd layers 5, 7, 9, 11, 13
+run 3.22 / 22.86 / 35.37 / 28.55 / 23.94; even layers 6, 8, 10, 12 run
+0.13 / 2.61 / 11.00 / 18.75. Odd `t` is P2 to move — the same layers the
+2026-08-28 journal entry found are LOSS-dominated and therefore slow to sweep. A
+mechanism is not claimed: this is the third instrument to show the parity split,
+and it is worth one experiment of its own rather than a paragraph of speculation.
+
 ### EXP-003 — endgame subtree cost: does searching beat storing?
 
 - **Objective.** Find the crossover `k*` at which materialising an endgame
