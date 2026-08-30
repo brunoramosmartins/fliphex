@@ -1,0 +1,356 @@
+{
+  "experiment": "EXP-002",
+  "variant": "5x3-h1",
+  "board": [
+    5,
+    3
+  ],
+  "cells": 15,
+  "hands": [
+    [
+      "P6",
+      "P3-y",
+      "P1",
+      "P2-adj",
+      "P2-skip",
+      "P2-opp",
+      "P3-fan",
+      "JOKER"
+    ],
+    [
+      "P6",
+      "P3-y",
+      "P1",
+      "P2-adj",
+      "P2-skip",
+      "P2-opp",
+      "P3-fan"
+    ]
+  ],
+  "configurations": 17506580337,
+  "value": "P1",
+  "ordering": "internal",
+  "termination": "exhausted",
+  "bits_per_entry": 2,
+  "interpreter": "pypy 3.11.15",
+  "seed": 3,
+  "seconds": 111407.25208087501,
+  "resumed_from_layer": null,
+  "verification": {
+    "V0_terminal_layer": {
+      "count": 32768,
+      "passed": true
+    },
+    "V1_layer_counts": {
+      "passed": true,
+      "problems": []
+    },
+    "V2_no_draw": {
+      "passed": true,
+      "mode": "asserted on every terminal"
+    },
+    "V4_sampled_rederivation": {
+      "agreed": 344,
+      "disagreed": 0,
+      "unaffordable": 217,
+      "terminal_agreed": 40,
+      "terminal_disagreed": 0,
+      "node_budget": 2000000,
+      "passed": true,
+      "problems": [],
+      "coverage": {
+        "samples_drawn": 601,
+        "verified": 384,
+        "verified_fraction": 0.6389351081530782,
+        "search_fraction": 0.6131907308377896,
+        "layers_searched": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14
+        ],
+        "shallowest_layer_searched": 6,
+        "layers_without_evidence": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "per_layer": {
+          "0": {
+            "sampled": 1,
+            "agreed": 0,
+            "disagreed": 0,
+            "unaffordable": 1,
+            "terminal_agreed": 0,
+            "terminal_disagreed": 0
+          },
+          "1": {
+            "sampled": 40,
+            "agreed": 0,
+            "disagreed": 0,
+            "unaffordable": 40,
+            "terminal_agreed": 0,
+            "terminal_disagreed": 0
+          },
+          "2": {
+            "sampled": 40,
+            "agreed": 0,
+            "disagreed": 0,
+            "unaffordable": 40,
+            "terminal_agreed": 0,
+            "terminal_disagreed": 0
+          },
+          "3": {
+            "sampled": 40,
+            "agreed": 0,
+            "disagreed": 0,
+            "unaffordable": 40,
+            "terminal_agreed": 0,
+            "terminal_disagreed": 0
+          },
+          "4": {
+            "sampled": 40,
+            "agreed": 0,
+            "disagreed": 0,
+            "unaffordable": 40,
+            "terminal_agreed": 0,
+            "terminal_disagreed": 0
+          },
+          "5": {
+            "sampled": 40,
+            "agreed": 0,
+            "disagreed": 0,
+            "unaffordable": 40,
+            "terminal_agreed": 0,
+            "terminal_disagreed": 0
+          },
+          "6": {
+            "sampled": 40,
+            "agreed": 30,
+            "disagreed": 0,
+            "unaffordable": 10,
+            "terminal_agreed": 0,
+            "terminal_disagreed": 0
+          },
+          "7": {
+            "sampled": 40,
+            "agreed": 34,
+            "disagreed": 0,
+            "unaffordable": 6,
+            "terminal_agreed": 0,
+            "terminal_disagreed": 0
+          },
+          "8": {
+            "sampled": 40,
+            "agreed": 40,
+            "disagreed": 0,
+            "unaffordable": 0,
+            "terminal_agreed": 0,
+            "terminal_disagreed": 0
+          },
+          "9": {
+            "sampled": 40,
+            "agreed": 40,
+            "disagreed": 0,
+            "unaffordable": 0,
+            "terminal_agreed": 0,
+            "terminal_disagreed": 0
+          },
+          "10": {
+            "sampled": 40,
+            "agreed": 40,
+            "disagreed": 0,
+            "unaffordable": 0,
+            "terminal_agreed": 0,
+            "terminal_disagreed": 0
+          },
+          "11": {
+            "sampled": 40,
+            "agreed": 40,
+            "disagreed": 0,
+            "unaffordable": 0,
+            "terminal_agreed": 0,
+            "terminal_disagreed": 0
+          },
+          "12": {
+            "sampled": 40,
+            "agreed": 40,
+            "disagreed": 0,
+            "unaffordable": 0,
+            "terminal_agreed": 0,
+            "terminal_disagreed": 0
+          },
+          "13": {
+            "sampled": 40,
+            "agreed": 40,
+            "disagreed": 0,
+            "unaffordable": 0,
+            "terminal_agreed": 0,
+            "terminal_disagreed": 0
+          },
+          "14": {
+            "sampled": 40,
+            "agreed": 40,
+            "disagreed": 0,
+            "unaffordable": 0,
+            "terminal_agreed": 0,
+            "terminal_disagreed": 0
+          },
+          "15": {
+            "sampled": 40,
+            "agreed": 0,
+            "disagreed": 0,
+            "unaffordable": 0,
+            "terminal_agreed": 40,
+            "terminal_disagreed": 0
+          }
+        }
+      }
+    },
+    "V5_checksum_sha256": "ab2620e1707f983fb0f57b5486062601925ab7fc7d6b5e4eaae856843e4bb22d",
+    "V6_mirror": {
+      "applicable": true,
+      "pairs_checked": 518,
+      "sampled_but_ineligible": 4768,
+      "problems": [],
+      "passed": true,
+      "coverage": {
+        "attempts": 5286,
+        "eligible_fraction": 0.09799470298902763,
+        "pairs_checked": 518,
+        "self_mirror": 2,
+        "non_trivial": 516,
+        "layers_without_coverage": [
+          0,
+          1
+        ],
+        "per_layer": {
+          "0": {
+            "attempts": 800,
+            "ineligible": 800,
+            "checked": 0,
+            "self_mirror": 0
+          },
+          "1": {
+            "attempts": 800,
+            "ineligible": 800,
+            "checked": 0,
+            "self_mirror": 0
+          },
+          "2": {
+            "attempts": 800,
+            "ineligible": 785,
+            "checked": 15,
+            "self_mirror": 0
+          },
+          "3": {
+            "attempts": 800,
+            "ineligible": 777,
+            "checked": 23,
+            "self_mirror": 0
+          },
+          "4": {
+            "attempts": 643,
+            "ineligible": 603,
+            "checked": 40,
+            "self_mirror": 0
+          },
+          "5": {
+            "attempts": 415,
+            "ineligible": 375,
+            "checked": 40,
+            "self_mirror": 1
+          },
+          "6": {
+            "attempts": 257,
+            "ineligible": 217,
+            "checked": 40,
+            "self_mirror": 1
+          },
+          "7": {
+            "attempts": 134,
+            "ineligible": 94,
+            "checked": 40,
+            "self_mirror": 0
+          },
+          "8": {
+            "attempts": 148,
+            "ineligible": 108,
+            "checked": 40,
+            "self_mirror": 0
+          },
+          "9": {
+            "attempts": 107,
+            "ineligible": 67,
+            "checked": 40,
+            "self_mirror": 0
+          },
+          "10": {
+            "attempts": 94,
+            "ineligible": 54,
+            "checked": 40,
+            "self_mirror": 0
+          },
+          "11": {
+            "attempts": 88,
+            "ineligible": 48,
+            "checked": 40,
+            "self_mirror": 0
+          },
+          "12": {
+            "attempts": 57,
+            "ineligible": 17,
+            "checked": 40,
+            "self_mirror": 0
+          },
+          "13": {
+            "attempts": 59,
+            "ineligible": 19,
+            "checked": 40,
+            "self_mirror": 0
+          },
+          "14": {
+            "attempts": 44,
+            "ineligible": 4,
+            "checked": 40,
+            "self_mirror": 0
+          },
+          "15": {
+            "attempts": 40,
+            "ineligible": 0,
+            "checked": 40,
+            "self_mirror": 0
+          }
+        },
+        "rows_partial": false
+      }
+    }
+  },
+  "layer_counts": {
+    "0": 1,
+    "1": 240,
+    "2": 23520,
+    "3": 713440,
+    "4": 12841920,
+    "5": 113008896,
+    "6": 627827200,
+    "7": 2018016000,
+    "8": 4036032000,
+    "9": 5022617600,
+    "10": 3616284672,
+    "11": 1643765760,
+    "12": 365281280,
+    "13": 48168960,
+    "14": 1966080,
+    "15": 32768
+  },
+  "passed": true
+}

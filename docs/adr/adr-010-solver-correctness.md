@@ -159,6 +159,205 @@ than a bare verdict.
   `docs/rules-canonical.md` misdescribes FLIPHEX, every check here passes and the
   answer is still wrong. `OPEN-1` is the live instance.
 
+## Amendment — Phase 3 (2026-08-05)
+
+**V1 was not decidable as written.** The mechanism was specified as both a gate
+that can fail *and* a measurement of an unknown quantity — the reachability gap.
+Those are incompatible. The closed-form formula counts **configurations
+consistent with the invariants**; a correct enumerator of the **reachable
+closure** disagrees with it, and not by a small residual. At layer `t = 1` the
+formula gives `C(N,1) · 2¹ · C(d₁,1) · C(d₂,0) = 2 · N · d₁` — 234 on the 3×3
+with the full deck — while the reachable count is `N · d₁ = 117`, because the
+`2^t` factor counts colourings that the mover's own colour forbids. **Exactly
+2× at layer 1**, and an unknown factor at every layer above. Under the original
+wording a correct run was indistinguishable from a failed V1, and the only way
+to resolve it would have been to inspect the gap and decide — the precise
+anti-pattern pre-registration exists to prevent.
+
+**V1 is now exact per-layer equality against the configuration space.** Per
+[adr-012](adr-012-endgame-database-storage.md) decision 4 the solver's index is
+a mixed-radix rank over exactly the four factors of the formula, so a stratified
+sweep enumerates the configuration space, not the reachable closure. V1 is
+therefore a genuine `perft`:
+
+> For every layer `t`, the enumerator's count must **equal** `C(N,t) · 2^t ·
+> C(d₁,⌈t/2⌉) · C(d₂,⌊t/2⌋)`. Any inequality, in either direction, voids the
+> run. There is no tolerance and no judgement call.
+
+**The reachability measurement is no longer V1's job.** It is a separate
+quantity, measured by `EXP-005` on the 5×3 as the fraction of the bound with no
+legal predecessor. The two must not be conflated again: V1 answers "did the
+enumerator lose or duplicate a configuration", `EXP-005` answers "how much of the
+configuration space is real". A single number cannot do both.
+
+**Ordering constraint that cannot be retrofitted.** The reachability count is
+taken **before** any don't-care filling (adr-012 decision 6). Filling destroys
+the distinction between *unreachable* and *computed*.
+
+**The 4×4 is withdrawn from V0 and V4 ([adr-011](adr-011-reduced-variant-parity.md),
+Accepted 2026-08-05).** Both were stated on a 16-cell board. 16 is even, so V2's
+premise — the no-draw theorem — is false there, which this ADR's own V2 text
+already forbade (*"any `N` used must be odd for the same reason"*). The
+contradiction sat between two ADRs written the same week and was caught by a
+pre-run red-team rather than by a run.
+
+- **V0's worked example** becomes **32,768 = 2¹⁵ on the 5×3** (hands 8 + 7,
+  exactly exhausted) alongside 2²⁵ = 3.36 × 10⁷ on the 5×5. The 3×3 fixture is
+  **512** at the adr-011 reduced deck (hands 5 + 4) — but **326,177,280** at the
+  *full* deck, where the hands are never exhausted and the terminal layer keeps
+  its hand dimension. A solver that dropped that dimension would produce 512 and
+  pass V0 against the wrong number, which is exactly the class of bug V0 exists
+  to catch.
+- **V4 is re-designated to the 5×3.** Its sample size **and seed** are recorded
+  in `experiments/registry.md` before the run; the Seed column may not read `—`
+  for a sampled check.
+- **V4 is supplemented by a principal-variation audit.** V4 bounds the *rate* of
+  errors in a database; it does not target the **root value**, which is the only
+  number the experiment reports. A defect affecting 10⁻⁶ of entries passes a
+  10⁴-sample V4 with probability ~0.99 and can still flip the root if it lies on
+  the propagation path. The audit re-derives, by direct forward search, every
+  position on the optimal PV from the root plus the root value under each
+  distinct first move.
+
+No 4×4 result may be cited under this ADR.
+
+## Amendment — V3's denominator (2026-08-07)
+
+**V3 was not achievable as written.** It required the two methods to agree on
+"the game-theoretic value of **every position**". No forward search can meet
+that, for a reason that is structural rather than budgetary: a configuration with
+**no legal predecessor** is never a node in any game tree, so there is no forward
+value in existence to compare against. The retrograde sweep computes a value for
+it — the recurrence is total over the configuration space — and the forward
+search correctly never produces one. Under the original wording, a run in which
+both solvers were entirely correct still failed V3.
+
+That defect stayed hidden while a second, unrelated one dominated the number.
+EXP-001's first runs reported 3.4% coverage, then 84.9%, and both figures were
+read as facts about the game. They were facts about the **instrument**: V3
+compares surviving transposition-table entries, and the table is direct-indexed
+(`zobrist & mask`, one entry per slot), so at high load colliding positions
+overwrite each other before V3 ever reads them. Coverage was bounded by
+*retention*, not by what the search visited.
+
+**V3 is restated as:** the two methods must agree on **every position the forward
+search reaches**, with the search **unpruned** and the table **sized so that
+retention is not the binding constraint**. A run reports three numbers, not one:
+configurations compared, the unreachable floor (EXP-005), and the table's
+occupancy — so that any shortfall is *attributable* rather than merely disclosed.
+
+Measured on the 3×3 h1 arm, commit `a1a7eb1`, with `--tt-bits 24`:
+
+| | configurations | share |
+|---|---|---|
+| configuration space | 711,963 | 100% |
+| unreachable from the opening (EXP-007, exact) | 27,860 | 3.91% |
+| **reachable, so comparable at all** | **684,103** | **96.09%** |
+| **compared, values agreeing on all** | **679,202** | **99.28% of reachable** |
+| residue, bounded by table replacements | 4,901 | 0.72% of reachable |
+
+The three numbers V3 now reports are what makes that decomposition possible. The
+denominator is **EXP-007's** transitive closure, not EXP-005's one-step count:
+the two differ here by 4,489 configurations, because a configuration whose every
+predecessor is itself unreachable passes the one-step test and is still
+unvisitable. Using the one-step ceiling would understate unreachability and so
+overstate the residue — which is what an earlier draft of this amendment did,
+quoting `≥ 6,090 never visited` and `≥ 4.14% unreachable` before the closure was
+measured. The exact figures above supersede those.
+
+Against the positions the search actually reached, agreement is **99.28%**, and
+the residue accounts for itself exactly:
+
+- **511** reachable terminal configurations, which the search never stores at all
+  — `_negamax` returns from a terminal before reaching `store`, so terminals are
+  structurally absent from the table and V3 cannot compare them by this route.
+- **4,390** non-terminal positions that shared a slot with another position:
+  3,300 evicted (the reported `replacements`) and the remaining ~1,090 *refused
+  entry*, because `store` keeps the deeper of two entries on a conflict and
+  silently drops the shallower — a refusal that no counter records.
+
+511 + 4,390 = 4,901, with nothing left over. Both effects are birthday collisions
+and shrink with table size; neither is a property of the game, and neither is a
+disagreement between the two solvers. That the second was invisible in the
+counters is itself the reason V3 now reports occupancy alongside coverage:
+`replacements` is a **lower** bound on coverage loss, not a measure of it.
+
+Table size is not a free parameter to be tuned until the number looks good; it is
+constrained in the reported direction. At `--tt-bits 21` the same run compared
+604,347 and spent 307,340,818 nodes; at `--tt-bits 24`, 679,202 and 26,287,459 —
+**11.7× fewer nodes**, because a thrashing table forces re-search of subtrees it
+has already proved.
+
+**This is not the weakening that was on the table.** The option recorded in
+`experiments/registry.md` on 2026-08-05 was to restate V3 as "every position the
+forward search visits" and accept whatever pruning left — which was **3.4%**.
+This amendment instead *raises* the bar: it mandates the unpruned search, mandates
+a table that is not the constraint, and requires the unreachable floor to be
+measured independently rather than assumed. The 96.72% ceiling is not an
+allowance the solver grants itself; it comes from EXP-005, which can falsify it.
+
+## Amendment — memory integrity, a threat V0–V6 does not cover (2026-08-07)
+
+`V0`–`V6` all assume the machine computed what the code says. On a run the size
+of EXP-002 that assumption is load-bearing and was never stated.
+
+**The exposure.** The 5×3 sweep is a **single** PyPy process holding 4.2 GB
+resident (7.5 GB high-water) for **32.4 hours of sweep plus ~20 hours of V4**,
+writing 17,506,580,337 packed 2-bit values, on consumer
+WSL hardware **without ECC memory**. A single flipped bit in the value array is a
+wrong game value for one configuration, propagated to every ancestor that reads
+it. It produces no crash, no counter, and no anomaly — it produces a plausible
+answer, which is the exact failure mode this ADR was written to address.
+
+**Why the ladder does not catch it.** `V1` counts entries per layer, not their
+values, so it is blind by construction. `V2` is the only *total* check and it
+runs on terminal configurations only. `V3` compares against an independent
+forward search, but only at 3×3 scale. `V4` (re-derivation) and `V6` (mirror
+agreement) do inspect values — at **40 sampled positions per layer**, against
+layers of up to 5.0 × 10⁹. The probability that sampling lands on a flipped
+entry is negligible. The ladder is strong against *logic* errors, which repeat,
+and has no coverage at all against *substrate* errors, which do not.
+
+**The precedent.** Takizawa 2023 §3.7 records that every CPU in the cluster had
+ECC, and §5 defends the choice against exactly this objection: *"computational
+errors due to CPU or memory faults cannot be entirely ruled out. However, as the
+vast majority of calculations were executed on a computer cluster with ECC
+memory, we believe the results to be nearly indisputable."* That is a
+verification claim about hardware, and it is one this project cannot make.
+
+**The available mitigation, and why it is not spent now.** `PackedSweep` already
+maintains `checks.digest`, a running hash over the sweep. The instrument is
+deterministic: same code, same variant, same seed ⇒ same digest. **Re-running an
+arm and comparing digests is therefore a genuine replay check** — a bit flip in
+either run changes the hash.
+
+**Corrected cost (2026-08-09).** This amendment originally priced the replay at
+"~13 hours per arm", from a projection made before any arm had finished. The h1
+arm actually took **32.4 h of sweep and ~52 h wall-clock end to end**. The replay
+is therefore a **multi-day** commitment per arm, not an overnight one, and the
+trigger below has to be read with that price attached.
+
+The trigger stands regardless: **if the 5×3 value is cited as a headline result —
+an H1 or H2 verdict in `docs/research.md` — the digest replay is run first.**
+Until then the 5×3 is reported as a single-run result on non-ECC hardware, and
+any artefact citing it says so. If the cost makes the replay impractical, the
+honest response is to weaken the *claim*, not to drop the trigger: a value that
+cannot be replayed is reported as unreplicated.
+
+**A second, cheaper check that does target the reported number.** The digest
+replay defends the whole database. The reported result is one root value, and
+EXP-002's own registration already requires a **principal-variation audit** for
+exactly that reason — `solver/minimax.py::principal_variation` documents itself
+as its input. That audit costs a forward search, not a second sweep. It was not
+run on h1 (see the EXP-002 amendment of 2026-08-09) and is the first thing to
+spend compute on, ahead of any replay.
+
+**This deliberately does not add a `V7`.** A mandatory level that is skipped on
+every run is worse than a disclosed gap: it converts an honest limitation into a
+false claim of coverage. The requirement here is on *reporting* — runs on
+non-ECC hardware disclose it, and the replay is a precondition for citation, not
+for computation.
+
 ## Alternatives considered
 
 **Trust a single clean run.** The default, and the position the ADR exists to

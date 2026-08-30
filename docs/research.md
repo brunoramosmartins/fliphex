@@ -1,10 +1,11 @@
 # Research
 
-**Status:** DRAFT. Hypotheses are **not yet locked** — locking happens at the
-end of Phase 2 and is marked by the `v0.3-hypotheses` tag, which is what
-timestamps the pre-registration. Until then H1–H6 may be reworded, split, or
-dropped. After that tag, this file may only gain verdicts; anything else needs
-an ADR.
+**Status: LOCKED (2026-08-05, tag `v0.3-hypotheses`).** The tag timestamps the
+pre-registration of H1–H6. From this point the file may only **gain verdicts**;
+any other change requires an ADR and must appear as a dated, visible amendment
+below — never as a silent rewrite of a hypothesis. The status line previously
+still read "DRAFT — not yet locked" after the tag had been pushed; that was a
+stale line, corrected here, not a change of standing.
 
 ## Thesis
 
@@ -39,16 +40,16 @@ Each hypothesis gets a verdict of **supported / rejected / inconclusive**,
 justified by an exact computation, a confidence interval, or a structural
 argument — stated explicitly, never by narrative.
 
-## Pre-registered hypotheses (DRAFT — lock at end of Phase 2)
+## Pre-registered hypotheses (LOCKED at tag `v0.3-hypotheses`)
 
 | ID | Statement | Test | Axis |
 |---|---|---|---|
-| **H1** | With perfect play the first player wins (strictly, since draws are impossible). | Exhaustive solve of the 3×3 (calibration) and 4×4 (primary strategic) variants; 20-seed self-play win rate with Wilson 95% CI on the full game. | 1 + 2 |
-| **H2** | Removing the joker does not change which player holds the theoretical advantage. | Solver + self-play on a joker-less variant (exact on 3×3/4×4). | 1 + 2 |
-| **H3** | The learned policy converges to a stable win-rate across independent seeds, and agrees with the solver's exact verdict on **every member of the pre-declared comparison set**: 3×3 (full deck), 4×4 ([adr-009](adr/adr-009-reduced-deck-policy.md) deck), and the 5×5 retrograde endgame layers at the largest `k` achieved. | ≥5-seed training; per-seed win rate with Wilson 95% CI and variance reported across seeds; per-variant agreement rate against Axis 1, restricted to Axis-1 artefacts satisfying [adr-004](adr/adr-004-solver-approach.md) R1 (`termination: exhausted`). | 2 |
+| **H1** | With perfect play the first player wins (strictly, since draws are impossible). | Exhaustive solve of the 3×3 (calibration) and **5×3 (primary strategic, [adr-011](adr/adr-011-reduced-variant-parity.md))** variants; 20-seed self-play win rate with Wilson 95% CI on the full game. | 1 + 2 |
+| **H2** | Removing the joker does not change which player holds the theoretical advantage. | Solver + self-play on a joker-less variant (exact on 3×3/5×3; per [adr-011](adr/adr-011-reduced-variant-parity.md) the contrast is what P1's extra tile is, not joker presence). | 1 + 2 |
+| **H3** | The learned policy converges to a stable win-rate across independent seeds, and agrees with the solver's exact verdict on **every member of the pre-declared comparison set**: 3×3, **5×3** ([adr-011](adr/adr-011-reduced-variant-parity.md) deck), and a pre-declared random sample of **shipped-5×5 endgame positions at `k ≤ 8` empty cells, solved exactly on demand** (`EXP-006`, registered 2026-08-05 — replaces the retrograde endgame layers, which `EXP-003` showed are not worth materialising). | ≥5-seed training; per-seed win rate with Wilson 95% CI and variance reported across seeds; per-variant agreement rate against Axis 1, restricted to Axis-1 artefacts satisfying [adr-004](adr/adr-004-solver-approach.md) R1 (`termination: exhausted`). | 2 |
 | **H4** | FLIPHEX 5×5 is out of reach on **both** complexity axes: its state space (~4.9 × 10¹⁷) exceeds every game solved by full enumeration (Nine Men's Morris 10¹¹, Awari 10¹², Connect Four 10¹⁴), and its game-tree complexity (~10⁶¹; ~10³⁰·⁵ at the Knuth–Moore minimal tree) puts it beyond the weak-solution route that carried checkers *despite* checkers' larger 5 × 10²⁰ state space. | Direct computation of both bounds; placement in the Allis/Schaeffer cross-game table. | 3 |
 | **H5** | No archetype dominates placement frequency in self-play, i.e. the 12-tile deck is well balanced. | Frequency and win-contribution analysis over the self-play database. | 2 + 3 |
-| **H6** *(optional / stretch)* | The design's balance is *robust to counterfactual variation* — the first-player advantage and joker effect hold their sign under a bounded set of design perturbations (board size 3×3→4×4→5×5; deck swaps, e.g. removing the chiral `P3-y`). | Re-run the H1/H2 verdicts against each perturbation and report whether the *direction* of the effect is preserved; exact where solvable, self-play otherwise. | 1 + 2 |
+| **H6** *(optional / stretch)* | The design's balance is *robust to counterfactual variation* — the first-player advantage and joker effect hold their sign under a bounded set of design perturbations (board size 3×3→5×3→5×5; deck swaps, e.g. removing the chiral `P3-y`). | Re-run the H1/H2 verdicts against each perturbation and report whether the *direction* of the effect is preserved; exact where solvable, self-play otherwise. | 1 + 2 |
 
 Under the game-design thesis, **H1, H2, H5** are the spine (they ask directly
 whether the design is balanced and fair); **H3** is the cross-axis honesty check;
@@ -103,7 +104,10 @@ lands next to a particular game.
 
 ## Amendments arising from Phase 2
 
-**H1/H2 — 4×4 is the primary exact-solve target, not 3×3.** The Phase 2
+**H1/H2 — 4×4 is the primary exact-solve target, not 3×3.**
+*(Superseded 2026-08-05 — the board is withdrawn by [adr-011](adr/adr-011-reduced-variant-parity.md);
+the argument survives on the 5×3. Left as written, since amendments record what
+was believed when they were made.)* The Phase 2
 complexity sweep (same bound formula, varying board size) puts the
 full-enumeration frontier at **N ≈ 13–15 cells**:
 
@@ -151,6 +155,102 @@ before any Axis-1 number may appear in the table below, and drafts — before th
 result exists — the strongest sentence a single implementation run once is
 entitled to. Its last clause ("it has not been independently reimplemented") is
 what the evidence-class column exists to carry.
+
+## Amendments arising from Phase 3
+
+These are **post-lock** amendments. Each is authorised by an ADR, dated, and
+recorded here rather than applied by rewriting a hypothesis in place. The
+hypothesis *statements* are unchanged; what changes is the set of variants they
+are measured on.
+
+**The 4×4 is withdrawn as an exact-solve target (2026-08-05, [adr-011](adr/adr-011-reduced-variant-parity.md)).**
+A pre-run red-team of `EXP-001`/`EXP-002` found that the 4×4 has **16 cells**,
+which is even. Scoring is a cell count, so an 8–8 terminal is reachable —
+`C(16,8) = 12,870` of its 65,536 terminal configurations — and **no tie-break
+rule exists** in [rules-canonical.md](rules-canonical.md), whose §7 derives the
+impossibility of draws entirely from 25 being odd.
+[adr-010](adr/adr-010-solver-correctness.md) V2 asserts the no-draw invariant
+totally and states that any `N` used must be odd; `fliphex/rules.py` raises on a
+tied terminal. The 4×4 is therefore not a variant of this game, and the
+withdrawal is a defect fix, not a scope choice.
+
+Two further defects on the same board, recorded because they would have survived
+a parity fix: the 4×4 gives P1 **no extra ply** and hands the **final placement
+to P2**, deleting the mechanism [rules-canonical.md](rules-canonical.md) §6 names
+as the source of the first-player advantage — so H1 could not have failed there
+in any interpretable way. And its automorphism group, measured with
+`scripts/check_symmetry.py 4 4`, is a **180° rotation**, not the 5×5's mirror; no
+tile can break a rotation, so [adr-009](adr/adr-009-reduced-deck-policy.md)'s
+reason for keeping the chiral `P3-y` in that deck does not apply to it.
+
+The replacement proposed by adr-011 is the **5×3** (15 cells, odd, hands 8 + 7,
+bound 1.75 × 10¹⁰), which preserves P1's extra ply, the joker as that extra ply,
+and the same Z/2 mirror as the shipped board. **Pending acceptance** — until then
+H1's and H3's variant lists carry a gap rather than a substitute.
+
+**H2 gains a paired design it did not have (2026-08-05, adr-011).** As registered,
+H2 had no second arm. On an odd board the joker cannot simply be removed — it is
+what makes P1's hand larger, so removing it leaves the board unfillable. H2's
+contrast becomes **what P1's extra tile is**: the zero-arrow joker, or the next
+archetype by ascending arrow count. Both arms hold `a + 1` and `a` tiles, so the
+two state spaces are exactly the same size and the comparison is matched. This
+isolates the joker's *strategic* content from the *structural* extra ply — the
+distinction rules-canonical.md §6 draws and the earlier design confounded.
+
+**H2 is not reported from root-value agreement (2026-08-05).** Agreement between
+two binary values carries at most 1 bit against a 50% prior, and on small boards
+most cells are boundary cells, so many ordinary placements flip nothing and act
+as joker substitutes. The H2 verdict comes from the **criticality** measure — the
+fraction of solved positions whose value changes when P1's extra tile is swapped
+— which requires the solved database to be indexed by hand. That is a constraint
+on the solver, decided before the solve.
+
+**H3 re-scoped: the shipped 5×5 stays in the comparison set, without a database
+(2026-08-05, `EXP-003`, authorised by [adr-012](adr/adr-012-endgame-database-storage.md)).**
+The contingency recorded below fired. `EXP-003` measured the cost of an exact
+endgame search on the shipped board and found it trivial: **480 nodes** at
+`k = 5` — the layer whose database would be ~1.2 × 10¹⁵ positions and ~150 TB —
+and 806,474 nodes at `k = 8`. `k* > 8`, so no database is built.
+
+But the member H3 loses and the member it needs are not the same thing. The
+Phase 2 amendment added the 5×5 endgame layers so that H3 would not rest entirely
+on reduced boards; what it actually required was **exact ground truth on the
+shipped game**, and the *database* was only the assumed means of getting it.
+EXP-003 shows a cheaper means: solve sampled endgame positions **on demand**.
+
+H3's comparison set therefore becomes 3×3, 5×3, and a pre-declared random sample
+of shipped-5×5 positions at `k ≤ 8`, each solved exactly at query time
+(`EXP-006`). This is stronger than what it replaces, on two counts. The
+retrograde route would have delivered whatever `k` the disk allowed, discovered
+after the fact; the sample is fixed in advance at a `k` already measured to be
+affordable. And `solver/minimax.py` proves or raises — it cannot return an
+approximate value — so every ground-truth value in the set satisfies
+[adr-004](adr/adr-004-solver-approach.md) R1 `termination: exhausted` by
+construction rather than by audit.
+
+`EXP-006`'s sampling protocol is registered **now**, before Axis 2 exists. That
+ordering is the point: a comparison set fixed after seeing the learner is not a
+comparison set.
+
+**The contingency as it was written, before the measurement
+(2026-08-05, [adr-012](adr/adr-012-endgame-database-storage.md)).**
+The Phase 2 amendment gave H3 the 5×5 retrograde endgame layers so it would not
+rest on toy boards. adr-012 now defers the decision to build those databases at
+all, pending `EXP-003`: Othello — FLIPHEX's structural twin — was weakly solved
+with forward alpha-beta and **no materialised endgame database** (Takizawa 2023),
+and the subtree below a `k = 5` node is order 10⁵–10⁷ nodes against ~150 TB of
+storage at that depth. If `EXP-003` puts the crossover beyond reachable `k`, H3
+loses that member and must be re-scoped or dropped. This is recorded now, before
+the measurement, so the outcome cannot be presented as having been anticipated
+either way.
+
+**adr-010 V1 restated (2026-08-05, adr-010 Phase 3 amendment).** V1 was specified
+as both a pass/fail gate and the reachability measurement, which is not
+decidable: the closed-form formula counts configurations, so a correct
+reachable-closure enumerator disagrees with it by exactly 2× at layer 1. V1 is
+now exact per-layer equality against the configuration space — a genuine `perft`,
+with no tolerance — and the reachability gap is measured separately by `EXP-005`.
+No Axis-1 figure in the Verdicts table below may cite V1 under the old wording.
 
 ## Verdicts
 

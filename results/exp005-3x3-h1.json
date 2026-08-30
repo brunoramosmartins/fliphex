@@ -1,0 +1,109 @@
+{
+  "experiment": "EXP-005",
+  "variant": "3x3-h1",
+  "board": [
+    3,
+    3
+  ],
+  "cells": 9,
+  "hands": [
+    [
+      "P6",
+      "P3-y",
+      "P1",
+      "P2-adj",
+      "JOKER"
+    ],
+    [
+      "P6",
+      "P3-y",
+      "P1",
+      "P2-adj"
+    ]
+  ],
+  "measured": "configurations with no legal predecessor, one step back",
+  "complete": true,
+  "configurations_total": 711963,
+  "configurations_measured": 711963,
+  "orphans": 23371,
+  "orphan_fraction": 0.032826,
+  "threshold": 0.2,
+  "layers": [
+    {
+      "layer": 0,
+      "total": 1,
+      "with_predecessor": 1,
+      "orphans": 0,
+      "orphan_fraction": 0.0
+    },
+    {
+      "layer": 1,
+      "total": 90,
+      "with_predecessor": 45,
+      "orphans": 45,
+      "orphan_fraction": 0.5
+    },
+    {
+      "layer": 2,
+      "total": 2880,
+      "with_predecessor": 2160,
+      "orphans": 720,
+      "orphan_fraction": 0.25
+    },
+    {
+      "layer": 3,
+      "total": 26880,
+      "with_predecessor": 23520,
+      "orphans": 3360,
+      "orphan_fraction": 0.125
+    },
+    {
+      "layer": 4,
+      "total": 120960,
+      "with_predecessor": 113400,
+      "orphans": 7560,
+      "orphan_fraction": 0.0625
+    },
+    {
+      "layer": 5,
+      "total": 241920,
+      "with_predecessor": 234360,
+      "orphans": 7560,
+      "orphan_fraction": 0.03125
+    },
+    {
+      "layer": 6,
+      "total": 215040,
+      "with_predecessor": 211680,
+      "orphans": 3360,
+      "orphan_fraction": 0.015625
+    },
+    {
+      "layer": 7,
+      "total": 92160,
+      "with_predecessor": 91440,
+      "orphans": 720,
+      "orphan_fraction": 0.007812
+    },
+    {
+      "layer": 8,
+      "total": 11520,
+      "with_predecessor": 11475,
+      "orphans": 45,
+      "orphan_fraction": 0.003906
+    },
+    {
+      "layer": 9,
+      "total": 512,
+      "with_predecessor": 511,
+      "orphans": 1,
+      "orphan_fraction": 0.001953
+    }
+  ],
+  "v1_problems": [],
+  "calibration_problems": [],
+  "verdict": "descriptive-only",
+  "verdict_reason": "3x3-h1 is not the registered configuration (5x3); this is a smoke test and the pre-registered rule is not applied to it",
+  "interpreter": "pypy 3.11.15",
+  "seconds": 3.5049153480213135
+}

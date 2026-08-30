@@ -294,6 +294,58 @@ the single largest layer in the game — 1.09 × 10¹⁷ positions on the 5×5. 
 technique pays off when the profile is a funnel; against a hump it is the worst
 available meeting point.
 
+## Amendment — Phase 3 (2026-08-05): the 4×4 is withdrawn, the 5×3 replaces it
+
+Superseded by [adr-011](adr-011-reduced-variant-parity.md) and
+[adr-012](adr-012-endgame-database-storage.md). **The decisions of this ADR are
+unchanged** — alpha-beta with a transposition table, exact solves on reduced
+boards, retrograde endgames — but two of the boards and one of the artefacts are
+not what the Phase 2 amendment above said they were.
+
+**1. Every reference to the 4×4 as an exact-solve target is withdrawn.** The 4×4
+has 16 cells; 16 is even; scoring is a cell count; there is no tie-break rule.
+`C(16,8) = 12,870` of its 65,536 terminal configurations are 8–8 ties, and
+[adr-010](adr-010-solver-correctness.md) V2 asserts the no-draw invariant as a
+theorem while `fliphex/rules.py` raises on a tie. The Phase 2 amendment's
+"solvable-and-rich intermediate board" argument was sound; the board it selected
+was not a FLIPHEX board. The board-size table above and the "FLIPHEX 4×4
+(adr-009 deck)" row of the two-axis table are superseded by:
+
+| Board | cells | hands (adr-011) | reachable bound | terminal layer |
+|---|--:|---|--:|--:|
+| 3×3 | 9 | 5 + 4 | 7.12 × 10⁵ | 512 |
+| **5×3** | **15** | **8 + 7** | **1.75 × 10¹⁰** | **32,768** |
+| 5×5 | 25 | 13 + 12 | 4.89 × 10¹⁷ | 3.36 × 10⁷ |
+
+**The conclusion the Phase 2 amendment drew survives the substitution and gets
+stronger.** At 1.75 × 10¹⁰ states against a game tree of ~10³⁰ on 15 plies, the
+5×3 is even more decisively an *enumeration* problem than the 4×4 was. "The
+4×4 is not a search problem, it is an enumeration problem" now reads **5×3**, and
+the move-ordering-is-irrelevant consequence for the proof-producing solve is
+unaffected.
+
+**2. R1–R3 apply unchanged, and R3 gains a required field.** Every Axis-1
+artefact must record `ordering: internal | az-seeded` and
+`termination: exhausted | budget` in its header — this was already the rule, but
+no artefact spec named the fields until `experiments/registry.md` was rewritten
+for `EXP-001`/`EXP-002`. H3's comparison set is defined by *filtering* on those
+fields; without them "the run was exhausted" is a claim in prose, which is
+exactly what R3 exists to replace.
+
+**3. Retrograde endgame databases are no longer assumed.** This ADR's part 3
+commits to computing them and to alpha-beta consulting them as a perfect
+evaluation function at depth `25 − k`. adr-012 keeps the *purpose* and defers the
+*artefact*: `k ≤ 5` is ~1.2 × 10¹⁵ positions (~150 TB at one bit) while the
+subtree below a `k = 5` node is order 10⁵–10⁷ nodes, so exact search may deliver
+the same perfect evaluation more cheaply. Othello — diverging, fixed-termination,
+hump-profiled, FLIPHEX's structural twin — was weakly solved with no materialised
+endgame database at all (Takizawa 2023). `EXP-003` measures the crossover before
+anything is built. If a database *is* built, adr-012 fixes the sweep direction as
+**pull, not push**: FLIPHEX layers form a DAG, so the successor-counter and
+fixpoint machinery the chess/checkers literature requires is not needed here, and
+[adr-003](adr-003-piece-representation.md) makes un-placing non-invertible
+anyway.
+
 ## Related
 
 - [adr-003](adr-003-piece-representation.md) — the state space this rests on

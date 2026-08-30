@@ -106,8 +106,60 @@ Consequences:
 - Any reduced-board result must be reported as evidence *about the 5×5 design*,
   carrying its board size and deck explicitly — never as a game in its own right.
 
+## Amendment — Phase 3 (2026-08-05): parity, hand sizes, and clause 3
+
+Superseded in part by [adr-011](adr-011-reduced-variant-parity.md). **Clause 1
+and clause 2 stand unchanged** — `P6` and `P3-y` first, then ascending arrow
+count. What changes is the capacity formula, the symmetry of the two hands, and
+the joker's status.
+
+**1. `a = ⌈N/2⌉` is replaced by `a = (N − 1) / 2`, and `N` must be odd.** The
+board-size formula was written without a parity constraint, which is how the 4×4
+(16 cells) became a target on a game whose no-draw theorem depends on odd cell
+counts. adr-011 makes odd `N` a precondition.
+
+**2. "Both players draw an identical reduced deck" is superseded.** It cannot
+hold on an odd board together with exact exhaustion: at `N = 9`, `a = 5` gives
+5 + 5 = 10 tiles for 9 cells. The rule becomes **P2 draws `a` archetypes; P1
+draws the same `a` plus the joker**, so `(a + 1) + a = N`. Both hands exhaust
+exactly, P1 moves last, and P1's extra tile is the joker — the shipped 5×5's own
+structure (13 = 12 + joker against 12) at smaller scale.
+
+This is not a revision of the project's figures but a *correction of this ADR to
+match them*: [adr-004](adr-004-solver-approach.md) and
+[adr-010](adr-010-solver-correctness.md) both already quote 7.1 × 10⁵ for the
+reduced 3×3, which is reproducible only with hands of 5 + 4 — the rule above.
+The identical-decks wording never produced the numbers the repo was using.
+
+**3. Clause 3 is withdrawn.** The joker is **structural**, not conditional on H2
+being under test: it is what makes P1's hand larger, so removing it leaves the
+board unfillable. H2's contrast becomes *what P1's extra tile is* — the
+zero-arrow joker, or the next archetype by ascending arrow count — with both arms
+holding `a + 1` and `a` tiles and therefore identically sized state spaces.
+
+**4. The worked examples are reissued.**
+
+| Board | cells | `a` | P2 draws | P1 draws (H1 arm) | bound |
+|---|--:|--:|---|---|--:|
+| 3×3 | 9 | 4 | `{P6, P3-y, P1, P2-adj}` | the same four **+ joker** | 7.12 × 10⁵ |
+| **5×3** | **15** | **7** | `{P6, P3-y, P1, P2-adj, P2-skip, P2-opp, P3-fan}` | the same seven **+ joker** | **1.75 × 10¹⁰** |
+
+The H2 arm swaps the joker for the next archetype: `P2-skip` on the 3×3,
+`P3-tri` on the 5×3. The old 4×4 example (`a = 8`) is withdrawn.
+
+**5. Clause 1's justification for `P3-y` is board-dependent, and this was not
+noticed.** `P3-y` is kept because its reflection leaves the deck and so breaks
+the board's Z/2 mirror at the game level. That reasoning requires the board's
+automorphism to *be* a reflection. Measured with `scripts/check_symmetry.py`, the
+4×4's non-trivial automorphism is a **180° rotation**, which no tile can break —
+so on that board the justification was void. The 5×3's is the same mirror as the
+5×5's (`A↔E`, `B↔D`, `C` fixed), so clause 1 holds there as intended. **Any
+future reduced board must have its automorphism group measured and recorded
+before its deck is justified under clause 1.**
+
 ## Related
 
+- [adr-011](adr-011-reduced-variant-parity.md) — parity, hand sizes, and the 5×3
 - [adr-003](adr-003-piece-representation.md) — the deck-as-theorem and the state bound
 - [adr-004](adr-004-solver-approach.md) — the solver that consumes this deck
 - [adr-008](adr-008-board-mirror-symmetry.md) — why `P3-y` is kept in every variant

@@ -1,0 +1,722 @@
+"""EXP-002's principal-variation audit — the gate that targets the reported number.
+
+Registered in ``experiments/registry.md`` with EXP-002 from the start, and not
+run on either arm until now (amendment of 2026-08-09). The registration states
+why it is not redundant with adr-010 V4:
+
+    "V4 bounds the *rate* of errors in the database; only the PV audit targets
+    the number actually reported."
+
+V4 samples 40 configurations per layer out of layers up to 5.0 × 10⁹. If the
+sweep were wrong about *the opening position specifically*, V4 would almost
+certainly miss it and still pass. This audit re-derives the one line the claim
+rests on.
+
+What it checks
+--------------
+1. **The principal variation.** The PV is walked out of the *sweep's* layer files
+   — at each position the mover picks a child the database calls a loss for the
+   opponent. Every position on that line is then re-derived by
+   ``solver/minimax.py``, which reaches the game through
+   ``fliphex.legal_moves``/``apply_move`` and shares no code with the packed
+   sweep. Two implementations, as adr-010 V3 requires of evidence.
+2. **Every distinct first move.** The root value is only as good as the claim
+   that *no other* opening does better. For each legal first move the audit
+   compares the database's verdict against a forward proof, so a sweep that got
+   one opening wrong cannot hide behind the one the PV happens to take.
+
+Why it needs the checkpoint files
+---------------------------------
+The sweep's layers are the thing being audited, and they only exist on disk since
+``solver/checkpoint.py``. The h2 arm has them; **h1 does not** — it ran before
+crash resume existed and its layers were discarded. Auditing h1 therefore
+requires re-running it with ``--checkpoint``, which the registry already wants
+for two other reasons.
+
+    python scripts/exp002_pv_audit.py --board 3 3 --arm h1 --checkpoint data/ck
+    ~/pypy3.11-v7.3.23-linux64/bin/pypy scripts/exp002_pv_audit.py --arm h2
+
+Cost: one forward proof per PV position (15 of them) plus one per distinct first
+move. Each of those is a *full* subgame proof in its own right — an earlier
+version of this docstring claimed they partition the root's own search, which is
+false and made part 2 look far cheaper than it is. Positions that exceed the
+node budget are reported as **unproven**, never as agreeing.
+
+Because a single proof can run for hours with nothing to show, every search is
+wrapped in a :class:`Heartbeat`. See its docstring for the run that made that
+non-negotiable.
+"""
+
+from __future__ import annotations
+
+import argparse
+import gc
+import json
+import sys
+import threading
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from fliphex.moves import apply_move, legal_moves  # noqa: E402
+from fliphex.notation import encode_move  # noqa: E402
+from fliphex.variant import Arm, Variant  # noqa: E402
+from solver.checkpoint import Checkpoint, atomic_write  # noqa: E402
+from solver.minimax import WIN, BudgetExceededError, Solver  # noqa: E402
+from solver.sweep_reader import SweepReader  # noqa: E402
+from solver.transposition import (  # noqa: E402
+    TranspositionTable,
+    max_capacity_for,
+)
+
+#: Memory the run needs for things that are not the transposition table, held
+#: back when sizing it. :class:`Database` keeps three sweep layers resident and
+#: the 5×3's largest three total ~3.2 GB; the rest is the interpreter and the
+#: search's own frames.
+NON_TABLE_RESERVE = 4 * 1024**3
+
+
+def rss_bytes() -> int:
+    """Resident set size of this process, or 0 where /proc is unavailable."""
+    try:
+        with open("/proc/self/statm", "rb") as fh:
+            return int(fh.read().split()[1]) * 4096
+    except (OSError, IndexError, ValueError):
+        return 0
+
+
+def default_rss_ceiling() -> int:
+    """80% of physical memory, the point past which this run should give up.
+
+    The table fills lazily, so an oversized ``--tt-bits`` does not fail at
+    startup — it fails hours in, when the slots finally populate. On
+    2026-08-23 a 2²⁷-slot table reached 15.1 GiB on a 15 GiB machine and the
+    kernel's OOM killer took the process at 504M nodes and 4.8 h of CPU. An
+    OOM kill writes no checkpoint, so all of it was lost. Stopping ourselves
+    first turns that into a saved ``unproven`` row.
+    """
+    try:
+        with open("/proc/meminfo", "rb") as fh:
+            for raw in fh:
+                if raw.startswith(b"MemTotal:"):
+                    return int(int(raw.split()[1]) * 1024 * 0.80)
+    except (OSError, IndexError, ValueError):
+        pass
+    return 0
+
+
+class Heartbeat:
+    """Print progress from *inside* one opaque proof, on a background thread.
+
+    Why this exists
+    ---------------
+    A single ``Solver.solve`` on the 5×3 root is hours long and, until this
+    class, printed nothing until it returned. One run was launched, the machine
+    stayed up for 68.8 hours, and it emitted not one line — leaving no way to
+    tell whether the search was making progress, had been killed, or was orders
+    of magnitude past its projection. That is an unacceptable instrument for a
+    proof measured in days, and the same blindness is what let an earlier
+    projection miss by 4× without anyone noticing mid-run.
+
+    The thread only sleeps and reads a counter, so it costs nothing the search
+    can measure. It is a daemon, so it never keeps a finished run alive.
+
+    Reading the counter
+    -------------------
+    ``Solver.solve`` **rebinds** ``solver.stats`` when it starts, so the counter
+    is looked up through the solver on every tick rather than captured once. A
+    tick that lands during the rebind reads the old object and reports a stale
+    count for one interval, which is harmless: nothing but the log depends on
+    it, and the row's node count still comes from the search itself.
+    """
+
+    def __init__(
+        self,
+        solver,
+        label: str,
+        every: float,
+        budget: int,
+        rss_ceiling: int = 0,
+    ) -> None:
+        self.solver = solver
+        self.label = label
+        self.every = every
+        self.budget = budget
+        # Breaching this sets ``max_nodes`` to 0, which the solver checks on
+        # every node, so the next one raises BudgetExceededError and the search
+        # unwinds through the path that already exists for an exhausted budget.
+        # ``tripped`` is how the caller tells the two apart afterwards: an
+        # unproven row must say whether it ran out of nodes or out of memory,
+        # or the next person reads it as "budget too small" and raises the
+        # wrong dial.
+        self.rss_ceiling = rss_ceiling
+        self.tripped: str | None = None
+        # Two clocks on purpose. ``perf_counter`` is CLOCK_MONOTONIC, which does
+        # not advance while the machine is suspended; ``time.time`` does. This
+        # laptop's lid gets closed mid-run, so the gap between them *is* the
+        # suspended time, reported directly instead of inferred. An earlier
+        # round of this work spent a day on a "corrupt clock" theory that a
+        # measurement this cheap would have settled outright.
+        self.started = time.perf_counter()
+        self.wall_started = time.time()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def __enter__(self) -> Heartbeat:
+        if self.every > 0:
+            self._thread.start()
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self._stop.set()
+
+    def _run(self) -> None:
+        # ``Event.wait`` rather than ``sleep`` so the last interval does not
+        # delay the line the search itself wants to print.
+        while not self._stop.wait(self.every):
+            elapsed = time.perf_counter() - self.started
+            wall = time.time() - self.wall_started
+            nodes = self.solver.stats.nodes
+            rate = nodes / elapsed if elapsed > 0 else 0.0
+            suspended = max(0.0, wall - elapsed)
+            rss = rss_bytes()
+            line = (
+                f"      [{time.strftime('%m-%d %H:%M')}] {self.label}  "
+                f"{nodes:>14,} nodes  {rate:>9,.0f}/s  {elapsed / 3600:5.2f} h cpu"
+                f"  {100 * nodes / self.budget:5.1f}% of budget"
+                f"  {rss / 1024**3:5.1f} GiB"
+            )
+            if suspended > 60:
+                line += f"  (+{suspended / 3600:.2f} h suspended)"
+            print(line, flush=True)
+
+            if self.rss_ceiling and rss > self.rss_ceiling and not self.tripped:
+                self.tripped = "rss-ceiling"
+                self.solver.max_nodes = 0
+                print(
+                    f"      [{self.label}] STOPPING: {rss / 1024**3:.1f} GiB "
+                    f"resident is past the {self.rss_ceiling / 1024**3:.1f} GiB "
+                    f"ceiling. Lower --tt-bits and resume; this position will "
+                    f"be recorded unproven.",
+                    flush=True,
+                )
+                return
+
+
+def rederive(
+    board,
+    state,
+    tt,
+    budget: int,
+    label: str = "",
+    every: float = 0.0,
+    rss_ceiling: int = 0,
+) -> tuple[int | None, int, str | None]:
+    """Prove ``state`` by forward search.
+
+    Returns ``(value, nodes, stopped)``. ``value`` is ``None`` when the search
+    did not finish, and ``stopped`` then says why — ``"budget"`` or
+    ``"rss-ceiling"``. The guard only runs when the heartbeat does, since it is
+    the heartbeat thread that watches memory.
+
+    ``label`` and ``every`` drive a :class:`Heartbeat`; ``every <= 0`` disables
+    it, which is what the cheap positions and the tests want.
+
+    The table is supplied by the caller and **shared across every position this
+    audit proves**, for two reasons. Allocating a 2²⁴-slot table costs ~200 ms,
+    which is 1.8 minutes of pure allocation across the 5×3's first moves and
+    dwarfs some of the searches it serves. And sharing is a real speedup rather
+    than only an economy: sibling openings transpose heavily, so a position
+    proved under one first move is often already proved under the next.
+
+    Sharing is sound because entries are keyed by Zobrist and depth, and a given
+    configuration has the same depth wherever it appears — the same property the
+    sweep relies on to index by layer.
+    """
+    solver = Solver(board, tt=tt, max_nodes=budget)
+    with Heartbeat(solver, label, every, budget, rss_ceiling) as beat:
+        try:
+            result = solver.solve(state)
+        except BudgetExceededError:
+            return None, solver.stats.nodes, beat.tripped or "budget"
+    return result.value, result.stats.nodes, None
+
+
+def partial_path(args, variant: Variant) -> Path:
+    return args.out / f"exp002-pv-audit-{variant.name}.json"
+
+
+def load_partial(args, variant: Variant) -> dict:
+    """Completed rows from an earlier session, keyed so they can be skipped.
+
+    The audit is hours of forward proofs and has no state beyond "which
+    positions are already settled", so resume is just: write the artefact after
+    every position, and on start skip what it already names. Each first-move
+    proof is independent of the others, which is what makes this sound — unlike
+    the sweep, there is no digest or RNG stream whose order matters.
+    """
+    path = partial_path(args, variant)
+    if args.no_resume or not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError:
+        print(f"  partial artefact at {path} is unreadable; starting over")
+        return {}
+
+
+def audit(variant: Variant, args) -> dict:
+    board = variant.board()
+    ckpt = Checkpoint(args.checkpoint / variant.name)
+    db = SweepReader(variant, ckpt)
+    root = variant.initial_state()
+
+    print(f"\n  === EXP-002 PV audit — {variant.name} ===")
+    print(f"  database: {ckpt.root}")
+    print(f"  root value from the sweep: {'P1' if db.value(root) == WIN else 'P2'}")
+    print(f"  interpreter: {sys.implementation.name} {sys.version.split()[0]}")
+    print(f"  node budget: {args.budget:,} per position")
+    table_bytes = (1 << args.tt_bits) * TranspositionTable.BYTES_PER_SLOT
+    print(
+        f"  transposition table: 2^{args.tt_bits} slots, "
+        f"{table_bytes / 1024**3:.2f} GiB when full"
+    )
+    print(
+        "  heartbeat: "
+        + (f"every {args.heartbeat:g}s" if args.heartbeat > 0 else "disabled"),
+        flush=True,
+    )
+    rss_ceiling = (
+        default_rss_ceiling() if args.max_rss_gb < 0 else int(args.max_rss_gb * 1024**3)
+    )
+    if rss_ceiling and args.heartbeat > 0:
+        print(f"  memory ceiling: {rss_ceiling / 1024**3:.1f} GiB resident", flush=True)
+    else:
+        print(
+            "  memory ceiling: DISABLED — an OOM kill will lose this position",
+            flush=True,
+        )
+
+    # Refuse an impossible table *here*, not four hours in. The buffers fill
+    # lazily, so an oversized --tt-bits runs fine until the moment it doesn't,
+    # and an OOM kill writes no checkpoint.
+    if rss_ceiling:
+        budget = rss_ceiling - NON_TABLE_RESERVE
+        affordable = max_capacity_for(budget)
+        if (1 << args.tt_bits) > affordable:
+            bits = affordable.bit_length() - 1
+            raise SystemExit(
+                f"\n  --tt-bits {args.tt_bits} needs "
+                f"{table_bytes / 1024**3:.1f} GiB when full. Under the "
+                f"{rss_ceiling / 1024**3:.1f} GiB ceiling, less "
+                f"{NON_TABLE_RESERVE / 1024**3:.1f} GiB for the sweep's "
+                f"resident layers and the interpreter, the largest table that "
+                f"fits is 2^{bits}. Re-run with --tt-bits {bits}, or raise "
+                f"--max-rss-gb if this machine really has the memory."
+            )
+
+    prior = load_partial(args, variant)
+    prior_pv = prior.get("pv", {}).get("rows", [])
+    prior_first = prior.get("first_moves", {}).get("rows", [])
+
+    # **Only a decided row is settled.** A row whose search ran out of budget is
+    # not evidence of anything, and re-running is usually how you spend a bigger
+    # budget on exactly those — the first attempt at the 5×3 left the root
+    # unproven at 200M nodes, and an earlier version of this resume skipped it,
+    # so a run launched at 5×10⁹ finished in 40 seconds having proved nothing
+    # while the artefact recorded the larger budget. Unproven rows are retried.
+    done_pv = {r["ply"]: r for r in prior_pv if r["got"] is not None}
+    done_first = {r["move"]: r for r in prior_first if r["got"] is not None}
+    retry_pv = len(prior_pv) - len(done_pv)
+    retry_first = len(prior_first) - len(done_first)
+
+    if done_pv or done_first or retry_pv or retry_first:
+        print(
+            f"  RESUMING from {partial_path(args, variant)}: "
+            f"{len(done_pv)} PV positions and {len(done_first)} first moves "
+            f"decided",
+            flush=True,
+        )
+        if retry_pv or retry_first:
+            print(
+                f"  retrying {retry_pv} PV positions and {retry_first} first "
+                f"moves that ran out of budget last time",
+                flush=True,
+            )
+    print(flush=True)
+
+    tt = TranspositionTable(1 << args.tt_bits, verify=True)
+
+    started = time.perf_counter()
+    line = db.principal_variation(board, root)
+    print(f"  principal variation, {len(line)} plies:")
+    print(f"    {' '.join(encode_move(board, m) for m in line)}\n", flush=True)
+
+    moves = legal_moves(board, root)
+
+    # Rows carried over from an earlier session live in these dicts from the
+    # start; they are **not** appended as the loops reach them. A checkpoint
+    # written mid-loop serialises whatever the dict holds, so a run that dies
+    # early no longer takes the earlier session's proofs down with it. The
+    # 2026-08-20 resume did exactly that: it carried thirteen decided plies,
+    # spent 21 h proving ply 0, saved — and that save wrote a single row,
+    # because plies 2-14 had not been re-appended yet. Thirteen proofs gone,
+    # silently, at the one moment the checkpoint was supposed to be earning
+    # its keep.
+    pv_done = dict(done_pv)
+    first_done = dict(done_first)
+
+    def pv_snapshot() -> list:
+        return [pv_done[k] for k in sorted(pv_done)]
+
+    def first_snapshot() -> list:
+        ordered = (encode_move(board, m) for m in moves)
+        return [first_done[n] for n in ordered if n in first_done]
+
+    # -- part 1: every position on the PV -----------------------------------
+    # Each PV position gets its **own** table, deliberately, even though sharing
+    # one would make eight of these nine searches return in a single node: every
+    # PV position lies inside the root's proof tree, so a shared table answers
+    # them from entries the ply-0 search wrote. That is fast and it is still
+    # forward-searcher output, but it collapses fifteen checks into one — a
+    # single table fault (the depth-preferred silent drop of adr-010's V3
+    # amendment was exactly that) would corrupt all of them together. A fresh
+    # table per position costs ~200 ms each and removes the table as a shared
+    # failure mode across the line the whole claim rests on.
+    if args.parts == "first":
+        print(f"  part 1 — SKIPPED (--parts first); {len(pv_done)} rows carried over")
+    else:
+        print("  part 1 — re-deriving every position on the PV by forward search")
+        print("    (independent table per position — see the comment in the source)")
+        state = root
+        for ply, move in enumerate([None, *line]):
+            if move is not None:
+                state = apply_move(board, state, move)
+            if state.is_terminal():
+                break
+            expected = db.value(state)
+            if ply in pv_done:
+                print(f"    ply {ply:2d}  (from a previous session)", flush=True)
+                continue
+            # Release the previous position's table **before** allocating the
+            # next. Rebinding alone is not enough: the right-hand side is
+            # evaluated while the old table is still referenced, so the two
+            # coexist for the duration of the allocation and the peak is
+            # doubled. That doubling is what killed the 2026-08-21 run — ply 0
+            # had filled its table, and ply 2's allocation landed on top of it.
+            fresh = None
+            gc.collect()
+            fresh = TranspositionTable(1 << args.tt_bits, verify=True)
+            got, nodes, stopped = rederive(
+                board,
+                state,
+                fresh,
+                args.budget,
+                f"pv ply {ply}",
+                args.heartbeat,
+                rss_ceiling,
+            )
+            status = (
+                "unproven"
+                if got is None
+                else ("agree" if got == expected else "DISAGREE")
+            )
+            pv_done[ply] = {
+                "ply": ply,
+                "expected": expected,
+                "got": got,
+                "nodes": nodes,
+                # Rows can outlive the run that made them, and a resume may use
+                # a different budget or table size, so each row carries its own.
+                # The node count is only interpretable against both.
+                "budget": args.budget,
+                "tt_bits": args.tt_bits,
+                "stopped": stopped,
+            }
+            print(
+                f"    ply {ply:2d}  sweep={'WIN ' if expected == WIN else 'LOSS'}  "
+                f"{status:9s}  {nodes:>12,} nodes",
+                flush=True,
+            )
+            _save(
+                args,
+                variant,
+                db,
+                root,
+                line,
+                pv_snapshot(),
+                first_snapshot(),
+                started,
+                board,
+            )
+            if stopped == "rss-ceiling":
+                # Aborting the *position* does not give the memory back, so
+                # marching on to the next one just produces a cascade of
+                # instant "unproven" rows and still ends in an OOM kill. That
+                # is exactly what the 2026-08-23 run did to plies 2 through 7.
+                # Past the ceiling the only useful move is to stop the run.
+                print(
+                    "\n  ABORTING the run: the memory ceiling was reached and "
+                    "the table cannot be shrunk in place. Lower --tt-bits and "
+                    "resume — everything proved so far is in the artefact.",
+                    flush=True,
+                )
+                return _finish(
+                    variant,
+                    args,
+                    db,
+                    root,
+                    line,
+                    pv_snapshot(),
+                    first_snapshot(),
+                    started,
+                    board,
+                )
+
+    # -- part 2: every distinct first move ----------------------------------
+    if args.parts == "pv":
+        print(
+            f"\n  part 2 — SKIPPED (--parts pv); "
+            f"{len(first_done)}/{len(moves):,} rows carried over"
+        )
+        return _finish(
+            variant,
+            args,
+            db,
+            root,
+            line,
+            pv_snapshot(),
+            first_snapshot(),
+            started,
+            board,
+        )
+
+    # Part 2 reads layer 1 and nothing else, so the layers the PV walk left
+    # cached are dead weight sitting underneath a 7 GiB table.
+    db.release()
+    gc.collect()
+
+    print(f"\n  part 2 — re-deriving the root under each of {len(moves):,} first moves")
+    print(f"    (layer cache released; {rss_bytes() / 1024**3:.1f} GiB resident)")
+    for i, move in enumerate(moves):
+        name = encode_move(board, move)
+        if name in first_done:
+            continue
+        child = apply_move(board, root, move)
+        expected = db.value(child)
+        # A heartbeat here is self-limiting: the thread's first tick is one
+        # interval in, so a position that proves quickly — which is most of
+        # them — prints nothing at all, and only a stalled one becomes visible.
+        label = f"first {i + 1}/{len(moves)} {name}"
+        got, nodes, stopped = rederive(
+            board, child, tt, args.budget, label, args.heartbeat, rss_ceiling
+        )
+        first_done[name] = {
+            "move": name,
+            "expected": expected,
+            "got": got,
+            "nodes": nodes,
+            "budget": args.budget,
+            "tt_bits": args.tt_bits,
+            "stopped": stopped,
+        }
+        _save(
+            args,
+            variant,
+            db,
+            root,
+            line,
+            pv_snapshot(),
+            first_snapshot(),
+            started,
+            board,
+        )
+        if stopped == "rss-ceiling":
+            print(
+                "\n  ABORTING the run: the memory ceiling was reached. Lower "
+                "--tt-bits and resume.",
+                flush=True,
+            )
+            break
+        if got is not None and got != expected:
+            print(f"    DISAGREE on {encode_move(board, move)}", flush=True)
+        if (i + 1) % args.report_every == 0:
+            rows = first_snapshot()
+            done = sum(1 for r in rows if r["got"] is not None)
+            bad = sum(1 for r in rows if r["got"] not in (None, r["expected"]))
+            print(
+                f"    {i + 1:>6,}/{len(moves):,}  proven {done:,}  disagree {bad}  "
+                f"{time.perf_counter() - started:,.0f}s",
+                flush=True,
+            )
+
+    return _finish(
+        variant,
+        args,
+        db,
+        root,
+        line,
+        pv_snapshot(),
+        first_snapshot(),
+        started,
+        board,
+    )
+
+
+def _finish(variant, args, db, root, line, pv_rows, first_rows, started, board) -> dict:
+    """Build the artefact, print the summary, and persist. One exit for both
+    the full run and the ``--parts`` short circuits, so a partial run reports
+    itself the same way a complete one does."""
+    artefact = _artefact(
+        variant, args, db, root, line, pv_rows, first_rows, started, board
+    )
+    _print_summary(variant, artefact, first_rows)
+    _save(args, variant, db, root, line, pv_rows, first_rows, started, board)
+    return artefact
+
+
+def _tally(rows) -> tuple[int, int, int]:
+    agree = sum(1 for r in rows if r["got"] == r["expected"])
+    disagree = sum(1 for r in rows if r["got"] not in (None, r["expected"]))
+    unproven = sum(1 for r in rows if r["got"] is None)
+    return agree, disagree, unproven
+
+
+def _artefact(
+    variant, args, db, root, line, pv_rows, first_rows, started, board
+) -> dict:
+    """Build the artefact. Written after *every* position, so it doubles as the
+    resume point — which is why ``rows`` is carried in full for both parts."""
+    pv_a, pv_d, pv_u = _tally(pv_rows)
+    fm_a, fm_d, fm_u = _tally(first_rows)
+    total_first = len(legal_moves(board, root))
+    complete = len(first_rows) == total_first and pv_u == 0
+    return {
+        "experiment": "EXP-002",
+        "audit": "principal-variation",
+        "variant": variant.name,
+        "root_value": "P1" if db.value(root) == WIN else "P2",
+        "principal_variation": [encode_move(board, m) for m in line],
+        # The budget *this session* ran at. Rows carry their own, since a
+        # resumed audit can mix budgets and the summary must not imply one.
+        "node_budget_this_session": args.budget,
+        "tt_bits": args.tt_bits,
+        "pv": {"agree": pv_a, "disagree": pv_d, "unproven": pv_u, "rows": pv_rows},
+        "first_moves": {
+            "agree": fm_a,
+            "disagree": fm_d,
+            "unproven": fm_u,
+            "settled": len(first_rows),
+            "total": total_first,
+            "rows": first_rows,
+            "disagreements": [
+                r for r in first_rows if r["got"] not in (None, r["expected"])
+            ],
+        },
+        # A partial run is never "passed": the audit exists to cover a specific
+        # line, and a line half-covered is a gap, not a weaker pass.
+        "complete": complete,
+        "passed": complete and pv_d == 0 and fm_d == 0,
+        "interpreter": f"{sys.implementation.name} {sys.version.split()[0]}",
+        "seconds": time.perf_counter() - started,
+    }
+
+
+def _save(args, variant, db, root, line, pv_rows, first_rows, started, board) -> None:
+    if args.no_write:
+        return
+    artefact = _artefact(
+        variant, args, db, root, line, pv_rows, first_rows, started, board
+    )
+    atomic_write(partial_path(args, variant), json.dumps(artefact, indent=2).encode())
+
+
+def _print_summary(variant, artefact, first_rows) -> None:
+    pv, fm = artefact["pv"], artefact["first_moves"]
+    print()
+    print(
+        f"    PV positions .......... {pv['agree']} agree, {pv['disagree']} "
+        f"disagree, {pv['unproven']} unproven"
+    )
+    print(
+        f"    first moves ........... {fm['agree']} agree, {fm['disagree']} "
+        f"disagree, {fm['unproven']} unproven"
+    )
+    print(f"    coverage (first moves)  {fm['agree'] / max(fm['total'], 1):.1%}")
+    print(f"    elapsed ............... {artefact['seconds']:,.1f}s")
+    print()
+    if artefact["passed"]:
+        print(f"    {variant.name}: PV AUDIT PASSED")
+    elif fm["disagree"] or pv["disagree"]:
+        print(f"    {variant.name}: PV AUDIT FAILED — see disagreements above")
+    else:
+        print(f"    {variant.name}: INCOMPLETE — no disagreement, but not full cover")
+    if pv["unproven"]:
+        print(
+            "    note: an unproven position on the PV is a gap, not a pass — the "
+            "audit exists precisely to cover this line."
+        )
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument(
+        "--board", type=int, nargs=2, default=(5, 3), metavar=("COLS", "ROWS")
+    )
+    p.add_argument("--arm", choices=["h1", "h2"], default="h2")
+    p.add_argument("--checkpoint", type=Path, default=Path("data/checkpoints"))
+    p.add_argument("--budget", type=int, default=200_000_000)
+    p.add_argument("--tt-bits", type=int, default=24)
+    p.add_argument(
+        "--parts",
+        choices=["all", "pv", "first"],
+        default="all",
+        help=(
+            "which halves to run. 'pv' is the one that targets the reported "
+            "value and is far cheaper; 'first' is the coverage half over every "
+            "distinct opening."
+        ),
+    )
+    p.add_argument(
+        "--max-rss-gb",
+        type=float,
+        default=-1.0,
+        help=(
+            "Stop the current search when resident memory passes this, record "
+            "the position unproven and checkpoint. Default -1 means 80%% of "
+            "physical memory. 0 disables the guard, which is how the 2026-08-23 "
+            "run lost 4.8 h of CPU to the OOM killer. Needs --heartbeat on."
+        ),
+    )
+    p.add_argument("--report-every", type=int, default=25)
+    p.add_argument(
+        "--heartbeat",
+        type=float,
+        default=60.0,
+        metavar="SECONDS",
+        help=(
+            "print nodes and rate from inside a running proof this often. "
+            "0 disables it. A single 5x3 proof is hours long and otherwise "
+            "silent, which once hid a 68.8 h run that produced no output at all."
+        ),
+    )
+    p.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="ignore a partial artefact and re-prove every position",
+    )
+    p.add_argument("--out", type=Path, default=Path("results"))
+    p.add_argument("--no-write", action="store_true")
+    args = p.parse_args()
+
+    variant = Variant(args.board[0], args.board[1], Arm(args.arm))
+    artefact = audit(variant, args)
+
+    if not args.no_write:
+        print(f"\n    artefact -> {partial_path(args, variant)}")
+    return 0 if artefact["passed"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

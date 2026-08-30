@@ -1,0 +1,84 @@
+{
+  "experiment": "EXP-001",
+  "variant": "3x3-h2",
+  "board": [
+    3,
+    3
+  ],
+  "cells": 9,
+  "hands": [
+    [
+      "P6",
+      "P3-y",
+      "P1",
+      "P2-adj",
+      "P2-skip"
+    ],
+    [
+      "P6",
+      "P3-y",
+      "P1",
+      "P2-adj"
+    ]
+  ],
+  "value": "P1",
+  "principal_variation": [
+    "A1:P1:0",
+    "A2:P1:0",
+    "A3:P2-adj:0",
+    "B1:P2-adj:0",
+    "B2:P2-skip:0",
+    "B3:P3-y:0",
+    "C1:P3-y:0",
+    "C2:P6:0",
+    "C3:P6:0"
+  ],
+  "ordering": "internal",
+  "termination": "exhausted",
+  "pruning": false,
+  "verification": {
+    "V0_terminal_layer": {
+      "count": 512,
+      "passed": true
+    },
+    "V1_layer_counts": {
+      "passed": true,
+      "problems": []
+    },
+    "V2_no_draw": {
+      "passed": true,
+      "mode": "asserted on every terminal"
+    },
+    "V3_two_methods": {
+      "positions_compared": 680709,
+      "configurations_total": 711963,
+      "coverage_percent": 95.61,
+      "forward_pruning": false,
+      "tt_capacity": 16777216,
+      "tt_occupied": 680709,
+      "tt_replacements": 2598,
+      "roots_agree": true,
+      "passed": true,
+      "problems": []
+    },
+    "V5_checksum_sha256": "307e99b869bd8660c2713d1eba097bac8e195b5994197d9d3d4a9a2aaa57e275"
+  },
+  "layer_counts": {
+    "0": 1,
+    "1": 90,
+    "2": 2880,
+    "3": 26880,
+    "4": 120960,
+    "5": 241920,
+    "6": 215040,
+    "7": 92160,
+    "8": 11520,
+    "9": 512
+  },
+  "forward_nodes": 28155522,
+  "seconds": {
+    "sweep": 153.5658679129847,
+    "forward": 131.89666211401345
+  },
+  "passed": true
+}

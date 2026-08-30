@@ -1,0 +1,58 @@
+{
+  "experiment": "EXP-003",
+  "board_cells": 25,
+  "hands": [
+    13,
+    12
+  ],
+  "seed": 1,
+  "samples_per_k": 200,
+  "max_nodes": 20000000,
+  "threshold": 1000000,
+  "k_star": null,
+  "sampling": "random playout (see registry: known bias)",
+  "results": [
+    {
+      "k": 7,
+      "with_tt": {
+        "n": 200,
+        "median": 20024.0,
+        "p90": 105897,
+        "max": 952272,
+        "total_seconds": 282.6647336111637,
+        "censored": 0,
+        "median_is_lower_bound": false
+      },
+      "without_tt": {
+        "n": 200,
+        "median": 32523.0,
+        "p90": 222660,
+        "max": 1866850,
+        "total_seconds": 522.6154429973103,
+        "censored": 0,
+        "median_is_lower_bound": false
+      }
+    },
+    {
+      "k": 8,
+      "with_tt": {
+        "n": 200,
+        "median": 806473.5,
+        "p90": 2683470,
+        "max": 9239393,
+        "total_seconds": 6759.04357100997,
+        "censored": 0,
+        "median_is_lower_bound": false
+      },
+      "without_tt": {
+        "n": 200,
+        "median": 1736921.5,
+        "p90": 5871599,
+        "max": 20000001,
+        "total_seconds": 14384.8942572831,
+        "censored": 1,
+        "median_is_lower_bound": false
+      }
+    }
+  ]
+}

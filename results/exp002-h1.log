@@ -1,0 +1,20 @@
+nohup: ignoring input
+  === EXP-002 — 5x3-h1, 15 cells, hands 8+7 ===
+  17,506,580,337 configurations, 2 bits/entry, seed 3
+  interpreter: pypy 3.11.15
+  sweep done in 32.38 h (150,192 cfg/s)
+  V4 — re-deriving sampled positions by forward search ...
+
+    VALUE ................. P1 wins with perfect play
+    V0 terminal layer ..... 32,768 (ok)
+    V1 per-layer counts ... ok
+    V2 no-draw ............ asserted on every terminal
+    V4 sampled re-derive .. 344 agree, 0 disagree, 217 over budget
+    V5 checksum ........... ab2620e1707f983f...
+    V6 mirror ............. 518 eligible pairs checked, 0 differ (4,768 sampled but ineligible — P3-y still in hand)
+
+  5x3-h1: P1 wins — ALL CHECKS PASSED
+
+  adr-009: a reduced-board result transfers to the shipped 5x5 as
+  evidence, never as proof. Report it with its board and deck.
+  artefact -> data/subgame-solutions/5x3-h1.json

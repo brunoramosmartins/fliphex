@@ -1,0 +1,43 @@
+nohup: ignoring input
+  === EXP-002 — 5x3-h1, 15 cells, hands 8+7 ===
+  17,506,580,337 configurations, 2 bits/entry, seed 3
+  interpreter: pypy 3.11.15
+  checkpoint: data/checkpoints/5x3-h1 (fresh start)
+    layer 15           32,768 configs      0.1s  (0s total)
+    layer 14        1,966,080 configs      1.2s  (1s total)
+    layer 13       48,168,960 configs     58.9s  (60s total)
+    layer 12      365,281,280 configs    429.7s  (490s total)
+    layer 11    1,643,765,760 configs   6654.4s  (7,144s total)
+    layer 10    3,616,284,672 configs   5762.1s  (12,906s total)
+    layer  9    5,022,617,600 configs  48540.7s  (61,447s total)
+    layer  8    4,036,032,000 configs   5820.1s  (67,267s total)
+    layer  7    2,018,016,000 configs  39915.7s  (107,183s total)
+    layer  6      627,827,200 configs    403.7s  (107,587s total)
+    layer  5      113,008,896 configs   3785.7s  (111,372s total)
+    layer  4       12,841,920 configs      3.6s  (111,376s total)
+    layer  3          713,440 configs     31.2s  (111,407s total)
+    layer  2           23,520 configs      0.1s  (111,407s total)
+    layer  1              240 configs      0.1s  (111,407s total)
+    layer  0                1 configs      0.0s  (111,407s total)
+  sweep done in 30.95 h (157,140 cfg/s)
+  V4 — re-deriving sampled positions by forward search ...
+
+    VALUE ................. P1 wins with perfect play
+    V0 terminal layer ..... 32,768 (ok)
+    V1 per-layer counts ... ok
+    V2 no-draw ............ asserted on every terminal
+    V4 sampled re-derive .. 344 agree, 0 disagree, 217 over budget, 40 terminal
+       coverage ........... 384 of 601 drawn (63.9%); search reached 61.3% of the rest
+       searched layers .... 9 of 16, shallowest t = 6
+       no evidence at ..... t = 0, 1, 2, 3, 4, 5
+    V5 checksum ........... ab2620e1707f983f...
+    V6 mirror ............. 518 eligible pairs checked, 0 differ (4,768 sampled but ineligible — P3-y still in hand)
+       eligibility ........ 9.8% of 5,286 draws
+       non-trivial pairs .. 516 (2 were mirror-fixed, comparing a value with itself)
+       no coverage at ..... t = 0, 1
+
+  5x3-h1: P1 wins — ALL CHECKS PASSED
+
+  adr-009: a reduced-board result transfers to the shipped 5x5 as
+  evidence, never as proof. Report it with its board and deck.
+  artefact -> data/subgame-solutions/5x3-h1.json

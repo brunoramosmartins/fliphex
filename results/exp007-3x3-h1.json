@@ -1,0 +1,109 @@
+{
+  "experiment": "EXP-007",
+  "variant": "3x3-h1",
+  "board": [
+    3,
+    3
+  ],
+  "cells": 9,
+  "hands": [
+    [
+      "P6",
+      "P3-y",
+      "P1",
+      "P2-adj",
+      "JOKER"
+    ],
+    [
+      "P6",
+      "P3-y",
+      "P1",
+      "P2-adj"
+    ]
+  ],
+  "measured": "transitive reachable closure from the opening position",
+  "complete": true,
+  "configurations_total": 711963,
+  "configurations_measured": 711963,
+  "unreachable": 27860,
+  "unreachable_fraction": 0.03913125,
+  "threshold": 0.2,
+  "layers": [
+    {
+      "layer": 0,
+      "total": 1,
+      "reachable": 1,
+      "unreachable": 0,
+      "unreachable_fraction": 0.0
+    },
+    {
+      "layer": 1,
+      "total": 90,
+      "reachable": 45,
+      "unreachable": 45,
+      "unreachable_fraction": 0.5
+    },
+    {
+      "layer": 2,
+      "total": 2880,
+      "reachable": 1600,
+      "unreachable": 1280,
+      "unreachable_fraction": 0.444444
+    },
+    {
+      "layer": 3,
+      "total": 26880,
+      "reachable": 21208,
+      "unreachable": 5672,
+      "unreachable_fraction": 0.211012
+    },
+    {
+      "layer": 4,
+      "total": 120960,
+      "reachable": 111813,
+      "unreachable": 9147,
+      "unreachable_fraction": 0.07562
+    },
+    {
+      "layer": 5,
+      "total": 241920,
+      "reachable": 234330,
+      "unreachable": 7590,
+      "unreachable_fraction": 0.031374
+    },
+    {
+      "layer": 6,
+      "total": 215040,
+      "reachable": 211680,
+      "unreachable": 3360,
+      "unreachable_fraction": 0.015625
+    },
+    {
+      "layer": 7,
+      "total": 92160,
+      "reachable": 91440,
+      "unreachable": 720,
+      "unreachable_fraction": 0.007812
+    },
+    {
+      "layer": 8,
+      "total": 11520,
+      "reachable": 11475,
+      "unreachable": 45,
+      "unreachable_fraction": 0.003906
+    },
+    {
+      "layer": 9,
+      "total": 512,
+      "reachable": 511,
+      "unreachable": 1,
+      "unreachable_fraction": 0.001953
+    }
+  ],
+  "v1_problems": [],
+  "falsifier": [],
+  "verdict": "descriptive-only",
+  "verdict_reason": "3x3-h1 is not the registered configuration (5x3); the pre-registered rule is not applied to it",
+  "interpreter": "pypy 3.11.15",
+  "seconds": 3.8216991540102754
+}

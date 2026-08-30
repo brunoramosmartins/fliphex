@@ -1,0 +1,149 @@
+{
+  "experiment": "EXP-004",
+  "variant": "5x3-h2",
+  "block_size": 4096,
+  "coder": "zlib level 3 (SUBSTITUTE \u2014 zstandard absent)",
+  "zstd_level": 3,
+  "interpreter": "pypy 3.11.15",
+  "layers": [
+    {
+      "raw_bytes": 1,
+      "rle_bytes": 2,
+      "zstd_bytes": 9,
+      "blocks": 1,
+      "block_size": 4096,
+      "layer": 0
+    },
+    {
+      "raw_bytes": 60,
+      "rle_bytes": 2,
+      "zstd_bytes": 12,
+      "blocks": 1,
+      "block_size": 4096,
+      "layer": 1
+    },
+    {
+      "raw_bytes": 5880,
+      "rle_bytes": 48,
+      "zstd_bytes": 69,
+      "blocks": 2,
+      "block_size": 4096,
+      "layer": 2
+    },
+    {
+      "raw_bytes": 178360,
+      "rle_bytes": 1480,
+      "zstd_bytes": 1838,
+      "blocks": 44,
+      "block_size": 4096,
+      "layer": 3
+    },
+    {
+      "raw_bytes": 3210480,
+      "rle_bytes": 26648,
+      "zstd_bytes": 32924,
+      "blocks": 784,
+      "block_size": 4096,
+      "layer": 4
+    },
+    {
+      "raw_bytes": 28252224,
+      "rle_bytes": 2426336,
+      "zstd_bytes": 905927,
+      "blocks": 6898,
+      "block_size": 4096,
+      "layer": 5
+    },
+    {
+      "raw_bytes": 156956800,
+      "rle_bytes": 1786136,
+      "zstd_bytes": 1846269,
+      "blocks": 38320,
+      "block_size": 4096,
+      "layer": 6
+    },
+    {
+      "raw_bytes": 504504000,
+      "rle_bytes": 158122836,
+      "zstd_bytes": 56660928,
+      "blocks": 123170,
+      "block_size": 4096,
+      "layer": 7
+    },
+    {
+      "raw_bytes": 1009008000,
+      "rle_bytes": 30306356,
+      "zstd_bytes": 20718021,
+      "blocks": 246340,
+      "block_size": 4096,
+      "layer": 8
+    },
+    {
+      "raw_bytes": 1255654400,
+      "rle_bytes": 772448888,
+      "zstd_bytes": 255520389,
+      "blocks": 306557,
+      "block_size": 4096,
+      "layer": 9
+    },
+    {
+      "raw_bytes": 904071168,
+      "rle_bytes": 94069722,
+      "zstd_bytes": 42565185,
+      "blocks": 220721,
+      "block_size": 4096,
+      "layer": 10
+    },
+    {
+      "raw_bytes": 410941440,
+      "rle_bytes": 339231272,
+      "zstd_bytes": 92321118,
+      "blocks": 100328,
+      "block_size": 4096,
+      "layer": 11
+    },
+    {
+      "raw_bytes": 91320320,
+      "rle_bytes": 29258002,
+      "zstd_bytes": 8558170,
+      "blocks": 22295,
+      "block_size": 4096,
+      "layer": 12
+    },
+    {
+      "raw_bytes": 12042240,
+      "rle_bytes": 12091078,
+      "zstd_bytes": 1726905,
+      "blocks": 2940,
+      "block_size": 4096,
+      "layer": 13
+    },
+    {
+      "raw_bytes": 491520,
+      "rle_bytes": 402090,
+      "zstd_bytes": 36086,
+      "blocks": 120,
+      "block_size": 4096,
+      "layer": 14
+    },
+    {
+      "raw_bytes": 8192,
+      "rle_bytes": 8184,
+      "zstd_bytes": 305,
+      "blocks": 2,
+      "block_size": 4096,
+      "layer": 15
+    }
+  ],
+  "raw_bytes": 4376645085,
+  "rle_bytes": 1440179080,
+  "zstd_bytes": 480894155,
+  "coder_is_registered_zstd": false,
+  "positions": 17506580340,
+  "raw_bits_per_position": 2.0,
+  "rle_ratio": 3.0389589362733975,
+  "zstd_ratio": 9.101056936323129,
+  "logic_minimised": null,
+  "logic_minimised_note": "absent: needs the reachable closure (EXP-007), not run on the 5x3",
+  "seconds": 81.6246731840074
+}

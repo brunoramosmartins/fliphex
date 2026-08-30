@@ -1,0 +1,153 @@
+{
+  "experiment": "EXP-002",
+  "check": "extra-tile criticality and cross-arm verification",
+  "arms": [
+    "5x3-h1",
+    "5x3-h2"
+  ],
+  "extra_tile": [
+    "JOKER",
+    "P3-tri"
+  ],
+  "interpreter": "pypy 3.11.15",
+  "complete": true,
+  "max_layer": 15,
+  "layers": [
+    {
+      "layer": 0,
+      "in_hand": 1,
+      "critical": 0,
+      "spent": 0,
+      "mismatch": 0,
+      "seconds": 0.0003947590012103319
+    },
+    {
+      "layer": 1,
+      "in_hand": 210,
+      "critical": 0,
+      "spent": 30,
+      "mismatch": 0,
+      "seconds": 0.0006164920050650835
+    },
+    {
+      "layer": 2,
+      "in_hand": 20580,
+      "critical": 0,
+      "spent": 2940,
+      "mismatch": 0,
+      "seconds": 0.0076191390107851475
+    },
+    {
+      "layer": 3,
+      "in_hand": 535080,
+      "critical": 0,
+      "spent": 178360,
+      "mismatch": 0,
+      "seconds": 0.010184423997998238
+    },
+    {
+      "layer": 4,
+      "in_hand": 9631440,
+      "critical": 0,
+      "spent": 3210480,
+      "mismatch": 0,
+      "seconds": 0.11598135100211948
+    },
+    {
+      "layer": 5,
+      "in_hand": 70630560,
+      "critical": 2273742,
+      "spent": 42378336,
+      "mismatch": 0,
+      "seconds": 1.0464548490126617
+    },
+    {
+      "layer": 6,
+      "in_hand": 392392000,
+      "critical": 505884,
+      "spent": 235435200,
+      "mismatch": 0,
+      "seconds": 5.13504269902478
+    },
+    {
+      "layer": 7,
+      "in_hand": 1009008000,
+      "critical": 230625119,
+      "spent": 1009008000,
+      "mismatch": 0,
+      "seconds": 19.31055074199685
+    },
+    {
+      "layer": 8,
+      "in_hand": 2018016000,
+      "critical": 52668697,
+      "spent": 2018016000,
+      "mismatch": 0,
+      "seconds": 33.06605455398676
+    },
+    {
+      "layer": 9,
+      "in_hand": 1883481600,
+      "critical": 666093883,
+      "spent": 3139136000,
+      "mismatch": 0,
+      "seconds": 48.63894774700748
+    },
+    {
+      "layer": 10,
+      "in_hand": 1356106752,
+      "critical": 149129838,
+      "spent": 2260177920,
+      "mismatch": 0,
+      "seconds": 33.50369722698815
+    },
+    {
+      "layer": 11,
+      "in_hand": 410941440,
+      "critical": 117314133,
+      "spent": 1232824320,
+      "mismatch": 0,
+      "seconds": 18.02142099099001
+    },
+    {
+      "layer": 12,
+      "in_hand": 91320320,
+      "critical": 17120077,
+      "spent": 273960960,
+      "mismatch": 0,
+      "seconds": 4.89996833098121
+    },
+    {
+      "layer": 13,
+      "in_hand": 6021120,
+      "critical": 1441233,
+      "spent": 42147840,
+      "mismatch": 0,
+      "seconds": 0.5633438760123681
+    },
+    {
+      "layer": 14,
+      "in_hand": 245760,
+      "critical": 56892,
+      "spent": 1720320,
+      "mismatch": 0,
+      "seconds": 0.0735422020079568
+    },
+    {
+      "layer": 15,
+      "in_hand": 0,
+      "critical": 0,
+      "spent": 32768,
+      "mismatch": 0,
+      "seconds": 0.003190677991369739
+    }
+  ],
+  "criticality_numerator": 1237229498,
+  "criticality_denominator": 7248350863,
+  "criticality": 0.17069117118979069,
+  "verification_compared": 10258229474,
+  "verification_mismatches": 0,
+  "verification_passed": true,
+  "mismatch_examples": [],
+  "seconds": 164.5082202969934
+}

@@ -1,0 +1,24 @@
+
+  === EXP-008 — exact agent strength, 5x5-h1 ===
+  25 cells, budget 2,000,000 nodes, search below k = 8
+  250 games per (opponent x seat), seed 5
+  interpreter: pypy 3.11.15
+
+    vs random    as P1   248/250   99.2%  [ 97.1,  99.8]  proved 30.8%     50.1s
+    vs random    as P2   242/250   96.8%  [ 93.8,  98.4]  proved 32.9%   1019.7s
+    vs heuristic as P1   178/250   71.2%  [ 65.3,  76.5]  proved 30.8%     75.1s
+    vs heuristic as P2   127/250   50.8%  [ 44.6,  56.9]  proved 33.3%    500.4s
+
+    control: heuristic vs heuristic, first seat   100/250   40.0%  [ 34.1,  46.2]      1.7s
+
+    vs random    pooled   490/500   98.0%  [ 96.4,  98.9]  proved 31.8%  CLEARS 90%
+    vs heuristic pooled   305/500   61.0%  [ 56.7,  65.2]  proved 32.0%  below 90%
+
+    elapsed ............... 1,647.0s
+    exit criterion ........ NOT MET
+    (a win rate here may not be quoted without proved_rate — the
+     agent proves at most the last 8 plies and the rest is the
+     fallback's play.)
+
+    artefact -> results/exp008-agent-strength.json
+
