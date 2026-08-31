@@ -129,18 +129,59 @@ Ex04 question 4 asks for exactly this justification.
 
 ## az/mcts.py — PUCT, and deduplicated expansion
 
-<!--
-Two things, and the second is mandatory rather than optional:
+PUCT over the real state, no determinization (adr-001), Dirichlet noise at the
+root, temperature 1 then greedy. Three expansion modes, because EXP-010 needs a
+baseline and a control alongside the design adr-005 mandates:
 
-- PUCT over the real state. Dirichlet noise at the root, temperature 1 for the
-  opening plies then greedy.
-- Children indexed by POSITION, not by action (adr-005 Phase 3 amendment,
-  risk R13). The tree becomes a DAG; the backup rule for a DAG is not
-  pre-decided by the ADR and has to be chosen and written down here.
+| mode | children indexed by | isolates |
+|---|---|---|
+| `ACTION` | action | the deployed-naive baseline |
+| `POSITION` | resulting position | the ADR's design |
+| `MULTIPLICITY` | action, priors ÷ multiplicity | prior mass alone |
 
-The amendment requires the measured effect against the naive tree to be
-reported. That comparison is an experiment and needs a registry entry first.
--->
+The third exists because without it a win for `POSITION` at a small budget is
+fully explained by *"it has ~4× fewer children and can finish one pass over
+them"* — an effect you would also get by deleting three quarters of the naive
+arm's children at random, which is not the mechanism the ADR describes.
+
+### Aliasing is decided without applying the move
+
+The natural definition of "these two actions are the same move" is *they reach
+the same `GameState.key()`*, and that costs an `apply_move` per move — 1,450 of
+them per expansion at the 5×5 root, more than the search itself.
+
+Since placed tiles are inert (adr-003) and flips never chain (adr-006), the
+resulting position depends only on `(cell, tile, arrows ∩ occupied neighbours)`.
+An integer AND replaces the whole simulation. That is an *argument*, and
+arguments can be wrong or can stop being true, so
+`tests/test_az_mcts.py` checks the cheap partition against the expensive one in
+both directions across three variants and three depths. It reproduces
+**1,450 → 325 (4.46×)** at the 5×5 root, agreeing with
+`scripts/measure_move_collapse.py`, which decides by the expensive path.
+
+### There is no DAG
+
+**adr-005's Phase 3 amendment predicted that deduplication "turns the tree into
+a DAG" and called the backup rule an unresolved subtlety it would not
+pre-decide. It does not.**
+
+Sibling-alias merging gives a child several *action labels* and still exactly
+one parent. The structure stays a tree, and there is no backup rule to choose.
+The DAG appears only under *cross-parent* transposition — two different parents
+reaching one position — which is a separate and larger search improvement that
+has nothing to do with R13, and which `az/mcts.py` deliberately does not
+implement.
+
+Found while writing the code, after the EXP-010 registration had already fixed a
+backup rule that turned out to have nothing to govern. The correction **removes**
+a confounder: the falsifier no longer has to read *"the mechanism is wrong or the
+backup rule is bad"*. Pinned by
+`test_sibling_merging_does_not_create_a_dag`, which walks the tree and asserts
+no node is reached twice.
+
+One consequence to keep straight when quoting the result: *"deduplication helps
+by X"* must never become *"transposition-aware MCTS helps by X"*. The second is
+the larger, untested claim.
 
 ## az/selfplay.py — game generation
 
