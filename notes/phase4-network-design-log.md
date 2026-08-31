@@ -321,10 +321,32 @@ unusually clean.
 
 ## az/replay_buffer.py
 
-<!--
-FIFO of (position, pi, z) triples. Capacity, and the refresh fraction per epoch
-— ex04 question 3 asks for the closed form.
--->
+A fixed-capacity FIFO of `(planes, π, z)`. Two decisions in it are worth keeping.
+
+**A ring buffer, not a `deque`.** The deque is the obvious FIFO and it was the
+first thing written here. But sampling indexes the buffer at *random* positions,
+and deque indexing is O(n) in the middle — on 100,000 samples that turns every
+batch into a scan. A list with a write cursor makes eviction and random access
+both O(1), which is the pair of operations this structure actually performs.
+
+**`π` stores its own moves.** The dense alternative — a vector aligned to
+`legal_moves` order — is smaller, and requires that order never to change. It is
+deterministic today and nothing enforces it. A reordering would silently
+misalign every stored target, and that surfaces as a training curve that never
+quite converges rather than as an error.
+
+**The refresh fraction.** `min(1, incoming / capacity)`: a generation of `g`
+samples into a buffer of `c` refreshes `g / c` of it and saturates once one
+generation can fill it. The expected age of a sample is `c / g` generations,
+which is the quantity the capacity should be chosen against — a buffer much
+larger than the run keeps training on positions from a network that no longer
+exists.
+
+`z` is exactly ±1, always, because draws are impossible. The sign convention is
+the error waiting to happen: it is read **from the mover at that position**, to
+match the encoding's own/opponent planes and the value head. `samples_from_game`
+is the only place the alternation is written, so it is the only place it can be
+written wrongly.
 
 ## az/train.py — the loss and the loop
 
@@ -365,12 +387,33 @@ byte-identically rather than merely restart the arithmetic. The rule generalises
 **a resume must be indistinguishable from an uninterrupted run, not merely a
 correct continuation of one.**
 
-**Cost, which is the good news.** The solver's ladder is 4.4 GB per arm, which is
-why it is gitignored. Axis 2's is not remotely that: 200 games × ≤25 plies is
-≤5,000 positions per generation, and a position stored as its compact state plus
-a 44-float factored policy target plus `z` is on the order of 200 bytes. A buffer
-holding twenty generations is roughly **20 MB**. Weights are 0.33 M parameters.
-Checkpointing every generation is essentially free.
+**Cost — the estimate first written here was wrong by an order of magnitude, in
+the direction that mattered.** It read: *"a position stored as its compact state
+plus a 44-float factored policy target plus `z` is on the order of 200 bytes… a
+buffer holding twenty generations is roughly 20 MB."* Both halves were wrong. The
+factored head has 44 *logits*, but `π` is a distribution over **legal moves**, of
+which there are up to 1,450 — and a sample stores its encoded planes, 750 bytes,
+not a compact state.
+
+Measured on the 5×5 at 400 simulations:
+
+| ply | children | visited | as objects | packed | ratio |
+|--:|--:|--:|--:|--:|--:|
+| 0 | 325 | 16 | 3,643 B | 1,049 B | 3.5× |
+| 6 | 280 | 3 | 1,415 B | 958 B | 1.5× |
+| 12 | 149 | 149 | **24,139 B** | **1,980 B** | **12.2×** |
+
+The support of `π` *widens* as the game shortens: by ply 12 the 400 simulations
+reach all 149 children, and 149 `Move` objects with their floats cost 24 KB. At
+that rate a 100,000-sample buffer is **2.4 GB** on a 15 GB machine — and a
+checkpoint written once per generation for sixty hours carries the same weight
+every time.
+
+Packing `π` as three bytes per move plus one float32 brings the worst case to
+**198 MB**; `Sample.policy` unpacks on demand, so callers still see
+`(Move, float)` pairs. Weights are 0.33 M parameters and negligible beside it.
+Checkpointing every generation is cheap again — but it was not cheap by default,
+and the estimate here said it was.
 
 **Granularity.** The longest uninterruptible unit is not a generation (≈24 min)
 but the **evaluator gate at ≈34 min** — 400 games at 5.1 s. Self-play within a
