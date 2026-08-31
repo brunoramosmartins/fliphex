@@ -100,9 +100,67 @@ critical path.
 The critical path is the engine. Phase 3 solved the same problem by moving to
 PyPy, which is not available here: PyPy does not run torch. So the options are a
 faster engine in CPython (bitboards, vectorised move generation), a two-process
-split with self-play in PyPy and inference served from CPython, or accepting
-2,499 plies/s and parallelising across the 12 cores — self-play is
-embarrassingly parallel, which recovers roughly an order of magnitude for free.
+split with self-play in PyPy and inference served from CPython, or parallelising
+across cores — self-play is embarrassingly parallel.
+
+**That last option was first written here as "roughly an order of magnitude for
+free", which was wrong and is corrected below.** The phrase read a structural
+property — games are independent — as a statement about scale, and took the
+scale from 12 *logical* cores. The machine has **6 physical** cores; hyper-
+threading returns very little on this workload. Measured speedup is **4.31×**,
+not 10×.
+
+## What one self-play game costs
+
+**Measured 2026-08-31, 5×5, `ExpansionMode.POSITION`, 400 simulations per move,
+three full games.** The leaf evaluator is a constant, so this isolates the cost
+of the *tree* from the cost of whatever evaluates it.
+
+| | |
+|---|--:|
+| Tree cost per simulation | **1.280 ms** |
+| Tree cost per game (25 plies) | **12.8 s** |
+| Plus the network at batch 1 (0.90 ms/sim) | **22 s** |
+
+The cost falls **150×** from the opening to the endgame, tracking the branching
+factor:
+
+| ply | branching | ms / simulation |
+|--:|--:|--:|
+| 0 | 1,450 | 3.207 |
+| 8 | 578 | 1.701 |
+| 16 | 189 | 0.434 |
+| 24 | 2 | 0.021 |
+
+This is why the root may not be used to estimate a game. Costing 25 plies at the
+root rate overstates a game by about 2.5×, and the earlier figures in this file
+were all root figures.
+
+**Parallel scaling, 12 workers over 6 physical cores** (engine only, four games
+per worker so that pool startup is amortised rather than charged to the parallel
+arms):
+
+| workers | games / s | speedup |
+|--:|--:|--:|
+| 1 | 0.331 | 1.00× |
+| 2 | 0.614 | 1.86× |
+| 4 | 0.941 | 2.85× |
+| 6 | 1.078 | 3.26× |
+| 8 | 1.291 | 3.90× |
+| 12 | 1.424 | **4.31×** |
+
+Six workers on six physical cores return 3.26×, so the shortfall is not only
+hyperthreading — memory bandwidth and laptop thermal limits are in it too. An
+earlier one-game-per-worker run gave 4.04×; the two agree, so the ceiling is
+real and not a startup artefact.
+
+**The composed figure: ~5.1 s per game, ~705 games per hour**, at 400
+simulations per move with the network at batch 1.
+
+One caveat, and it is not small: the scaling above is **engine-only**. Once torch
+is in each worker, the network's 41% of a simulation competes for the same cores,
+and each worker will need its threads pinned to 1. Whether the composed rate
+holds cannot be measured until `az/network.py` exists.
 
 **Sizing note against adr-005.** The probe comes to **328,921 parameters**,
 below the ADR's stated 0.5–1.5 M target band. The factored head is the reason:
@@ -209,11 +267,63 @@ z is always exactly +/-1 because draws are impossible.
 
 ## The evaluator gate
 
-<!--
-400 games at 55%, per the adr-005 Phase 2 amendment. If it is relaxed, the
-relaxation must state its own false-promotion rate. Record which was chosen and
-what it cost in compute.
--->
+**Chosen 2026-08-31: the adr-005 threshold unchanged — 400 games at 55% — run
+every 5 generations rather than every generation.**
+
+The schedule it sits in is **30 generations × 200 self-play games**, which comes
+to 6,000 self-play games and 2,400 evaluation games per seed: **11.9 h per seed,
+59.6 h for H3's five seeds** at the 705 games/hour measured above.
+
+The cadence is the compute decision. Gating every generation would cost 12,000
+evaluation games against 6,000 self-play games — **two thirds of the phase's
+compute spent judging rather than learning**, and 127.6 h for five seeds.
+
+**H3's five seeds are affordable, so no deviation is registered.** adr-005 sized
+the phase around *"two independent seeds"* and called that "realistic rather than
+aspirational"; `docs/research.md` locked H3 at **≥5** at `v0.3-hypotheses`. The
+ADR's estimate was written before any of this was measured and is superseded by
+measurement, not amended — it was an estimate about compute, not a decision about
+the hypothesis.
+
+### The relaxation's false-promotion rate, which adr-005 requires stated
+
+At 400 games and a 55% threshold, against a champion of genuinely equal strength:
+
+| | |
+|---|--:|
+| Per-gate false promotion (true p = 0.50) | **2.55%** |
+| Power at true p = 0.52 | 12.5% |
+| Power at true p = 0.55 | 52.1% |
+| Power at true p = 0.60 | **98.1%** |
+| Power at true p = 0.65 | 100.0% |
+
+**The relaxation makes the gate safer, not weaker, and the reason is worth
+keeping.** adr-005 asks for the false-promotion rate because it was written with
+a *lower threshold* in mind, where relaxing plainly costs error control. Cadence
+relaxation is a different object: it does not touch the per-gate rate at all, it
+reduces the number of gate events.
+
+| cadence | gate events | P(at least one false promotion) |
+|---|--:|--:|
+| every generation | 30 | **53.9%** |
+| every 5 generations | 6 | **14.4%** |
+
+Gating every generation over 30 generations is more likely than not to promote a
+challenger that is no better than the champion. The cheaper schedule is also the
+one that controls the family-wise error.
+
+The second effect points the same way. A challenger gated every 5 generations
+has accumulated five generations of improvement before it is judged, which puts
+it in the p ≥ 0.60 regime where power is 98% — rather than the p ≈ 0.52 regime,
+where a single-generation challenger would be caught 12.5% of the time. Coarser
+cadence buys power as well as error control.
+
+**What it costs, stated plainly.** The champion generating self-play data can be
+up to five generations stale, so some fraction of the training data comes from a
+weaker generator than necessary. And promotion granularity is coarse: if the run
+peaks at generation 13, the gate will not see it — only generations 5, 10, 15,
+20, 25 and 30 are inspected. Neither is measured here; both are the accepted
+price.
 
 ## The plain-UCT floor
 
