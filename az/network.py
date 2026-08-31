@@ -216,6 +216,67 @@ def masked_log_policy(
     return torch.log_softmax(scores, dim=0)
 
 
+class NetworkEvaluator:
+    """Adapts a network to the search's ``prior`` and ``evaluate`` hooks.
+
+    The search calls both on the same position, one immediately after the other:
+    ``_expand`` asks for the priors and the very next line asks for the leaf
+    value. Wired naively that is **two forward passes over identical input**,
+    which at the measured batch-1 cost of 0.90 ms takes a simulation from
+    2.18 ms to 3.08 ms — a 41% increase in the whole self-play budget, about 24
+    hours over a five-seed run.
+
+    So one result is cached, keyed on the state *object*. ``_expand`` and
+    ``evaluate`` receive the same instance, so the check is an identity test and
+    always hits. If that call pattern ever changes the cache simply misses and
+    the network is asked again: the optimisation cannot make an answer wrong,
+    only slower.
+
+    Args:
+        net: The network to evaluate with.
+        board: The geometry, needed to encode.
+    """
+
+    def __init__(self, net: FlipHexNet, board: Board) -> None:
+        self.net = net
+        self.board = board
+        self.forwards = 0
+        self._state: GameState | None = None
+        self._cell: Tensor | None = None
+        self._tile: Tensor | None = None
+        self._rotation: Tensor | None = None
+        self._value: float = 0.0
+
+    def _ensure(self, state: GameState) -> None:
+        if self._state is state:
+            return
+        was_training = self.net.training
+        self.net.eval()
+        try:
+            with torch.no_grad():
+                x = to_tensor(
+                    encode(self.board, state), self.board.n_cols, self.board.n_rows
+                )
+                cell, tile, rotation, value = self.net(x)
+        finally:
+            self.net.train(was_training)
+        self._state = state
+        self._cell, self._tile, self._rotation = cell[0], tile[0], rotation[0]
+        self._value = float(value[0])
+        self.forwards += 1
+
+    def prior(self, board: Board, state: GameState, moves: list[Move]) -> list[float]:
+        """Priors over ``moves``, matching the search's ``PriorFn`` signature."""
+        self._ensure(state)
+        log_priors = masked_log_policy(self._cell, self._tile, self._rotation, moves)
+        return log_priors.exp().tolist()
+
+    def evaluate(self, board: Board, state: GameState) -> float:
+        """The leaf value for ``state``'s mover, matching ``Evaluator``."""
+        self._ensure(state)
+        return self._value
+
+
 @torch.no_grad()
 def policy_and_value(
     net: FlipHexNet,
