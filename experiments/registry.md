@@ -27,7 +27,7 @@ Freely editable (append-only in practice).
 | EXP-009 | 2026-08-30 | — | 1 | WIN/LOSS mix per layer: the parity split, measured instead of inferred | 5×3-h1, all 16 layers, exhaustive | — | **complete** | **Uniformity breaks at `t = 5`.** Layers 0–4 are uniform — every one of the 12,841,920 configurations at `t = 4` is a P1 win, every one of the 713,440 at `t = 3` a P2 loss — then the parities converge monotonically to 50/50. Confirms EXP-002's criticality boundary and EXP-004's compression ratios from a third direction, and retires the parity question. 70.8 s. [`exp009-parity-5x3-h1.json`](../results/exp009-parity-5x3-h1.json) |
 | EXP-007 | 2026-08-07 | — | 1 | True reachable closure per layer, and what one-step-back predecessor counting misses | 5×3, 15 cells, hands 8 + 7, both arms | — | registered; 3×3 pilot run | **The registered rule runs on the complete 5×3 only** and has not. The 3×3 pilot is instrument shakedown, not the result: [`exp007-3x3-h1.json`](../results/exp007-3x3-h1.json), [`exp007-3x3-h2.json`](../results/exp007-3x3-h2.json). Row added retrospectively on 2026-08-30 — the experiment was registered in full below but never listed here. |
 | EXP-010 | 2026-08-30 | — | 2 | Deduplicated (by-position) MCTS expansion against the naive by-action tree, with a multiplicity-corrected control | 5×3-**h2** (V5 `51192b4d…`), 3,000 WIN positions stratified over `t = 5..14`, uniform prior + rollout leaves, 3 arms, primary at budget 400 | 17 | **complete** | **`B − A = +4.77` pts** [+3.47, +6.06] at the primary budget; falsifier did not fire; every registered prediction held. **The benefit is prior mass, not visit-splitting** — arm C keeps all 540 children, corrects only the priors, and recovers the whole effect (`B − C = −0.77`, not distinguishable from zero). Concentrated where a decision exists: **+8.9** pts on odd layers (floor 16.2%) against **+0.6** on even (floor 66.8%), with layers 12–14 saturated. Aliased mass **27.5%**, tree overhead **+19.6%** (inference cost absent — no network). 22.7 min. [`exp010-mcts-dedup-5x3-h2.json`](../results/exp010-mcts-dedup-5x3-h2.json) |
-| EXP-011 | 2026-08-30 | — | 2 | Is the factored policy head too costly *in the pipeline*? (risk R5) | 5×3-**h2** (V5 `51192b4d…`), 2,500 WIN positions, 2,000 train / 500 held out, 5 seeds per arm, primary = top-1 optimality after 400 PUCT sims | 23 | **registered, revised after red-team** (blocked on `az/mcts.py` + `az/network.py`) | |
+| EXP-011 | 2026-08-30 | — | 2 | Is the factored policy head too costly *in the pipeline*? (risk R5) | 5×3-**h2** (V5 `51192b4d…`), 2,500 WIN positions, 2,000 train / 500 held out, 5 seeds per arm, primary = top-1 optimality after 400 PUCT sims; arms **34** vs **1,170** logits (amended 2026-08-31) | 23 | **registered; amended 2026-08-31; unblocked, not yet run** | |
 
 **Registration basis.** EXP-001 through EXP-005 are registered against the H1/H2
 text at tag `v0.3-hypotheses`. Any post-lock amendment to that text is recorded
@@ -2018,6 +2018,56 @@ before drawing. Same arm as EXP-010, for the reasons recorded there.
   fires it is registered as an amendment with its own seeds, rather than being
   judged by the same threshold on the same held-out set — which would be a
   forking path with no multiplicity control.
+
+#### Amendment (2026-08-31) — the arms' logit counts, corrected against the built network
+
+**Nothing has been run. The arms above were written on 2026-08-30, before
+`az/network.py` existed; the network as built does not have the shapes they
+name.** The registration is amended rather than rewritten, so the drift is
+visible.
+
+**The factored head is 34 logits on this deck, not 29.** The tile factor emits
+one logit per tile in the *full* set of 13, not one per tile in this variant's
+deck, because the Phase 4 amendment to
+[adr-005](../docs/adr/adr-005-alphazero-scope-and-network.md) made the layout
+variant-independent: plane `k` and logit `k` mean the same thing on the 3×3, the
+5×3 and the 5×5, and the hand mask decides which are legal. So the factored arm
+is **15 cells + 13 tiles + 6 rotations = 34**.
+
+**The flat head is 1,170 logits, not 720 — and this one is not bookkeeping.**
+`15 × 8 × 6 = 720` sizes the flat head to the eight tiles this deck happens to
+contain. That would hand the flat arm a piece of information the factored arm is
+not given: which tiles exist in this variant. The flat head would enter the
+comparison with the action space pre-restricted, which biases the measurement
+**toward the flat head** — the arm whose win fires a fallback and amends the
+architecture. Being sloppy in that direction is the expensive one. Both arms
+therefore span the same action space, `15 × 13 × 6 = **1,170**`.
+
+**What this changes about the question.** The comparison is a ratio of output
+widths, and the amendment moves it:
+
+| | registered 2026-08-30 | as built |
+|---|--:|--:|
+| factored | 29 | **34** |
+| flat | 720 | **1,170** |
+| ratio | 24.8× | **34.4×** |
+
+The 5×5 figure adr-005 argues from is `44` against `1,950`, a ratio of **44.3×**.
+The corrected 5×3 ratio is closer to it than the registered one was, so the
+reduced board is now a slightly better proxy for the board the decision is
+actually about. That is a happy accident of the repair, not a reason for it.
+
+**Unchanged:** the ground truth and its digest, the seed (23), the sample size
+and split, the stratification, the five seeds per arm, every metric, the decision
+rule and its 5-point margin, and the anti-circularity repairs. The tower is
+measured at **332,965** parameters on the 5×3, which is the "0.33 M" the split
+argument above was written against.
+
+**Instrument note.** `az/train.py`'s loss is reusable here unchanged — its policy
+term takes any `π` — but this experiment trains **supervised against exact
+optimal play**, not on self-play targets, so the batches come from the solved
+database rather than from `az/selfplay.py`. The flat head does not exist yet and
+is part of the instrument to be built.
 
 #### The unit is the position, not the action label
 
