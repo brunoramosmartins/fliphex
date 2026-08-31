@@ -9,6 +9,140 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-08-30 — Two registrations red-teamed before a line of code existed, and three failures that had happened here before
+
+EXP-010 and EXP-011 were registered and then red-teamed the same afternoon. Both
+were rewritten. Nothing was lost, because no instrument existed yet — the total
+cost of the error was drafting two sections of markdown. Recording the defects
+because three of them are **recurrences**, and a failure that recurs is about
+process rather than about the day it happened on.
+
+**The first: a metric that is a constant on part of its own sample, with the
+share unreported.** Both entries scored a move as optimal if the resulting
+position is a loss for the opponent. In a position that is *itself* a loss for
+the mover, no such move exists, so every arm scores zero deterministically. Worse,
+the random-move floor is not a constant either: a parent at `t = 6` moves into
+`t = 7`, where EXP-009 measured 75% of configurations as losses for the mover —
+so about three quarters of legal moves are optimal and **a random move scores 75%
+with no search at all**. At `t = 5` the floor is near zero. A pooled "66% against
+64%" would have been a parity-weighted mixture of two floors, with neither number
+moved by the thing under test.
+
+This is the third time. V3 reported agreement "on every position compared" and
+the comparison was 2–3% of the space. V4 dropped terminal samples with a bare
+`continue` and its own numbers stopped adding up to its own sample size. Now a
+metric whose floor swings by 75 points across layers, pooled. The pattern is
+always the same shape: **the instrument reports a verdict without reporting how
+much of its own sample produced it.** Both entries now carry a measured floor, a
+stated ceiling, and a per-layer table, and forbid quoting the headline without
+them.
+
+**The second: predicting a band from a regime the design excludes.** EXP-010's
+first draft predicted 60–80% aliased policy mass, derived as `1 − 1/4.46` from
+the collapse at the **5×5 root** — and then sampled `t ≥ 5` on the 5×3, which
+corresponds to the 5×5 around ply 8, where the collapse is ~1.8× and the honest
+prediction is 20–45%. The prediction would have failed, and the failure would
+have read as *"R13 was overstated"* rather than as a regime mismatch. This is the
+same reflex as the three wrong explanations of the parity split in Phase 3:
+reasoning about a quantity from the side instead of measuring it in the place it
+will be measured. EXP-011's cheap no-training number is the antidote and I had
+already written it into one entry without applying the idea to the other.
+
+**The third: declaring a threshold with no power to detect it.** The falsifier was
+"worse by more than 2 points" at N = 1,000, where McNemar's 80%-power floor is
+~3.4 points. So the only branch that could change anything was the one the design
+could not see — in an entry whose second line says an experiment that cannot
+change the decision is legitimate *only if it is not dressed up as a test*.
+adr-005's Phase 2 amendment had already done exactly this arithmetic for the
+evaluator gate, and concluded that a gate promoting noise one time in six is
+worse than no gate. I read that when writing it and repeated the error anyway,
+five weeks later, in a document that cites it.
+
+**Two substantive design changes came out of it, both costing compute, both
+worth it.** EXP-010 gains a third arm — children indexed by action but priors
+divided by alias multiplicity — because without it a win for deduplication at a
+small budget is fully explained by "fewer children", an effect obtainable by
+deleting three quarters of the naive arm's children at random. EXP-011 goes from
+one seed per arm to five, because the dominant noise there is training-run
+variance and no number of positions touches it.
+
+**And one repair I first argued against and then found I was wrong about.** The
+red-team suggested moving both entries from the h1 arm to h2, which has the
+principal-variation audit and the recurrence check. I objected that h2 has no
+joker, and the joker is the inert tile par excellence — the thing EXP-011's
+rotation number is about. That was backwards. The joker's rotation orbit is 1, so
+it changes nothing *by orbit*, which is a definitional artefact and not the
+inertness mechanism adr-005 describes. The mechanism only shows up in tiles with
+orbit > 1. Counting: h1's P1 deck holds two single-orbit tiles in eight, h2's
+holds one. h2 is both better verified **and** less contaminated, and my objection
+had the sign inverted.
+
+**The last one is not a recurrence, and it is the one worth keeping.** EXP-011's
+first draft argued anti-circularity compliance because "every network trained
+here is discarded". Weights were never the thing at risk. What survives an
+experiment is its **decision** — and an architecture chosen by agreement with the
+solver on the 5×3 is selected on 5×3 solver agreement, which H3 later reports as
+evidence, because the 5×3 is in H3's comparison set. adr-005 point 4 names
+checkpoints; adr-004's general form names the dimension, and it is the general
+form that binds. The leak was one ternary choice among fallbacks the ADR had
+already enumerated — small, and repairable only by saying so, which both entries
+now do.
+
+---
+
+## 2026-08-30 — Phase 4 opened, and the axis changes character
+
+**Two carry-overs from the Phase 3 gate, both deliberate.**
+
+TIL #2 and TIL #3 stay unwritten and move into Phase 4. TIL #2 is *MCTS in
+perfect-information games*, and Phase 4 is where MCTS gets built — writing it
+from Phase 3's reading would have produced a summary of Silver 2017 instead of
+something learned. TIL #3 rides along rather than being written alone. This is
+the second time a TIL has been deferred for material rather than for time, and
+both times the deferral was right; noting it because a third would be a pattern
+worth distrusting.
+
+`v0.4-solver-mvp` is being backfilled onto `ac6e571`, the commit at which the
+3×3 was solved and double-solved with V0/V1/V2/V3/V5. The tag was never made at
+the time because there was no moment that felt like an MVP — the 3×3 and the 5×3
+landed in one continuous stretch and the 3×3 read as a fixture, not a
+deliverable. That reading was wrong on the roadmap's own terms: the 3×3 solve
+*is* the exit criterion Phase 3 was written around. The tag is marked
+retrospective in the release notes rather than presented as contemporaneous.
+
+**The measurement problem inverts.** Axis 1 could be wrong without crashing, so
+Phase 3 spent most of its apparatus on verification — V0–V6, double-solves,
+digest replays, cross-arm comparison. Axis 2 cannot be verified that way: there
+is no exact answer to check a learned policy against on the shipped 5×5, which
+is the entire reason H3 exists and the entire reason its comparison set had to be
+enumerated in advance. The discipline that replaces verification is
+**pre-registration plus the anti-circularity rule** — checkpoint selection may
+not read Axis 1 (adr-005 Phase 2 amendment, point 4). That rule costs something
+real: the exact 5×3 database is sitting right there, free to query, and it is the
+one yardstick that would make training decisions easy. It stays unused for
+selection and is logged as a diagnostic only.
+
+**Phase 4 inherits one open risk at the top of the register.** R13 — the action
+space is 4.46× aliased at the root — was measured at the end of Phase 3 and is
+entirely a Phase 4 problem. It is worth stating plainly what makes it a risk
+rather than an inefficiency: the aliasing does not merely waste simulations, it
+*biases* them, and then the training target is read off the biased counts. A
+position reachable by six rotations collects six priors and six under-explored
+children. The naive implementation would train the network to spread policy mass
+across labels that denote the same board. Deduplicated expansion is therefore not
+an optimisation to schedule later; it changes what the pipeline learns.
+
+**One thing the roadmap assumed and reality has not yet supplied.** Phase 4 was
+written around "the author's laptop GPU", and the ADR sized the network so that
+two independent seeds would be "realistic rather than aspirational". Neither
+`torch` nor a visible CUDA device exists in the working environment today. That
+is the first task of the phase and it is a genuine fork: if training runs on CPU,
+the ≥5-seed requirement in H3 is the constraint that breaks first, and it breaks
+a *pre-registered* quantity — so any relaxation has to be argued in the registry,
+not absorbed silently into a smaller run.
+
+---
+
 ## 2026-08-30 — Phase 3 closing: three exit criteria the phase outgrew
 
 **The roadmap asked for H1/H2 partial verdicts; they are not being written.**

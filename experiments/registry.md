@@ -26,6 +26,8 @@ Freely editable (append-only in practice).
 | EXP-008 | 2026-08-30 | — | 1 | Exact agent strength on the shipped 5×5 with no endgame database | 25 cells, hands 13 + 12; 2M-node budget, `search_below_k = 8`; 250 games per opponent × seat | 5 | **complete** | **Exit criterion NOT met.** vs random **98.0%** [96.4, 98.9] ✅; vs heuristic **61.0%** [56.7, 65.2] ❌. `proved_rate` **32%** — no rate may be quoted without it. Post-hoc control: between two heuristics the **first** seat wins only 40.0%, a property of the greedy agent and **not** an H1 input; it does not baseline the P2 arm (seeds unmatched by seat). [`exp008-agent-strength.json`](../results/exp008-agent-strength.json) |
 | EXP-009 | 2026-08-30 | — | 1 | WIN/LOSS mix per layer: the parity split, measured instead of inferred | 5×3-h1, all 16 layers, exhaustive | — | **complete** | **Uniformity breaks at `t = 5`.** Layers 0–4 are uniform — every one of the 12,841,920 configurations at `t = 4` is a P1 win, every one of the 713,440 at `t = 3` a P2 loss — then the parities converge monotonically to 50/50. Confirms EXP-002's criticality boundary and EXP-004's compression ratios from a third direction, and retires the parity question. 70.8 s. [`exp009-parity-5x3-h1.json`](../results/exp009-parity-5x3-h1.json) |
 | EXP-007 | 2026-08-07 | — | 1 | True reachable closure per layer, and what one-step-back predecessor counting misses | 5×3, 15 cells, hands 8 + 7, both arms | — | registered; 3×3 pilot run | **The registered rule runs on the complete 5×3 only** and has not. The 3×3 pilot is instrument shakedown, not the result: [`exp007-3x3-h1.json`](../results/exp007-3x3-h1.json), [`exp007-3x3-h2.json`](../results/exp007-3x3-h2.json). Row added retrospectively on 2026-08-30 — the experiment was registered in full below but never listed here. |
+| EXP-010 | 2026-08-30 | — | 2 | Deduplicated (by-position) MCTS expansion against the naive by-action tree, with a multiplicity-corrected control | 5×3-**h2** (V5 `51192b4d…`), 3,000 WIN positions stratified over `t = 5..14`, uniform prior + rollout leaves, 3 arms, primary at budget 400 | 17 | **registered, revised after red-team** (blocked on `az/mcts.py`) | |
+| EXP-011 | 2026-08-30 | — | 2 | Is the factored policy head too costly *in the pipeline*? (risk R5) | 5×3-**h2** (V5 `51192b4d…`), 2,500 WIN positions, 2,000 train / 500 held out, 5 seeds per arm, primary = top-1 optimality after 400 PUCT sims | 23 | **registered, revised after red-team** (blocked on `az/mcts.py` + `az/network.py`) | |
 
 **Registration basis.** EXP-001 through EXP-005 are registered against the H1/H2
 text at tag `v0.3-hypotheses`. Any post-lock amendment to that text is recorded
@@ -1636,6 +1638,418 @@ uniformity all along.
 sweep enumerates, most of which is unreachable in play. What it licenses is a
 statement about the artefact's structure, not about FLIPHEX strategy, and it
 links to no hypothesis.
+
+### EXP-010 — deduplicated MCTS expansion against the naive tree
+
+- **Registered.** 2026-08-30 at the Phase 4 opening; **revised the same day**
+  after `experiment-redteam`, before any instrument existed. The first draft is
+  superseded in full — it is not preserved, because nothing was run from it. The
+  defects it carried are recorded in the 2026-08-30 journal entry, since three of
+  them are recurrences of failures this project has already had once.
+- **This is not an open decision.** The
+  [adr-005](../docs/adr/adr-005-alphazero-scope-and-network.md) Phase 3
+  amendment already *requires* children to be indexed by position rather than by
+  action. This entry registers a measurement, not a choice.
+- **Objective.** Measure what deduplicated expansion buys, and what it costs,
+  against an otherwise identical naive tree, on positions whose exact value is
+  known — and separate the benefit that comes from the ADR's stated mechanism
+  from the benefit that comes merely from having fewer children.
+- **The mechanism being measured.** 1,450 root actions reach **325** distinct
+  positions on the 5×5 (4.46×; 2.28× over a whole game),
+  `scripts/measure_move_collapse.py`. Expanding by action splits one position's
+  visit counts across up to six labels **(i)** *and* gives each label its own
+  prior **(ii)**. `π` is then read off the split counts. Risk **R13**, score 9.
+- **Hypothesis.** — none. This is an instrument-quality measurement about the
+  search. It is **not** evidence about H1, H2 or H3, and the anti-circularity
+  clause below explains why it may read Axis 1 anyway.
+
+#### Ground truth, pinned
+
+`data/subgame-solutions/5x3-**h2**.json`, V5 digest
+`51192b4d403ac1cb45c22d92ce58bab215843f457f245e7aca6d18744f8a3f43`. The run must
+verify the digest before drawing and abort on mismatch.
+
+**Why h2 and not h1**, recorded because the first draft chose h1 and the reason
+it changed is not obvious. h2 is the arm the principal-variation audit actually
+ran on — 15 of 15, `results/exp002-pv-audit-5x3-h2.json` — and the arm the
+layer-to-layer recurrence check covered. h1 has neither, and its V4 produced no
+search evidence at `t = 0..5`, which includes the shallowest layer sampled here.
+h2 is also **less contaminated for EXP-011's purposes**: its P1 deck holds one
+single-rotation-orbit tile (`P6`) against h1's two (`P6` and the joker).
+
+#### The sample
+
+- **3,000 positions**, drawn once, seed **17**, and used by **both** arms — the
+  comparison is paired. **Independent of EXP-011's draw**: different seed,
+  separate draw, so the two entries' results do not share sampling error and may
+  be read jointly.
+- **Stratified uniformly across layers `t = 5..14`**, 300 per layer. Uniform
+  sampling over the union would concentrate the draw near `t = 8–9` where the
+  layers are widest and would set the parity mix by accident.
+- **`t ≥ 5` because EXP-009 measured layers 0–4 as uniform** — every
+  configuration there shares one value, so every legal move is optimal and the
+  comparison would discriminate nothing. `t = 15` is terminal and has no moves.
+- **Restricted to positions that are a WIN for the side to move.** This is the
+  repair for the defect that killed the first draft: in a position that is a
+  *loss*, no optimal move exists, every arm scores zero deterministically, and
+  the pooled metric becomes a parity-weighted mixture of degenerate cases. The
+  restriction is a declared domain, not a filter applied after seeing results,
+  and it is the only domain on which the primary metric is defined.
+
+#### The searcher, specified
+
+The first draft said "uniform prior, no trained network", which names the prior
+and leaves the **leaf evaluator** unstated — three different experiments hide in
+that gap, and under one of them the headline number is decided by child
+insertion order, which differs between arms by construction.
+
+- **Prior: uniform** over the expanded children. No trained network anywhere.
+  With a network in the loop any difference is confounded with that network's
+  quality, and at generation 0 the network is noise.
+- **Leaf evaluator: random rollout to a terminal**, one playout per simulation,
+  returning the exact ±1 outcome. FLIPHEX playouts are ≤ 15 plies here, always
+  terminate and always yield a decided winner, so this is well defined and cheap.
+  It makes the searcher plain UCT with a uniform prior, which is
+  [adr-005](../docs/adr/adr-005-alphazero-scope-and-network.md)'s own designated
+  baseline — appropriate, because the question is about the *tree*, not about a
+  policy.
+- **`c_puct` fixed at its default, not tuned here.** Recorded as a stated
+  constant rather than a control: the same `c_puct` does **not** mean the same
+  exploration behaviour across arms with different child counts, because PUCT's
+  exploration term normalises the prior over the children. Arm C below exists
+  because of this.
+- **Deduplication is sibling-alias merging at a single parent**, not a full
+  cross-parent transposition DAG. On a placement game with inert tiles the latter
+  is a large separate benefit unrelated to R13, and folding the two together
+  would credit deduplication with someone else's win.
+- **DAG backup rule: the mean over parents**, fixed here rather than in the
+  design log, because a load-bearing free parameter pre-registered in a freely
+  editable file is not pre-registered. The rule is **confounded with
+  deduplication** in every comparison below, and the falsifier's wording accounts
+  for that.
+
+#### Three arms
+
+| | Children indexed by | Prior per child | Isolates |
+|---|---|---|---|
+| **A — naive** | action | uniform over actions | the deployed-naive baseline |
+| **B — deduplicated** | position | uniform over positions | the ADR's design |
+| **C — multiplicity-corrected** | action | uniform, divided by alias multiplicity | mechanism (ii) alone |
+
+**Arm C is the control the first draft lacked.** Without it, a gain for B at a
+small budget is fully explained by "B has ~4× fewer children and can complete a
+pass over them" — an effect obtainable by deleting three quarters of A's children
+at random, which is not the ADR's mechanism. B vs C isolates visit-splitting
+**(i)**; C vs A isolates prior mass **(ii)**.
+
+**Arm A's root readout is the argmax over action labels**, matching what the ADR
+says happens in deployment — "`π` is then read off those split counts" — not the
+argmax after aggregating aliased visits. Registered because the choice moves the
+primary number and a competent implementation would silently do the other thing.
+
+#### Metrics
+
+1. **Primary — top-1 optimality at budget 400**, paired: the fraction of the
+   3,000 positions where the most-visited root child is a move whose resulting
+   position is exactly a loss for the opponent. Comparisons B vs A, B vs C, C vs A
+   by McNemar on the discordant pairs, with 95% intervals on each difference.
+2. **Reported with it, and the primary number may not be quoted without them:**
+   - the **random-legal-move floor** on the same sample, measured rather than
+     assumed, per layer;
+   - the **exact-search ceiling** (100% by construction, stated so the scale is
+     explicit);
+   - the primary metric **stratified by `t`**, never only pooled.
+   The floor is not a constant: it is set by the value mix of the layer *below*
+   the sampled one, and EXP-009's table implies it swings from near 0% at `t = 5`
+   to roughly 75% at `t = 6`. A pooled number without the floor beside it has no
+   interpretable scale, which is the V3/V4 failure mode this project has now hit
+   three times.
+3. **Budgets 100 and 1,600** are run and reported as **secondary and
+   descriptive**, carrying no decision rule. Only budget 400 is tested. This is
+   the multiplicity control: three tested budgets on one sample would fire
+   somewhere under the null about 14% of the time.
+4. **Cost, split in two** because the two halves transfer differently:
+   - **tree cost** — position hashing and DAG backup, per simulation. This
+     transfers to deployment.
+   - **inference cost** — *not measured here*, because there is no network. In
+     deployment deduplication **reduces** the number of distinct children to
+     evaluate, so its sign is plausibly negative. Recorded so that a measured
+     tree overhead is never quoted as the pipeline's overhead.
+5. **Diagnostic — aliased policy mass at the root**, defined without ambiguity:
+   for a root position whose legal actions partition into `k` classes by
+   resulting position, with class `j` holding `m_j` actions, the aliased share is
+   `Σ_j (m_j − 1) / Σ_j m_j` — i.e. every action beyond the first in its class.
+   Measured on the sample rather than predicted from the 5×5 root. **Under-reports
+   by construction**: the mechanism compounds down the tree and this is measured
+   at the root only.
+
+#### Decision rule
+
+The adopted design does not depend on the outcome; what the outcome governs is
+whether adr-005 stands.
+
+- **B ≥ A on the primary** → proceed as the ADR directs.
+- **Falsifier, stated as a non-inferiority test**: B worse than A by more than a
+  **2-point margin**, i.e. the 95% interval on `(B − A)` lies entirely below
+  **−2** — not below zero, which is a different and much weaker claim. If it
+  fires, an ADR amendment is written **before** any self-play run. The amendment
+  cannot be written from this result alone: the falsifier's honest reading is
+  *"the amendment's stated mechanism is wrong **or** the chosen DAG backup rule
+  is bad"*, and those are not separated here.
+- **If B beats A but C also beats A by a comparable margin**, the benefit is
+  mostly prior mass and not visit-splitting. That does not change the design —
+  the ADR mandates B — but it is reported as such rather than as a vindication of
+  both mechanisms.
+- **Cost is reported, not gated.** The first draft listed a "50% overhead
+  ceiling" under *Decision rule* with no consequence attached, which invites it
+  to be quoted as a threshold that was met. There is no cost threshold.
+
+#### Power
+
+McNemar, discordant proportion `π_d ≈ 0.15`, two-sided 5%, 80% power. At
+**N = 3,000** the detectable difference is **~2 points**, which is what makes the
+2-point falsifier resolvable — at the first draft's N = 1,000 the floor was ~3.4
+points and the falsifier could not fire, while the entry nonetheless presented it
+as a test. If the realised `π_d` differs materially from 0.15 the achieved
+detectable difference is recomputed from it and **reported**, rather than the
+threshold being quietly reinterpreted.
+
+#### Anti-circularity
+
+adr-005 point 4 forbids Axis 1 from driving Axis 2's selection. This experiment
+reads Axis 1 and is nevertheless compliant, on a narrower and stronger argument
+than the first draft's:
+
+The first draft argued "no trained parameters, so nothing is selectable". That
+reading is too narrow — a **search design** selected by agreement with the solver
+on the 5×3 is still a selection along the dimension H3 later reports, since the
+5×3 is a member of H3's comparison set and top-1 optimality against the solver is
+metric-for-metric H3's 5×3 evidence.
+
+What actually holds: **adr-005 already mandates arm B**, so no outcome selects
+anything. The one channel that could is the falsifier, and it triggers an *ADR
+amendment written by hand*, not an automatic design change. If this experiment
+ever gains a trained network or the power to choose between arms, the clearance
+lapses and the entry is re-registered.
+
+#### Expected result, recorded before the run
+
+- **B > A on the primary, by 2 to 8 points at budget 400.** Band re-derived for
+  the regime actually sampled. The first draft predicted 3–15 points from the
+  5×5 root's 4.46× collapse — a regime this design *excludes*, since `t ≥ 5` on
+  15 cells corresponds to the 5×5 around ply 8 (~1.8×) and decays from there.
+- **Aliased mass on the sample: 20 to 45%**, not the 60–80% the first draft
+  imported from `1 − 1/4.46 = 77.6%` at the 5×5 root.
+- **C between A and B**, nearer B — most of the effect predicted to be prior mass
+  rather than visit-splitting.
+- **Tree overhead under 20%.**
+- The margin between B and A is predicted to shrink as the budget rises, since a
+  naive tree with enough simulations eventually visits all six aliases anyway.
+
+#### Threats to validity
+
+- **Regime mismatch.** Measured where the aliasing is weakest, by construction.
+  Generalising to the 5×5 root requires the alias structure to be comparable, and
+  adr-005's own decay table says it is not. The result licenses "deduplication
+  helps at ~1.8× collapse"; the 5×5 root is 4.46× and is *more* favourable, so
+  the direction transfers and the magnitude does not.
+- **The searcher is not the deployed searcher.** Uniform prior, rollout
+  evaluation. A trained value head changes the tree's shape and could change the
+  sign, though no mechanism for that is known.
+- **Reachability.** The sample is drawn from the configuration space, not from
+  positions a strong agent reaches. EXP-005 and EXP-007 have **not run on the
+  5×3**, so the unreachable share is unknown; on the 3×3 it was 3.28%. The
+  reachable share is reported as unknown rather than assumed small.
+- **h2's `t = 5` layer** is the most discriminating and the least independently
+  verified: V4's coverage there is thin on both arms.
+- **Backup rule confounded** with deduplication throughout, as stated above.
+
+**Artefact.** `results/exp010-mcts-dedup-5x3-h2.json`, carrying every quantity
+above including the floors, the per-layer table, and the realised `π_d`.
+
+### EXP-011 — is the factored policy head too costly in the pipeline? (risk R5)
+
+- **Registered.** 2026-08-30 at the Phase 4 opening; **revised the same day**
+  after `experiment-redteam`, before any instrument existed. The first draft is
+  superseded in full and nothing was run from it.
+- **Objective.** Test whether the factored policy head's conditional-independence
+  assumption is *too costly*, which is the question
+  [adr-005](../docs/adr/adr-005-alphazero-scope-and-network.md) actually asks and
+  requires to be "checked explicitly and logged, not assumed away". Risk **R5**.
+- **The assumption.** 25 cell + 13 tile + 6 rotation logits combined as
+  `log p(cell) + log p(tile) + log p(rotation)` — 44 instead of 1,950. It asserts
+  that cell, tile and rotation are conditionally independent given the state,
+  which is false on its face.
+- **Hypothesis.** — none. A negative result changes the architecture, not a claim
+  about FLIPHEX.
+
+#### What the first draft got wrong about its own question
+
+It measured supervised approximation error against the exact optimal policy and
+let that fire fallback **(b)**. But adr-005 lists the mitigations *in order*, and
+**(a) is "rely on MCTS to correct the prior, which is exactly what MCTS is
+for"**. A supervised test contains no MCTS, so it cannot speak to the ADR's first
+and primary defence — while being empowered to trigger the second. It is entirely
+possible for 400 simulations to wash out a 7-point gap in the prior, which is
+precisely what (a) claims.
+
+The repair is to make the **MCTS-corrected readout primary** and the supervised
+error secondary. This costs little: the searcher already exists as EXP-010's
+instrument.
+
+#### Ground truth and sample
+
+`data/subgame-solutions/5x3-h2.json`, V5 digest
+`51192b4d403ac1cb45c22d92ce58bab215843f457f245e7aca6d18744f8a3f43`, verified
+before drawing. Same arm as EXP-010, for the reasons recorded there.
+
+- **2,500 positions**, seed **23** — **a separate draw from EXP-010's**, so the
+  two entries are not nested and their results may be read together.
+- Stratified uniformly across `t = 5..14`; **restricted to positions that are a
+  WIN for the side to move**, for the reason given in EXP-010.
+- **Split 2,000 train / 500 held-out, declared here.** The first draft had no
+  split at all, which made it a memorisation contest between a 720-logit output
+  layer and a 29-logit one over 2,000 examples on a 0.33 M-parameter tower — a
+  contest whose result would have been an artefact either way. **Every reported
+  number is on the held-out 500.**
+
+#### Arms and what they hold fixed
+
+- **Factored** (29 logits on this deck: 15 cells + 8 tiles + 6 rotations) and
+  **flat** (15 × 8 × 6 = 720 logits). Identical tower, optimiser, epochs, batch
+  order, and training positions.
+- **Each arm is trained independently, tower and head together** — the deployment
+  configuration. This measures *network + head*, not the head in isolation, and
+  that is deliberate: the decision adr-005 asks about is the pipeline's, and a
+  frozen shared tower would answer a cleaner question that nobody has to act on.
+  If the result is ambiguous, a frozen-tower arm is the diagnostic, registered
+  then.
+- **5 seeds per arm.** The first draft ran one, which is the error adr-005's own
+  Phase 2 amendment already did the arithmetic for on the evaluator gate: the
+  dominant noise is **training-run variance**, and no number of positions touches
+  initialisation and SGD noise. Fixing the position sample and varying only the
+  seed, the between-arm gap is compared against the **between-seed spread** — a
+  gap smaller than the spread is not a result.
+- **The conditioned arm (fallback (b)) is not run speculatively.** If the rule
+  fires it is registered as an amendment with its own seeds, rather than being
+  judged by the same threshold on the same held-out set — which would be a
+  forking path with no multiplicity control.
+
+#### The unit is the position, not the action label
+
+Both the target and the metrics are defined over **distinct resulting
+positions**, aggregating aliased actions. The first draft defined the target as
+uniform mass over optimal *moves*, which under R13 already assigns up to 6× mass
+to positions reachable by six rotations — so the flat head would have been scored
+partly on reproducing alias multiplicity, and the measured gap would have been
+contaminated by exactly the phenomenon EXP-010 exists to remove. That also
+contradicted the first draft's own claim that the two entries are independent.
+They are independent **only** under the position-level definition adopted here.
+
+#### Metrics
+
+1. **Primary — top-1 optimality after 400 PUCT simulations**, each head supplying
+   the prior, on the held-out 500, at 5 seeds per arm. This is the quantity the
+   decision is about, and the only one that can speak to mitigation (a).
+2. **Secondary — supervised policy agreement** on the held-out 500: top-1
+   agreement with the exact optimal policy, and cross-entropy against it, both at
+   the position level. Paired across arms on identical positions; compared with
+   McNemar (agreement) and a paired *t* on seed means (cross-entropy), 95%
+   intervals on both.
+3. **Reported beside both**: the random-legal-move floor per layer, as in
+   EXP-010.
+
+#### One number that needs no training at all
+
+Computed first and reported regardless of how everything else turns out: the
+fraction of (position, cell, tile) triples in the sample for which **rotation
+does not change the resulting board**. adr-005's Phase 3 amendment claims "a
+sizeable share of the rotation factor's output is not modelling a choice at all",
+and that has never been quantified.
+
+**Reported twice — with and without single-rotation-orbit tiles — and per layer.**
+h2's P1 deck holds `P6`, whose orbit is 1, so rotation trivially changes nothing
+for it **by orbit, not by the inertness mechanism the ADR describes**. Including
+it inflates the headline by a definitional artefact. The number that supports the
+ADR's claim is the one over multi-orbit tiles; the other is reported so nobody
+recomputes it later and gets a different answer. (This is also why h2 is the
+better arm here: 1 single-orbit tile in 8, against h1's 2.)
+
+#### Decision rule
+
+Read on the **primary** metric, on the held-out set, with the between-seed spread
+reported alongside:
+
+- Factored within **5 percentage points** of flat, *and* the gap no larger than
+  the between-seed spread → the assumption is accepted for v1, adr-005 stands.
+- Factored worse by **more than 5 points** *and* the gap exceeding the
+  between-seed spread → **mitigation (a) has failed on its own terms**, and
+  fallback **(b)** — rotation logits conditioned on the chosen cell — is
+  registered as an amendment and run.
+- Gap larger than 5 points but **within** the seed spread → not a result. Add
+  seeds, do not adopt a fallback.
+- If (b) is run and still loses by more than 5 points → fallback **(c)**, the
+  flat head. **Recorded now so it cannot be forgotten later: (c) does not fix
+  aliasing.** 1,950 logits over 1,450 actions is the same redundancy with more
+  parameters; only EXP-010's deduplication addresses it.
+
+#### Anti-circularity — the first draft's clearance did not hold
+
+It argued compliance because "every network trained in this experiment is
+discarded". That answers a question adr-005 does not ask. What survives is not
+weights but the **architecture decision**, selected by fitting Axis 1 ground
+truth on 5×3 positions and scored by agreement with the solver — and H3 later
+reports Axis 2's per-variant agreement against Axis 1 on a comparison set that
+**includes the 5×3**. The general form of the rule, from adr-004, covers this:
+*neither axis may be used to select or terminate the other along the dimension on
+which they are later compared.*
+
+The leak is small — one ternary choice among fallbacks adr-005 already
+enumerated — and is repaired here rather than argued away, by **both** available
+repairs:
+
+1. **H3's 5×3 comparison sample is drawn disjointly** from seeds 17 and 23. Both
+   draws are recorded in their artefacts so the disjointness is checkable rather
+   than asserted.
+2. **If the decision rule fires**, H3's 5×3 member carries an
+   architecture-selection caveat in the verdict table's evidence class. If it
+   does not fire, no architecture was selected by Axis 1 and no caveat is needed.
+
+The weights are still discarded — no network trained here seeds a self-play run,
+initialises a generation, or contributes to a checkpoint. That was never
+sufficient on its own.
+
+#### Expected result, recorded before the run
+
+- **Factored loses 0 to 4 points on the primary**, i.e. MCTS largely absorbs the
+  prior's weakness, which is mitigation (a)'s claim.
+- **Factored loses more on the secondary than on the primary** — 3 to 10 points
+  of supervised top-1 agreement — with most of the loss on positions where
+  several tiles are legal on the same strong cell. If the primary and secondary
+  gaps come out equal, mitigation (a) is doing nothing and that is the more
+  interesting finding.
+- **Between-seed spread of 2 to 6 points** on the primary, which is the reason
+  5 seeds are run.
+- **Rotation irrelevant in over 30% of multi-orbit triples**, rising with the
+  number of empty neighbours.
+
+#### Threats to validity
+
+- **The capacity ratio here is roughly half the deployed one, and the bias runs
+  toward accepting adr-005.** The 5×5 head is 44 logits against 1,950 — **44.3×**.
+  On the 5×3 h2 deck it is 29 against 720 — **24.8×**. Fewer cells and tiles means
+  less joint cell×tile×rotation structure to lose, so conditional independence is
+  a *less* costly assumption here by construction. **A pass at 5×3 does not
+  license the 5×5.** Both head geometries go in the artefact so that "the
+  factored head lost 2 points" is never quoted as a 5×5 number.
+- **Trained against ground truth**, so the supervised metric is an upper bound on
+  what self-play could extract; the primary metric is less exposed to this.
+- **Reachability**, as in EXP-010: sampled from the configuration space, and the
+  5×3's reachable share is unknown.
+- **The searcher used for the primary is EXP-010's** — uniform-`c_puct`, rollout
+  evaluation, deduplicated expansion. Whatever is wrong with it is wrong here too.
+
+**Artefact.** `results/exp011-policy-head-5x3-h2.json`.
 
 ## Planned
 
