@@ -265,6 +265,57 @@ Cross-entropy on the MCTS policy plus MSE on the outcome, with weight decay.
 z is always exactly +/-1 because draws are impossible.
 -->
 
+## az/checkpoint.py — surviving a 60-hour run
+
+**Decided 2026-08-31, before `az/train.py` is written.** Five seeds cost 59.6 h
+on a laptop that sleeps, throttles and reboots. Axis 1 already lost two runs to
+exactly that, one of them 20.8 hours in, which is why `solver/checkpoint.py`
+exists. Axis 2 gets the same guarantee, and the module is separate because `az/`
+may not import `solver/`.
+
+**What Axis 2 does not inherit is the cheap part.** The retrograde sweep resumes
+from one array because layer `t` depends on layer `t + 1` and nothing else. A
+training loop has no such single-object state, and the tempting analogue — save
+the weights — is *not* a resume point. A complete one is:
+
+| | why it cannot be dropped |
+|---|---|
+| Challenger weights | the obvious half |
+| Optimiser state (Adam moments) | dropping them restarts the moment estimates and puts a visible transient in the loss curve at every resume |
+| Champion weights | it generates the self-play data and is the gate's opponent |
+| Replay buffer | positions from earlier generations that have not aged out yet; regenerating them costs the generations that made them |
+| Generation counter, and which generation last gated | |
+| **RNG state** | see below — this is the one that matters most here |
+
+**The RNG state is load-bearing because H3 is a seed hypothesis.** H3 reports a
+per-seed win rate across ≥5 independent seeds and the variance between them. A
+resume that re-seeds produces a run that is still *valid* but no longer
+*reproducible from the seed it claims* — and reproducibility across seeds is the
+quantity H3 is built on. This is the same failure `solver/checkpoint.py` guards
+against with its `replay`: there, resume must reproduce the V5 checksum
+byte-identically rather than merely restart the arithmetic. The rule generalises:
+**a resume must be indistinguishable from an uninterrupted run, not merely a
+correct continuation of one.**
+
+**Cost, which is the good news.** The solver's ladder is 4.4 GB per arm, which is
+why it is gitignored. Axis 2's is not remotely that: 200 games × ≤25 plies is
+≤5,000 positions per generation, and a position stored as its compact state plus
+a 44-float factored policy target plus `z` is on the order of 200 bytes. A buffer
+holding twenty generations is roughly **20 MB**. Weights are 0.33 M parameters.
+Checkpointing every generation is essentially free.
+
+**Granularity.** The longest uninterruptible unit is not a generation (≈24 min)
+but the **evaluator gate at ≈34 min** — 400 games at 5.1 s. Self-play within a
+generation is ≈17 min. Checkpointing per generation caps the worst-case loss at
+the gate's 34 minutes; the gate additionally records its running win count, since
+that is one integer and turns a 34-minute loss into a 5-second one.
+
+Every write goes to a temporary file in the same directory followed by
+`os.replace`, and the manifest is written *after* what it names — the same
+discipline as Axis 1, for the same reason: a run killed mid-write must leave
+either the old complete state or the new one, never a half-written buffer that
+resumes into silent corruption.
+
 ## The evaluator gate
 
 **Chosen 2026-08-31: the adr-005 threshold unchanged — 400 games at 55% — run
