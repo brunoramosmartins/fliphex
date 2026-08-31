@@ -243,3 +243,107 @@ def test_a_generation_trains_from_the_buffers_own_stream():
 
     assert len(history) == 3
     assert all(set(row) == {"policy", "value", "total"} for row in history)
+
+
+# -- the flat head, EXP-011's other arm ---------------------------------------
+
+
+def test_the_flat_head_spans_the_full_action_space():
+    """Not the tiles this deck holds: that would be a fact the factored arm is
+    not given, biasing the comparison toward the arm whose win amends the ADR."""
+    from az.network import FlatHeadNet
+
+    net = FlatHeadNet(5, 3)
+
+    assert net.flat_head.out_features == 15 * 13 * 6 == 1170
+
+
+def test_the_flat_head_shares_the_factored_tower():
+    """Inheritance is what makes 'identical tower' structural rather than a claim."""
+    from az.network import FlatHeadNet, FlipHexNet
+
+    torch.manual_seed(0)
+    flat = FlatHeadNet(5, 3)
+    torch.manual_seed(0)
+    factored = FlipHexNet(5, 3)
+
+    assert isinstance(flat, FlipHexNet)
+    for key, tensor in factored.tower.state_dict().items():
+        assert torch.equal(flat.tower.state_dict()[key], tensor)
+
+
+@pytest.mark.parametrize("variant", [FULL, SMALL, TINY])
+@pytest.mark.parametrize("plies", [0, 4])
+def test_the_legal_mask_selects_exactly_the_legal_moves(variant, plies):
+    """The flat arm's notion of legal is the factored arm's, not a second one."""
+    from az.network import flat_index
+    from az.train import legal_mask
+
+    board, state = advance(variant, plies)
+    moves = legal_moves(board, state)
+
+    mask = legal_mask(_planes(board, state), variant.n_cells)
+
+    assert int(mask.sum()) == len(moves)
+    for move in moves:
+        assert mask[0, flat_index(move)]
+
+
+@pytest.mark.parametrize("plies", [0, 5])
+def test_the_flat_loss_equals_its_naive_masked_cross_entropy(plies):
+    from az.network import FlatHeadNet, flat_masked_log_policy
+    from az.train import flat_policy_loss
+
+    torch.manual_seed(plies)
+    board, state = advance(SMALL, plies)
+    moves = legal_moves(board, state)
+    support = moves[:4]
+    pi = dict.fromkeys(support, 0.25)
+    packed_moves, probs = pack_policy(pi)
+    sample = Sample(
+        planes=encode(board, state), moves=packed_moves, probs=probs, value=1.0
+    )
+    batch = make_batch([sample], SMALL.n_cols, SMALL.n_rows)
+    logits = torch.randn(1, SMALL.n_cells * 13 * 6)
+
+    computed = flat_policy_loss(logits, batch, SMALL.n_cells)
+
+    log_p = flat_masked_log_policy(logits[0], moves)
+    lookup = {m: log_p[i] for i, m in enumerate(moves)}
+    naive = -sum(pi[m] * lookup[m] for m in support)
+
+    assert computed.item() == pytest.approx(naive.item(), abs=1e-4)
+    assert isinstance(FlatHeadNet(5, 3), object)
+
+
+def test_a_flat_step_reduces_the_loss_and_reaches_every_parameter():
+    from az.network import FlatHeadNet
+
+    torch.manual_seed(0)
+    net = FlatHeadNet(3, 3)
+    optimiser = torch.optim.Adam(net.parameters(), lr=1e-2)
+    batch = make_batch([a_sample(TINY, 0), a_sample(TINY, 2)], 3, 3)
+
+    first = train_step(net, optimiser, batch)
+    for _ in range(20):
+        last = train_step(net, optimiser, batch)
+
+    assert last["policy"] < first["policy"]
+    assert [n for n, p in net.named_parameters() if p.grad is None] == []
+
+
+def test_the_flat_head_is_bigger_where_it_matters():
+    """The comparison is a ratio of output widths: 34 against 1170 on the 5x3."""
+    from az.network import FlatHeadNet, FlipHexNet
+
+    factored = FlipHexNet(5, 3)
+    flat = FlatHeadNet(5, 3)
+    factored_logits = (
+        factored.cell_head.out_features
+        + factored.tile_head.out_features
+        + factored.rotation_head.out_features
+    )
+
+    assert factored_logits == 34
+    assert flat.flat_head.out_features == 1170
+    assert flat.count_parameters() > factored.count_parameters()

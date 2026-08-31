@@ -60,7 +60,7 @@ import torch
 from torch import Tensor
 
 from az.encoding import EMPTY_PLANE, N_HAND_PLANES, OWN_HAND_PLANE
-from az.network import N_ROTATIONS, FlipHexNet
+from az.network import N_ROTATIONS, FlatHeadNet, FlipHexNet
 from az.replay_buffer import ReplayBuffer, Sample
 from fliphex.state import TILES
 
@@ -206,6 +206,45 @@ def policy_loss(
     return (normaliser - expected).mean()
 
 
+def legal_mask(planes: Tensor, n_cells: int) -> Tensor:
+    """``(B, n_cells * 13 * 6)`` boolean mask of the legal triples.
+
+    Built from the same three factors as :func:`legal_normaliser` — empty cells,
+    the mover's hand, and the static rotation orbits — so the flat arm's notion
+    of "legal" is the factored arm's, not a second implementation that could
+    drift from it.
+    """
+    batch = planes.shape[0]
+    empty = planes[:, EMPTY_PLANE].reshape(batch, -1).bool()
+    hand = planes[:, OWN_HAND_PLANE : OWN_HAND_PLANE + N_HAND_PLANES, 0, 0].bool()
+
+    mask = (
+        empty[:, :, None, None]
+        & hand[:, None, :, None]
+        & ORBIT_MASK.to(planes.device)[None, None, :, :]
+    )
+    return mask.reshape(batch, n_cells * N_HAND_PLANES * N_ROTATIONS)
+
+
+def flat_policy_loss(logits: Tensor, batch: Batch, n_cells: int) -> Tensor:
+    """Cross-entropy for the flat head, masked to the legal triples.
+
+    The same collapse as :func:`policy_loss` — ``Z - sum pi * score`` — with the
+    normaliser taken over the masked logits directly, since a flat head's scores
+    do not factor and so cannot be split into two log-sum-exps.
+    """
+    size = len(batch)
+    mask = legal_mask(batch.planes, n_cells)
+    normaliser = torch.logsumexp(logits.masked_fill(~mask, NEG_INF), dim=1)
+
+    flat = (batch.cells * N_HAND_PLANES + batch.tiles) * N_ROTATIONS + batch.rotations
+    scores = logits[batch.index, flat]
+    expected = torch.zeros(size, device=scores.device, dtype=scores.dtype)
+    expected.index_add_(0, batch.index, batch.probs * scores)
+
+    return (normaliser - expected).mean()
+
+
 def value_loss(predicted: Tensor, target: Tensor) -> Tensor:
     """Mean-squared error on an outcome that is always exactly ±1."""
     return torch.nn.functional.mse_loss(predicted, target)
@@ -218,12 +257,16 @@ def train_step(
     *,
     value_weight: float = VALUE_WEIGHT,
 ) -> dict[str, float]:
-    """One gradient step. Returns the losses for the run log."""
+    """One gradient step, on either head. Returns the losses for the run log."""
     net.train()
     optimiser.zero_grad(set_to_none=True)
 
-    cell_logits, tile_logits, rotation_logits, value = net(batch.planes)
-    policy = policy_loss(cell_logits, tile_logits, rotation_logits, batch)
+    if isinstance(net, FlatHeadNet):
+        logits, value = net(batch.planes)
+        policy = flat_policy_loss(logits, batch, net.n_cells)
+    else:
+        cell_logits, tile_logits, rotation_logits, value = net(batch.planes)
+        policy = policy_loss(cell_logits, tile_logits, rotation_logits, batch)
     outcome = value_loss(value, batch.value)
     total = policy + value_weight * outcome
 

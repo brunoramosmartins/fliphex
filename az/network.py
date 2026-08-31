@@ -158,6 +158,73 @@ class FlipHexNet(nn.Module):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
 
+class FlatHeadNet(FlipHexNet):
+    """The same tower, with one logit per ``(cell, tile, rotation)`` triple.
+
+    This is the fallback the architecture record keeps in reserve, and the arm
+    the factored head is measured against. It **subclasses** rather than
+    reimplements: the registration promises the two arms share a tower,
+    optimiser, epochs and batch order, and inheriting the constructor makes that
+    structurally true instead of a claim someone has to re-verify.
+
+    The head spans the **full** action space — ``n_cells x 13 x 6``, so 1,170 on
+    the 5x3 — not the tiles a particular deck happens to hold. Sizing it to the
+    deck would hand this arm a fact the factored arm is not given, and would
+    bias the comparison toward the head whose win amends the architecture.
+
+    Note it does **not** fix action aliasing: 1,170 logits over 540 legal moves
+    is the same redundancy with more parameters. Only deduplicated expansion in
+    the search addresses that.
+    """
+
+    def __init__(self, n_cols: int = 5, n_rows: int = 5, **kwargs) -> None:
+        super().__init__(n_cols, n_rows, **kwargs)
+        del self.cell_head, self.tile_head, self.rotation_head
+        self.flat_head = nn.Linear(
+            32 * self.n_cells, self.n_cells * N_HAND_PLANES * N_ROTATIONS
+        )
+
+    def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:  # type: ignore[override]
+        """Return ``(flat_logits, value)``.
+
+        The signature differs from the factored head's deliberately: these are
+        different parameterisations of the policy, and a caller that has to
+        branch on which one it holds is better than one that silently treats a
+        1,170-wide tensor as a 15-wide one.
+        """
+        features = self.tower(self.stem(x))
+        policy = self.policy_conv(features)
+        return self.flat_head(policy), self.value_head(features).squeeze(-1)
+
+
+def flat_index(move: Move) -> int:
+    """Position of ``move`` in a flat head's output.
+
+    ``(cell * 13 + tile) * 6 + rotation``, matching the ``(cells, tiles,
+    rotations)`` ordering the masks in :mod:`az.train` are built with.
+    """
+    return (move.cell * N_HAND_PLANES + move.tile) * N_ROTATIONS + move.rotation
+
+
+def flat_masked_log_policy(logits: Tensor, moves: list[Move]) -> Tensor:
+    """Score ``moves`` from a flat head and renormalise over them.
+
+    Args:
+        logits: ``(n_cells * 13 * 6,)`` for a single position.
+        moves: The legal moves. Must be non-empty.
+
+    Returns:
+        ``(len(moves),)`` log-probabilities.
+
+    Raises:
+        ValueError: If ``moves`` is empty.
+    """
+    if not moves:
+        raise ValueError("no legal moves: a terminal position has no policy")
+    index = torch.tensor([flat_index(m) for m in moves], device=logits.device)
+    return torch.log_softmax(logits[index], dim=0)
+
+
 def to_tensor(
     buffers: bytes | list[bytes],
     n_cols: int,
@@ -275,6 +342,36 @@ class NetworkEvaluator:
         """The leaf value for ``state``'s mover, matching ``Evaluator``."""
         self._ensure(state)
         return self._value
+
+
+class FlatNetworkEvaluator(NetworkEvaluator):
+    """:class:`NetworkEvaluator` for a :class:`FlatHeadNet`.
+
+    Same one-entry cache and the same reason for it: the search asks for the
+    priors and the leaf value on the same state, one line apart.
+    """
+
+    def _ensure(self, state: GameState) -> None:
+        if self._state is state:
+            return
+        was_training = self.net.training
+        self.net.eval()
+        try:
+            with torch.no_grad():
+                x = to_tensor(
+                    encode(self.board, state), self.board.n_cols, self.board.n_rows
+                )
+                logits, value = self.net(x)
+        finally:
+            self.net.train(was_training)
+        self._state = state
+        self._logits = logits[0]
+        self._value = float(value[0])
+        self.forwards += 1
+
+    def prior(self, board: Board, state: GameState, moves: list[Move]) -> list[float]:
+        self._ensure(state)
+        return flat_masked_log_policy(self._logits, moves).exp().tolist()
 
 
 @torch.no_grad()
