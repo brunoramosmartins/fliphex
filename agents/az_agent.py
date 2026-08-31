@@ -1,7 +1,9 @@
 """The learned agent, and the prior-free floor it has to clear.
 
-Both wrap a PUCT search behind the same interface as the random, heuristic and
-solver agents, so the benchmark protocol applies to them unchanged.
+Both are thin adapters onto :class:`az.player.SearchPlayer`, which holds the move
+selection itself. The split is a layering one: ``agents`` may import ``az``, and
+``az`` must never import ``agents``. The evaluator gate lives in ``az`` and needs
+to play matches, so the logic has to sit below this file rather than in it.
 
 Not exported from ``agents/__init__.py``, on purpose
 ---------------------------------------------------
@@ -16,80 +18,43 @@ this module directly instead::
 Evaluation determinism
 ----------------------
 At ``temperature_plies=0`` and ``dirichlet_weight=0`` these agents are
-deterministic functions of the position. Two deterministic agents replay one
-game for as many games as you ask for, so a 400-game evaluator gate between them
-measures a sample of size one while reporting ``n = 400``.
-
-The default here is therefore *strength*, not variety: the caller must introduce
-diversity deliberately. :data:`EVALUATION_TEMPERATURE_PLIES` is the recommended
-setting for match play — the opening is sampled from the visit counts, the rest
-is greedy — which weakens both sides identically and so leaves the comparison
-fair while making the games distinct.
+deterministic functions of the position, and two of them replay one game. See
+:mod:`az.player` and :mod:`az.gate`; the default here is *strength*, so a caller
+running a match has to ask for diversity deliberately.
 """
 
 from __future__ import annotations
 
-import random
-
 from agents.base import Agent
-from az.mcts import MCTS, ExpansionMode, policy_target
-from az.network import FlipHexNet, NetworkEvaluator
+from az.mcts import ExpansionMode
+from az.network import FlipHexNet
+from az.player import EVALUATION_TEMPERATURE_PLIES, SearchPlayer
 from fliphex.board import Board
 from fliphex.moves import Move
 from fliphex.state import GameState
 
-#: Opening plies to sample rather than take greedily, when two searchers meet in
-#: a match. Zero is strongest and identical every game; see the module docstring.
-EVALUATION_TEMPERATURE_PLIES = 4
+__all__ = ["EVALUATION_TEMPERATURE_PLIES", "AZAgent", "UCTAgent"]
 
 
-class _SearchAgent(Agent):
-    """Shared plumbing: one search per move, seeded per call.
+class _PlayerAgent(Agent):
+    """Adapter: an :class:`Agent` backed by a :class:`SearchPlayer`."""
 
-    The tree is not reused across plies. That is the same simplification the
-    self-play loop makes, and keeping the two identical means a gate result is
-    about the networks rather than about a search difference.
-    """
+    def __init__(self, player: SearchPlayer) -> None:
+        self.player = player
 
-    def __init__(
-        self,
-        *,
-        simulations: int,
-        seed: int | None = None,
-        temperature_plies: int = 0,
-        dirichlet_weight: float = 0.0,
-        mode: ExpansionMode = ExpansionMode.POSITION,
-    ) -> None:
-        self.simulations = simulations
-        self.temperature_plies = temperature_plies
-        self.dirichlet_weight = dirichlet_weight
-        self.mode = mode
-        self._rng = random.Random(seed)
+    @property
+    def simulations(self) -> int:
+        return self.player.simulations
 
-    def _hooks(self, board: Board):
-        """Return ``(prior, evaluate)`` for the search. ``None`` means default."""
-        raise NotImplementedError
+    @property
+    def mode(self) -> ExpansionMode:
+        return self.player.mode
 
     def select(self, board: Board, state: GameState) -> Move:
-        prior, evaluate = self._hooks(board)
-        search = MCTS(
-            board,
-            mode=self.mode,
-            prior=prior,
-            evaluate=evaluate,
-            dirichlet_weight=self.dirichlet_weight,
-            seed=self._rng.randrange(2**31),
-        )
-        root = search.run(state, self.simulations)
-        pi = policy_target(root, temperature=1.0)
-
-        if state.ply() < self.temperature_plies:
-            moves = sorted(pi)
-            return self._rng.choices(moves, weights=[pi[m] for m in moves], k=1)[0]
-        return max(pi, key=lambda m: (pi[m], m))
+        return self.player.select(board, state)
 
 
-class AZAgent(_SearchAgent):
+class AZAgent(_PlayerAgent):
     """PUCT guided by a trained network.
 
     Args:
@@ -97,52 +62,35 @@ class AZAgent(_SearchAgent):
         simulations: PUCT simulations per move.
         seed: Seeds the search and any opening sampling.
         temperature_plies: Opening plies sampled from the visit counts. Zero
-            plays strongest and identically every game — see the module
+            plays strongest and identically every game — read the module
             docstring before using zero in a match.
-        dirichlet_weight: Root noise. Zero for evaluation; the self-play loop
-            supplies its own.
-        mode: Child expansion. ``POSITION`` deduplicates aliased actions and is
-            the mandated design; the others exist for the aliasing experiment.
+        dirichlet_weight: Root noise. Zero for evaluation.
+        mode: Child expansion; ``POSITION`` is the mandated design.
     """
 
     name = "az"
 
     def __init__(self, net: FlipHexNet, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.net = net
-
-    def _hooks(self, board: Board):
-        evaluator = NetworkEvaluator(self.net, board)
-        return evaluator.prior, evaluator.evaluate
+        super().__init__(SearchPlayer(net, **kwargs))
 
     def __repr__(self) -> str:
         return f"AZAgent(simulations={self.simulations}, mode={self.mode.value})"
 
 
-class UCTAgent(_SearchAgent):
+class UCTAgent(_PlayerAgent):
     """Prior-free UCT with random playouts — the floor with no network in it.
 
-    The learned agent must beat this before any result about it is reported.
-    It depends on no training, so it cannot be flattered by a bad one, and its
-    playouts are sound here in a way they are not in Go: a playout is at most one
-    ply per empty cell, always terminates, and always yields a decided winner
-    because a draw is impossible on an odd cell count.
-
-    Args:
-        simulations: Simulations per move.
-        seed: Seeds the search, the playouts and any opening sampling.
-        temperature_plies: As :class:`AZAgent`.
-        dirichlet_weight: As :class:`AZAgent`.
-        mode: As :class:`AZAgent`. Kept configurable so the floor can be run with
-            the same expansion mode as whatever it is measuring.
+    The learned agent must beat this before any result about it is reported. It
+    depends on no training, so a bad run cannot flatter it, and its playouts are
+    sound in a way they are not in Go: a playout is at most one ply per empty
+    cell, always terminates, and always yields a decided winner because a draw is
+    impossible on an odd cell count.
     """
 
     name = "uct"
 
-    def _hooks(self, board: Board):
-        # None, None gives the search its own defaults: a uniform prior and a
-        # random rollout to a decided terminal.
-        return None, None
+    def __init__(self, **kwargs) -> None:
+        super().__init__(SearchPlayer(None, **kwargs))
 
     def __repr__(self) -> str:
         return f"UCTAgent(simulations={self.simulations}, mode={self.mode.value})"

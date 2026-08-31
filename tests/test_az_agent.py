@@ -27,6 +27,7 @@ from agents.base import Agent
 from agents.random_agent import RandomAgent
 from az.mcts import ExpansionMode
 from az.network import FlipHexNet
+from az.player import SearchPlayer
 from fliphex.moves import apply_move, legal_moves
 from fliphex.rules import is_terminal
 from fliphex.state import Colour
@@ -208,6 +209,24 @@ def test_the_package_export_list_stays_torch_free():
 
     assert "AZAgent" not in agents.__all__
     assert "UCTAgent" not in agents.__all__
+
+
+def test_the_agents_are_adapters_onto_the_az_layer(net):
+    """The gate needs move selection and lives in az, so the logic must sit
+    below this wrapper -- otherwise az imports agents and agents imports az."""
+    assert isinstance(AZAgent(net, simulations=1).player, SearchPlayer)
+    assert isinstance(UCTAgent(simulations=1).player, SearchPlayer)
+
+
+def test_az_does_not_import_agents():
+    import subprocess
+    import sys as _sys
+
+    code = "import sys, az.gate, az.player; print('agents' in sys.modules)"
+    result = subprocess.run(
+        [_sys.executable, "-c", code], capture_output=True, text=True, check=True
+    )
+    assert result.stdout.strip() == "False"
 
 
 def test_the_colours_are_what_the_helper_assumes():

@@ -538,6 +538,42 @@ peaks at generation 13, the gate will not see it — only generations 5, 10, 15,
 20, 25 and 30 are inspected. Neither is measured here; both are the accepted
 price.
 
+### Implementation, and two things the gate had to be protected from
+
+`az/gate.py`. The arithmetic above lives in code — `false_promotion_rate`,
+`power`, `family_wise_false_promotion` — rather than only in this note, so the
+numbers a run reports are computed rather than quoted.
+
+**Seats alternate, and an odd game count is refused.** Whether the first seat is
+worth anything is an open question on this game, so a match run entirely from one
+seat would confound *stronger network* with *better seat*. The result carries the
+per-seat split rather than only the total.
+
+**Two deterministic searchers replay one game.** At temperature zero a player is
+a pure function of the position, so a 400-game gate between two of them reports
+`n = 400` on an effective sample of **one** — and the win rate comes out 0% or
+100%, which reads as a decisive result rather than a broken measurement. Nothing
+errors. `run_gate` warns rather than forbids, since single-position use is
+legitimate, and defaults to sampling four opening plies.
+
+**The resume interface was wrong on the first pass.** `on_progress` reported
+`(games_done, wins)`, which is enough to restore the total and *not* enough to
+restore the per-seat split — a resumed gate would have reported the right win
+rate with a fabricated seat breakdown. Writing the resume test is what exposed
+it; the callback now carries `first_seat_wins` too.
+
+### A layering error caught while wiring it
+
+The gate plays matches, so it needs move selection, and the first version took it
+from `agents.az_agent`. That made `az` import `agents` while `agents` imports
+`az` — a cycle Python tolerates only for as long as the import order happens to
+work out.
+
+Move selection is **search policy**, not agent plumbing, so it belongs on the
+`az` side of the line. It now lives in `az/player.py` as `SearchPlayer`, and the
+two agent classes are thin adapters onto it. Pinned by a test that imports
+`az.gate` in a subprocess and asserts `agents` never enters `sys.modules`.
+
 ## The plain-UCT floor
 
 <!--
