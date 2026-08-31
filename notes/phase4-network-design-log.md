@@ -43,7 +43,9 @@ to clear it *against*, and neither may be quoted without the caveat recorded in
 the registry.
 
 **Open risk carried in.** [R13](../docs/risk-register.md) at score 9 — the
-highest in the register — is a Phase 4 risk in its entirety.
+highest in the register — is a Phase 4 risk in its entirety. **Dropped to 6 on
+2026-08-31** when EXP-010 measured the mitigation; what remains is that it has
+never been seen in a real 5×5 self-play loop.
 
 ## Environment and hardware
 

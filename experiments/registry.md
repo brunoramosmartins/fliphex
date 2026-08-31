@@ -26,7 +26,7 @@ Freely editable (append-only in practice).
 | EXP-008 | 2026-08-30 | — | 1 | Exact agent strength on the shipped 5×5 with no endgame database | 25 cells, hands 13 + 12; 2M-node budget, `search_below_k = 8`; 250 games per opponent × seat | 5 | **complete** | **Exit criterion NOT met.** vs random **98.0%** [96.4, 98.9] ✅; vs heuristic **61.0%** [56.7, 65.2] ❌. `proved_rate` **32%** — no rate may be quoted without it. Post-hoc control: between two heuristics the **first** seat wins only 40.0%, a property of the greedy agent and **not** an H1 input; it does not baseline the P2 arm (seeds unmatched by seat). [`exp008-agent-strength.json`](../results/exp008-agent-strength.json) |
 | EXP-009 | 2026-08-30 | — | 1 | WIN/LOSS mix per layer: the parity split, measured instead of inferred | 5×3-h1, all 16 layers, exhaustive | — | **complete** | **Uniformity breaks at `t = 5`.** Layers 0–4 are uniform — every one of the 12,841,920 configurations at `t = 4` is a P1 win, every one of the 713,440 at `t = 3` a P2 loss — then the parities converge monotonically to 50/50. Confirms EXP-002's criticality boundary and EXP-004's compression ratios from a third direction, and retires the parity question. 70.8 s. [`exp009-parity-5x3-h1.json`](../results/exp009-parity-5x3-h1.json) |
 | EXP-007 | 2026-08-07 | — | 1 | True reachable closure per layer, and what one-step-back predecessor counting misses | 5×3, 15 cells, hands 8 + 7, both arms | — | registered; 3×3 pilot run | **The registered rule runs on the complete 5×3 only** and has not. The 3×3 pilot is instrument shakedown, not the result: [`exp007-3x3-h1.json`](../results/exp007-3x3-h1.json), [`exp007-3x3-h2.json`](../results/exp007-3x3-h2.json). Row added retrospectively on 2026-08-30 — the experiment was registered in full below but never listed here. |
-| EXP-010 | 2026-08-30 | — | 2 | Deduplicated (by-position) MCTS expansion against the naive by-action tree, with a multiplicity-corrected control | 5×3-**h2** (V5 `51192b4d…`), 3,000 WIN positions stratified over `t = 5..14`, uniform prior + rollout leaves, 3 arms, primary at budget 400 | 17 | **registered, revised after red-team** (blocked on `az/mcts.py`) | |
+| EXP-010 | 2026-08-30 | — | 2 | Deduplicated (by-position) MCTS expansion against the naive by-action tree, with a multiplicity-corrected control | 5×3-**h2** (V5 `51192b4d…`), 3,000 WIN positions stratified over `t = 5..14`, uniform prior + rollout leaves, 3 arms, primary at budget 400 | 17 | **complete** | **`B − A = +4.77` pts** [+3.47, +6.06] at the primary budget; falsifier did not fire; every registered prediction held. **The benefit is prior mass, not visit-splitting** — arm C keeps all 540 children, corrects only the priors, and recovers the whole effect (`B − C = −0.77`, not distinguishable from zero). Concentrated where a decision exists: **+8.9** pts on odd layers (floor 16.2%) against **+0.6** on even (floor 66.8%), with layers 12–14 saturated. Aliased mass **27.5%**, tree overhead **+19.6%** (inference cost absent — no network). 22.7 min. [`exp010-mcts-dedup-5x3-h2.json`](../results/exp010-mcts-dedup-5x3-h2.json) |
 | EXP-011 | 2026-08-30 | — | 2 | Is the factored policy head too costly *in the pipeline*? (risk R5) | 5×3-**h2** (V5 `51192b4d…`), 2,500 WIN positions, 2,000 train / 500 held out, 5 seeds per arm, primary = top-1 optimality after 400 PUCT sims | 23 | **registered, revised after red-team** (blocked on `az/mcts.py` + `az/network.py`) | |
 
 **Registration basis.** EXP-001 through EXP-005 are registered against the H1/H2
@@ -1879,6 +1879,77 @@ lapses and the entry is re-registered.
 
 **Artefact.** `results/exp010-mcts-dedup-5x3-h2.json`, carrying every quantity
 above including the floors, the per-layer table, and the realised `π_d`.
+
+#### Result (2026-08-31) — 1,360 s, `B − A = +4.77` pts, and the benefit is prior mass
+
+Artefact [`results/exp010-mcts-dedup-5x3-h2.json`](../results/exp010-mcts-dedup-5x3-h2.json).
+3,000 positions, PyPy 3.11.15, 22.7 minutes. **Every pre-registered prediction
+held**; the falsifier did not fire.
+
+| budget | A naive | B dedup | C mult-corrected | `B − A` | `B − C` |
+|--:|--:|--:|--:|--:|--:|
+| 100 | 66.63 | 67.83 | **70.83** | +1.20 [+0.03, +2.37] | **−3.00** [−4.26, −1.74] |
+| **400** | 74.17 | **78.93** | 79.70 | **+4.77** [+3.47, +6.06] | −0.77 [−2.11, +0.58] |
+| 1600 | 83.30 | **86.33** | 84.43 | +3.03 [+1.88, +4.19] | **+1.90** [+0.74, +3.06] |
+
+Realised discordance put the detectable difference at **1.86 points** against the
+registered 2-point margin — the design had the power its falsifier needed, which
+the first registration did not.
+
+**The benefit is prior mass, not visit-splitting.** At the primary budget
+`C − A = +5.53` [+4.17, +6.90] while `B − C = −0.77` [−2.11, +0.58] is not
+distinguishable from zero. Arm C keeps all 540 children and only corrects their
+priors, and it recovers the whole effect. This is the case the entry
+pre-registered as *"reported as such rather than as a vindication of both
+mechanisms"* — mechanism **(ii)** carries the result and mechanism **(i)** is not
+shown to contribute at 400 simulations. **The design does not change: adr-005
+mandates B**, and B is also the arm that gets there with a quarter of the
+children.
+
+**The sign of `B − C` inverts with the budget** — C ahead by 3.00 points at 100,
+B ahead by 1.90 at 1600, both intervals excluding zero. A coherent story is
+available (few simulations reward keeping more distinct children to explore;
+many simulations make split counts start to hurt), and it is **not being told as
+a finding**: budgets 100 and 1600 are registered as secondary and descriptive
+with no decision rule, precisely so that three tested budgets could not fire
+somewhere under the null. Promoting this to a claim requires its own
+registration.
+
+**Nearly half the sample could not discriminate, and the per-layer table says
+so.** Split by the parity EXP-009 identified:
+
+| | n | random floor | A | B | `B − A` |
+|---|--:|--:|--:|--:|--:|
+| odd `t` (mover rarely wins) | 1,500 | 16.2% | 54.4 | 63.3 | **+8.9** |
+| even `t` | 1,500 | 66.8% | 93.9 | 94.5 | +0.6 |
+
+Layers 12, 13 and 14 are **saturated** — all three arms at ≥ 99%. The pooled
+`+4.77` is an average over two populations that have nothing to do with each
+other: where a decision exists the effect is roughly nine points, and where a
+random move already scores 67% there is nothing left to win. The strongest layer
+is `t = 5`: floor 3.0%, A 24.3%, **B 43.7%**, with 55.1% aliased mass. Quoting
+the pooled figure without this table would misdescribe the result in both
+directions.
+
+**Predictions, checked.** `B > A` by 2–8 points at budget 400 → **+4.77** ✓.
+Aliased mass 20–45% → **27.5%** ✓. C between A and B, nearer B → C in fact
+*level with or above* B at the primary budget, which is the stronger form of the
+same prediction. Tree overhead under 20% → **+19.6%**, held, but only just.
+Margin shrinking as budget rises → held for `B − A` from 400 to 1600 (+4.77 to
++3.03), **not** from 100 to 400 (+1.20 to +4.77), which the entry did not
+anticipate and which the low-budget inversion above explains.
+
+**Cost, and what it is not.** Tree overhead is **+19.6%** at the primary budget
+(25.4 ms → 30.4 ms per search). **Inference cost is absent by construction** —
+there is no network here — and in deployment deduplication *reduces* the number
+of distinct children to evaluate, so the pipeline's sign is plausibly the other
+way. The 19.6% may not be quoted as the pipeline's overhead.
+
+**One thing this does not license.** Cross-parent transposition is deliberately
+not implemented, so *"deduplication helps by 4.77 points"* must never become
+*"transposition-aware MCTS helps by 4.77 points"*. And the 5×3 at `t ≥ 5` sits
+near the 5×5's ply 8 (~1.8× collapse) rather than its root (4.46×): the direction
+transfers, the magnitude does not.
 
 ### EXP-011 — is the factored policy head too costly in the pipeline? (risk R5)
 
