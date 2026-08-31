@@ -348,12 +348,63 @@ match the encoding's own/opponent planes and the value head. `samples_from_game`
 is the only place the alternation is written, so it is the only place it can be
 written wrongly.
 
-## az/train.py — the loss and the loop
+## az/train.py — the loss, and a normaliser that needs no move generation
 
-<!--
-Cross-entropy on the MCTS policy plus MSE on the outcome, with weight decay.
-z is always exactly +/-1 because draws are impossible.
--->
+Cross-entropy on the search policy plus MSE on the outcome. `z` is exactly ±1
+always, so the value head's worst case is bounded at 4.0 and there is no draw
+mass pulling the output toward zero.
+
+**The problem the loss ran into.** The network's policy is the factored score
+*renormalised over the legal moves*:
+
+```
+log p(m) = score(m) − log Σ_{m′ legal} exp score(m′)
+```
+
+That sum runs over **every** legal move. A replay sample stores only the visited
+support — the moves the search actually reached — so the two obvious repairs are
+to store the whole legal move list beside each sample, several kilobytes and more
+than a doubling of the buffer, or to call `legal_moves` on every sample of every
+batch.
+
+**Neither is needed, because legality factorises exactly.** A move is legal iff
+the cell is empty, the tile is in hand, and the rotation lies in that tile's
+orbit — and the orbit is a property of the tile alone, never of the cell.
+Measured against move generation:
+
+| variant | ply | moves | empty | × pairs |
+|---|--:|--:|--:|--:|
+| 5×5-h1 | 0 | 1,450 | 25 | 58 |
+| 5×5-h1 | 7 | 702 | 18 | 39 |
+| 5×3-h2 | 11 | 28 | 4 | 7 |
+
+Every row is an exact product, and the `(tile, rotation)` set is identical for
+every empty cell. So the normaliser splits into two independent log-sum-exps:
+
+```
+Z = LSE over empty cells of cell
+  + LSE over available (t, r) of  tile[t] + rotation[r]
+```
+
+Both masks read straight off the input planes — plane 2 gives the empty cells,
+planes 4–16 give the mover's hand — and the orbit table is static. **The training
+loop never calls `legal_moves`.**
+
+With `Σ π(m) = 1` the cross-entropy then collapses to `Z − Σ π(m)·score(m)`,
+which is one gather and one scatter-add over the batch.
+
+This is checked, not argued: `test_the_closed_form_normaliser_equals_the_brute_force_one`
+compares against `logsumexp` over actual generated moves across three variants
+and three depths, and `test_the_loss_equals_the_naive_masked_cross_entropy`
+compares the collapsed form against the literal one. If a rule change ever
+introduces a cell-dependent restriction, the factorisation breaks and the loss
+would silently optimise the wrong distribution — those two tests are the only
+thing that would notice.
+
+**Ragged batching.** Each position visited a different number of moves, so
+policies are concatenated with a row index rather than padded. Padding to the
+widest policy in a batch would allocate the worst case on every row, and the
+worst case is 1,450.
 
 ## az/checkpoint.py — surviving a 60-hour run
 
