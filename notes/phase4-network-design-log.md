@@ -555,12 +555,36 @@ fallbacks, in order: condition rotation logits on the chosen cell; then the flat
 1950-logit head. Note the flat head does NOT fix aliasing.
 -->
 
-## agents/az_agent.py
+## agents/az_agent.py — and a determinism trap the gate walks into
 
-<!--
-Network + MCTS behind the same Agent interface as random, heuristic and solver,
-so benchmark-protocol.md applies unchanged.
--->
+`AZAgent` (network + PUCT) and `UCTAgent` (uniform prior + random rollouts, the
+floor), both behind the same interface as random, heuristic and solver, so the
+benchmark protocol applies unchanged.
+
+**Deliberately not exported from `agents/__init__.py`.** Importing any submodule
+of a package runs that package's `__init__` first, so listing `AZAgent` there
+would make `from agents.random_agent import RandomAgent` load torch — a second or
+two on every import, and an outright failure under the faster interpreter the
+exact-solver runs use, which has no torch build. Pinned by a test that imports an
+agent in a subprocess and asserts `torch` is absent from `sys.modules`.
+
+**The trap, which belongs to the gate and not to the agents.** At temperature
+zero with no root noise, a searcher is a *pure function of the position*. Two of
+them play the same game every time. A 400-game evaluator gate between two
+deterministic agents therefore measures a sample of size **one** while reporting
+`n = 400`, and the binomial interval computed on it is fiction.
+
+It is easy to walk into because nothing errors: the games run, the win rate comes
+out 0% or 100%, and a 100% win rate looks like a decisive result rather than a
+broken measurement.
+
+The fix is to sample the opening from the visit counts and play greedily after —
+`EVALUATION_TEMPERATURE_PLIES = 4`. It weakens both sides identically, so the
+comparison stays fair, and it makes the games genuinely distinct. The default
+stays 0, because the strongest configuration is the right default for anything
+that is not a match; **the caller has to introduce diversity deliberately.** Both
+halves are pinned by tests, one asserting the replay and one asserting the way
+out.
 
 ## Training runs and the submission log
 
