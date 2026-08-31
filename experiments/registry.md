@@ -1722,11 +1722,21 @@ insertion order, which differs between arms by construction.
   cross-parent transposition DAG. On a placement game with inert tiles the latter
   is a large separate benefit unrelated to R13, and folding the two together
   would credit deduplication with someone else's win.
-- **DAG backup rule: the mean over parents**, fixed here rather than in the
-  design log, because a load-bearing free parameter pre-registered in a freely
-  editable file is not pre-registered. The rule is **confounded with
-  deduplication** in every comparison below, and the falsifier's wording accounts
-  for that.
+- **There is no DAG, and therefore no backup rule to choose.** Corrected
+  2026-08-30 while implementing `az/mcts.py`, against an earlier revision of this
+  entry that fixed the rule as "the mean over parents". Sibling-alias merging
+  gives a child several *action labels* and still exactly **one parent**, so the
+  structure stays a tree. adr-005's Phase 3 amendment predicted that
+  deduplication "turns the tree into a DAG" and called the backup rule an
+  unresolved subtlety — that is true of *cross-parent* transposition, which this
+  entry does not implement, and not of the merging that addresses R13. Pinned by
+  `tests/test_az_mcts.py::test_sibling_merging_does_not_create_a_dag`, which walks
+  the tree and asserts no node is reached twice.
+
+  This **removes a confounder** rather than adding one: the earlier revision had
+  to word its falsifier as "the mechanism is wrong *or* the backup rule is bad",
+  and that disjunction is now gone. The ADR's stated cost for deduplication does
+  not materialise; only its benefit is at stake.
 
 #### Three arms
 
@@ -1792,10 +1802,9 @@ whether adr-005 stands.
 - **Falsifier, stated as a non-inferiority test**: B worse than A by more than a
   **2-point margin**, i.e. the 95% interval on `(B − A)` lies entirely below
   **−2** — not below zero, which is a different and much weaker claim. If it
-  fires, an ADR amendment is written **before** any self-play run. The amendment
-  cannot be written from this result alone: the falsifier's honest reading is
-  *"the amendment's stated mechanism is wrong **or** the chosen DAG backup rule
-  is bad"*, and those are not separated here.
+  fires, an ADR amendment is written **before** any self-play run. Since there is
+  no backup rule to confound it (see above), the falsifier reads cleanly: **the
+  amendment's stated mechanism is wrong.**
 - **If B beats A but C also beats A by a comparable margin**, the benefit is
   mostly prior mass and not visit-splitting. That does not change the design —
   the ADR mandates B — but it is reported as such rather than as a vindication of
@@ -1862,7 +1871,11 @@ lapses and the entry is re-registered.
   reachable share is reported as unknown rather than assumed small.
 - **h2's `t = 5` layer** is the most discriminating and the least independently
   verified: V4's coverage there is thin on both arms.
-- **Backup rule confounded** with deduplication throughout, as stated above.
+- **Cross-parent transposition is deliberately absent.** Two different parents
+  reaching the same position get separate nodes here. That is a real search
+  improvement this entry declines to measure, so "deduplication helps by X" must
+  never be read as "transposition-aware MCTS helps by X" — the second is a larger
+  and untested claim.
 
 **Artefact.** `results/exp010-mcts-dedup-5x3-h2.json`, carrying every quantity
 above including the floors, the per-layer table, and the realised `π_d`.
