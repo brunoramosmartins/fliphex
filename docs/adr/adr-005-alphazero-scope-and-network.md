@@ -250,6 +250,72 @@ with more parameters. Only deduplication addresses it.
 **Not evidence about the game.** The collapse was measured on reachable positions
 by random playout. It says nothing about H1, H2 or H3.
 
+## Amendment — Phase 4 (2026-08-31): the input is 30 planes, not 29
+
+**The tower, the heads and the training scheme are unchanged. The input plane
+table above is wrong by one plane, and the error is not cosmetic.**
+
+The Decision section specifies the hands as **13 own** and **12 opponent**, which
+sums with the four board and side-to-move planes to 29. That table cannot be
+implemented as written alongside the encoding it sits in, because "own" and
+"opponent" are relative to the side to move.
+
+On the shipped 5×5 the first player's hand is the twelve archetypes **plus the
+joker** — thirteen tiles — and the second player's is the twelve archetypes:
+
+```
+5x5-h1   purple bits=13 joker=True    green bits=12 joker=False
+```
+
+So on every ply where the second player moves, the *opponent* is the player
+holding the joker, and a 12-plane opponent block has nowhere to put it. The
+specified encoding hides the joker on half of all plies. The joker is the tile
+that gives the first player the extra ply and therefore the last move of the
+game; whether it has been spent is not a detail of the position.
+
+**Corrected table.** Both hand blocks are 13 wide:
+
+| Plane(s) | Content |
+|---|---|
+| 0 | own colour, per cell |
+| 1 | opponent colour, per cell |
+| 2 | empty, per cell |
+| 3 | side to move (constant plane) |
+| 4–16 | own hand: one constant plane per tile still held (13) |
+| 17–29 | opponent hand: one constant plane per tile still held (13) |
+
+The second player's joker plane is simply always zero, which costs one plane of
+25 bytes and buys a layout that means the same thing on both sides.
+
+**The bit is recoverable in principle, which is why this is worth stating.**
+Occupied cells give the ply count, the ply count gives how many tiles each side
+has played, and subtracting the visible archetype planes leaves the joker. But
+that is a global count across the board — the operation a small convolutional
+tower is worst at. Spending one input plane is cheaper than making the network
+learn arithmetic to recover it.
+
+**A second reason, in H3's favour.** Making both blocks 13 makes the layout
+independent of the variant: the 3×3, the 5×3 and the 5×5 differ only in spatial
+size, and plane *k* means the same thing on all three. H3's comparison set reads
+across all three, so one layout for all three is worth having.
+
+**The alternative reading, rejected.** Keeping 29 is possible if "own" always
+means the first player rather than the mover. That costs the canonical
+orientation: the value head's `+1` would no longer mean "good for the side to
+move", and the network would have to learn each position twice. The perspectival
+encoding is the more valuable of the two properties.
+
+**Consequence for the sizing target.** The tower is now measured at **352,495**
+parameters on the 5×5 (332,965 on the 5×3, 324,319 on the 3×3), still below the
+0.5–1.5 M band this ADR targets. That band was an estimate made before the
+factored head existed; 44 output logits instead of 1,950 removes the projection
+that carried most of the difference. The instruction — start at the small end,
+grow only if training plateaus below the heuristic baseline — is unchanged.
+
+Pinned by `tests/test_az_encoding.py`, whose
+`test_the_opponents_joker_is_visible_when_the_second_player_moves` fails loudly
+if the opponent block is ever narrowed back to 12.
+
 ## Related
 
 - [adr-003](adr-003-piece-representation.md) — why no orientation planes

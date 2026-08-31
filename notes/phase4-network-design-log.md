@@ -171,21 +171,89 @@ has more headroom than it was written to expect. Reaching 1 M would take
 128 filters or 8 blocks. No amendment needed; the band was an estimate and this
 is the measurement.
 
+## The input encoding — and the plane that was missing
+
+`az/encoding.py`. Thirty binary planes over the board grid, written from the
+**mover's** point of view so that the value head's `+1` always means "good for
+the player being chosen for".
+
+| plane | content |
+|---|---|
+| 0–2 | own colour / opponent colour / empty |
+| 3 | side to move (constant) |
+| 4–16 | own hand, one constant plane per tile still held (13) |
+| 17–29 | opponent hand, same (13) |
+
+No orientation planes: placed tiles are inert, so rotation is not part of the
+state at all. Pinned by `test_there_are_no_orientation_planes`, which plays every
+rotation of one tile onto one cell of an empty board and asserts all of them
+encode identically — the same aliasing EXP-010 measured, seen from the input
+side.
+
+**adr-005 specified 29 planes and the table could not be implemented as
+written.** It splits the hands 13 own / 12 opponent, which sums to 29 with the
+four board planes. But "own" and "opponent" are relative to the side to move, and
+on the 5×5 the *first* player is the one holding thirteen tiles:
+
+```
+5x5-h1   purple bits=13 joker=True    green bits=12 joker=False
+```
+
+So whenever the second player moves, the opponent is the thirteen-tile player and
+the 12-plane block has nowhere to put the joker. **On half of all plies the
+specified encoding hides the tile that decides who moves last.** Corrected to 13
+and 13 in the Phase 4 amendment; `test_the_opponents_joker_is_visible_when_the_second_player_moves`
+fails if anyone narrows it back.
+
+Worth being precise about the severity, because it is easy to overstate. The bit
+is *recoverable*: occupied cells give the ply count, which gives how many tiles
+each side has played, and subtracting the visible archetype planes leaves the
+joker. It is a global count across the board — the operation a small conv tower
+is worst at. One input plane is cheaper than teaching the network arithmetic.
+
+The repair also makes the layout **variant-independent**. Plane *k* means the
+same thing on the 3×3, the 5×3 and the 5×5; only the spatial size changes. H3
+reads across all three.
+
+**Size on the wire.** One position is `30 × n_cells` bytes: **750 B** on the 5×5,
+450 B on the 5×3, 270 B on the 3×3. The encoder needs neither torch nor numpy,
+which keeps two doors open — self-play in a faster interpreter, and a replay
+buffer that does not drag a tensor library into its storage format.
+
 ## az/network.py — the residual tower and the two heads
 
-<!--
-adr-005: 3x3 conv stem to 64 filters, 4 residual blocks, ~0.5-1.5 M parameters,
-factored policy head (25 + 13 + 6 = 44 logits), tanh value head. Record actual
-parameter count, and the masking-and-renormalisation path for illegal moves.
--->
+3×3 convolutional stem into 64 filters, four residual blocks, then the two heads,
+exactly as adr-005 specifies.
 
-## The input encoding
+| variant | parameters |
+|---|--:|
+| 5×5 | **352,495** |
+| 5×3 | 332,965 |
+| 3×3 | 324,319 |
 
-<!--
-29 planes of 5x5, per the adr-005 table. Record the tensor size in bytes, the
-plane ordering as implemented, and any deviation from the ADR with its reason.
-Ex04 question 4 asks for exactly this justification.
--->
+Below the ADR's 0.5–1.5 M band, for the reason already recorded above: 44 output
+logits instead of 1,950 removes the projection that band was estimated with.
+
+**The factored head, and why summing raw logits is not a shortcut.** adr-005
+specifies `log p(cell) + log p(tile) + log p(rotation)`, masked to legal moves
+and renormalised. `masked_log_policy` sums the **raw** logits instead. That is
+the identical distribution, not an approximation: each `log_softmax` differs from
+its logits by a term constant across moves, and three constants added to every
+legal move's score cancel in the renormalisation. It saves three softmaxes and is
+better conditioned. The claim is checked against the literal formulation in
+`test_summing_raw_logits_equals_the_specified_log_softmax_rule` — so if a factor
+ever gains a per-move term, the shortcut stops being valid and a test says so
+rather than the loss curve.
+
+**Masking is load-bearing.** The head scores every `(cell, tile, rotation)`
+triple, including triples that are not moves — a tile no longer in hand, an
+occupied cell, a rotation the tile's symmetry orbit collapses. Restricting the
+renormalisation to the legal list is what removes them.
+
+**One footgun, handled.** `policy_and_value` saves and restores the module's
+training flag. It is called from inside the training loop, and a helper that
+quietly left `eval` set would freeze every batch-norm layer for the rest of a
+60-hour run without raising anything.
 
 ## az/mcts.py — PUCT, and deduplicated expansion
 
