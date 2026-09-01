@@ -27,7 +27,7 @@ Freely editable (append-only in practice).
 | EXP-009 | 2026-08-30 | — | 1 | WIN/LOSS mix per layer: the parity split, measured instead of inferred | 5×3-h1, all 16 layers, exhaustive | — | **complete** | **Uniformity breaks at `t = 5`.** Layers 0–4 are uniform — every one of the 12,841,920 configurations at `t = 4` is a P1 win, every one of the 713,440 at `t = 3` a P2 loss — then the parities converge monotonically to 50/50. Confirms EXP-002's criticality boundary and EXP-004's compression ratios from a third direction, and retires the parity question. 70.8 s. [`exp009-parity-5x3-h1.json`](../results/exp009-parity-5x3-h1.json) |
 | EXP-007 | 2026-08-07 | — | 1 | True reachable closure per layer, and what one-step-back predecessor counting misses | 5×3, 15 cells, hands 8 + 7, both arms | — | registered; 3×3 pilot run | **The registered rule runs on the complete 5×3 only** and has not. The 3×3 pilot is instrument shakedown, not the result: [`exp007-3x3-h1.json`](../results/exp007-3x3-h1.json), [`exp007-3x3-h2.json`](../results/exp007-3x3-h2.json). Row added retrospectively on 2026-08-30 — the experiment was registered in full below but never listed here. |
 | EXP-010 | 2026-08-30 | — | 2 | Deduplicated (by-position) MCTS expansion against the naive by-action tree, with a multiplicity-corrected control | 5×3-**h2** (V5 `51192b4d…`), 3,000 WIN positions stratified over `t = 5..14`, uniform prior + rollout leaves, 3 arms, primary at budget 400 | 17 | **complete** | **`B − A = +4.77` pts** [+3.47, +6.06] at the primary budget; falsifier did not fire; every registered prediction held. **The benefit is prior mass, not visit-splitting** — arm C keeps all 540 children, corrects only the priors, and recovers the whole effect (`B − C = −0.77`, not distinguishable from zero). Concentrated where a decision exists: **+8.9** pts on odd layers (floor 16.2%) against **+0.6** on even (floor 66.8%), with layers 12–14 saturated. Aliased mass **27.5%**, tree overhead **+19.6%** (inference cost absent — no network). 22.7 min. [`exp010-mcts-dedup-5x3-h2.json`](../results/exp010-mcts-dedup-5x3-h2.json) |
-| EXP-011 | 2026-08-30 | — | 2 | Is the factored policy head too costly *in the pipeline*? (risk R5) | 5×3-**h2** (V5 `51192b4d…`), 2,500 WIN positions, 2,000 train / 500 held out, 5 seeds per arm, primary = top-1 optimality after 400 PUCT sims; arms **34** vs **1,170** logits (amended 2026-08-31) | 23 | **registered; amended 2026-08-31; unblocked, not yet run** | |
+| EXP-011 | 2026-08-30 | — | 2 | Is the factored policy head too costly *in the pipeline*? (risk R5) | 5×3-**h2** (V5 `51192b4d…`), 2,500 WIN positions, 2,000 train / 500 held out, 5 seeds per arm, primary = top-1 optimality after 400 PUCT sims; arms **34** vs **1,170** logits (amended 2026-08-31) | 23 | **complete** | **The rule fires: fallback (b) is to be registered and run.** Flat beats factored **+7.0** pts on the primary metric (73.7% vs 66.8%, floor 39.6%), paired *t* **+6.96** [+4.81, +9.11], between-seed spread **1.5%** — the five seeds of each arm do not overlap. **Mitigation (a) is close to inert**: 400 PUCT simulations closed only ~1 point of the **+8.0** supervised gap. Factored is worse on *training* loss too (2.616 vs 2.375), so this is expressiveness, not generalisation. **Cannot separate independence from capacity** — 34 logits against 1,170, 0.33 M params against 0.88 M; (b) is the probe that would. Rotation is inert on only **11.4%** of multi-orbit (cell, tile) pairs, so the ADR's "sizeable share" claim is *not* the reason. Interval reaches +4.81, just under the 5-pt margin — recorded, not repaired. H3's 5×3 member now carries an architecture-selection caveat. [`exp011-factored-head-5x3-h2.json`](../results/exp011-factored-head-5x3-h2.json) |
 
 **Registration basis.** EXP-001 through EXP-005 are registered against the H1/H2
 text at tag `v0.3-hypotheses`. Any post-lock amendment to that text is recorded
@@ -2126,6 +2126,110 @@ reported alongside:
   flat head. **Recorded now so it cannot be forgotten later: (c) does not fix
   aliasing.** 1,950 logits over 1,450 actions is the same redundancy with more
   parameters; only EXP-010's deduplication addresses it.
+
+#### Result (2026-09-01)
+
+Run `scripts/exp011_factored_head.py`, 2h16, artefact
+[`exp011-factored-head-5x3-h2.json`](../results/exp011-factored-head-5x3-h2.json),
+log [`exp011.log`](../results/exp011.log).
+
+**The registered rule fires. Fallback (b) is to be registered and run.**
+
+| | factored | flat | gap |
+|---|--:|--:|--:|
+| **Primary — top-1 optimality after 400 PUCT sims** | **66.8%** | **73.7%** | **+7.0** |
+| Secondary — supervised top-1 agreement | 58.6–60.8% | 65.6–68.6% | **+8.0** |
+| Between-seed spread (max of the two arms) | | | 1.5% |
+| Random-legal-move floor | | 39.6% | |
+
+Per seed, primary: factored `67.2, 66.6, 66.2, 65.8, 68.0`; flat
+`74.2, 74.2, 75.6, 71.8, 72.8`. **Every one of the five factored seeds is below
+every one of the five flat seeds** — the arms do not overlap at all, which is
+what the 1.5% spread against a 7.0-point gap says in a different way.
+
+Paired *t* on seed means: **+6.96** [+4.81, +9.11]. Supervised McNemar over all
+seeds: **+8.0 points** [+6.0, +10.0], 680 discordant of 2,500.
+
+#### The sharpest number is the one about mitigation (a)
+
+adr-005's first mitigation is *"rely on MCTS to correct the prior, which is
+exactly what MCTS is for"*, and the whole reason this entry was rewritten after
+red-team was so the primary metric could speak to it. It does:
+
+- supervised gap: **+8.0** points
+- gap after 400 PUCT simulations: **+7.0** points
+
+**400 simulations closed about one point of an eight-point deficit — roughly an
+eighth of it.** Mitigation (a) is not merely insufficient; it is close to inert
+at this budget on this board. That is the finding, and it is a stronger statement
+than "the flat head is better".
+
+#### Not overfitting, and not early stopping
+
+Final *training* policy loss: factored **2.616**, flat **2.375**. The factored arm
+is worse on the data it was fitted to, not only on the held-out set, so this is
+an expressiveness limit rather than a generalisation one. More epochs would not
+close it.
+
+#### What this cannot separate, stated plainly
+
+The flat arm carries **879,381** parameters against the factored arm's
+**332,965** — the head is 1,170 logits against 34. The experiment therefore
+cannot distinguish *"cell, tile and rotation are not conditionally independent"*
+from *"44 logits is not enough capacity"*. Both are reasons the factored head
+loses, and adr-005's question — is it **too costly** — is answered either way,
+which is why the design was written at the pipeline level. But the *mechanism* is
+not established here, and no sentence in the write-up may claim it is. The
+registration's own contingency applies: a frozen-shared-tower arm is the
+diagnostic, registered if it is wanted.
+
+Fallback (b) — rotation logits conditioned on the chosen cell — is the natural
+next probe precisely because it adds far less capacity than (c) while removing
+the specific independence the ADR names. If (b) recovers most of the gap, the
+mechanism was independence; if it does not, it was capacity.
+
+#### The rule fired on its own terms, and the margin deserves a note
+
+The registered rule reads on the **point estimate** and the between-seed spread:
+*"factored worse by more than 5 points and the gap exceeding the between-seed
+spread"*. 7.0 > 5 and 7.0 > 1.5, so it fires as written.
+
+**But the paired-*t* interval is [+4.81, +9.11], and 4.81 is below the 5-point
+margin.** Under the stricter reading EXP-010's red-team imposed on *its*
+falsifier — the interval must exclude the margin, not merely the point estimate
+clear it — this would be marginal rather than decisive. That stricter form was
+never written into EXP-011's rule.
+
+This is recorded, not repaired. Rewriting a decision rule after seeing the
+numbers is precisely what pre-registration exists to prevent, and the direction
+of the temptation here is towards the *weaker* conclusion, which makes it no more
+legitimate. The verdict stands as the locked rule gives it; a reader who prefers
+the stricter criterion has both numbers.
+
+#### The number that needed no training
+
+Over 2,500 positions and 51,250 `(cell, tile)` pairs:
+
+| | |
+|---|--:|
+| rotation changes nothing, all tiles | **21.6%** |
+| rotation changes nothing, multi-orbit tiles only | **11.4%** |
+
+adr-005's Phase 3 amendment claims *"a sizeable share of the rotation factor's
+output is not modelling a choice at all"*. **The honest reading is that 11.4% is
+not a sizeable share.** The larger figure includes `P6`, whose orbit is 1 and for
+which the property is vacuous — a definitional artefact, which is why both were
+required. The rotation factor has more to model than the amendment supposed, so
+this is *not* the reason the factored head lost.
+
+#### Anti-circularity — the caveat is now live
+
+The rule fired, so repair 2 of the clearance below applies: **H3's 5×3 member
+carries an architecture-selection caveat in its evidence class**, because the
+architecture was selected by fitting Axis 1 ground truth on 5×3 positions and H3
+later reports Axis 2's agreement against Axis 1 on a set including the 5×3.
+Repair 1 stands independently — H3's 5×3 comparison sample is drawn disjointly
+from seeds 17 and 23.
 
 #### Anti-circularity — the first draft's clearance did not hold
 

@@ -1,0 +1,22 @@
+drew 2500 WIN positions over layers 5..14
+train 2000  held-out 500
+rotation inert on 21.6% of (cell, tile) pairs; 11.4% excluding single-orbit tiles
+  factored seed 0: search 67.2% [63.0%, 71.2%]  supervised 58.6%  xent 3.4663
+  factored seed 1: search 66.6% [62.4%, 70.6%]  supervised 60.4%  xent 3.4436
+  factored seed 2: search 66.2% [61.9%, 70.2%]  supervised 57.4%  xent 3.5153
+  factored seed 3: search 65.8% [61.5%, 69.8%]  supervised 58.0%  xent 3.5840
+  factored seed 4: search 68.0% [63.8%, 71.9%]  supervised 60.8%  xent 3.5020
+      flat seed 0: search 74.2% [70.2%, 77.8%]  supervised 66.6%  xent 3.3971
+      flat seed 1: search 74.2% [70.2%, 77.8%]  supervised 66.6%  xent 3.3835
+      flat seed 2: search 75.6% [71.6%, 79.2%]  supervised 68.6%  xent 3.3871
+      flat seed 3: search 71.8% [67.7%, 75.6%]  supervised 67.8%  xent 3.3546
+      flat seed 4: search 72.8% [68.7%, 76.5%]  supervised 65.6%  xent 3.3989
+
+factored 66.8%
+flat     73.7%
+gap      +7.0%
+spread   1.5%
+floor    39.6%
+verdict  mitigation (a) failed on its own terms; register fallback (b)
+written  results/exp011-factored-head-5x3-h2.json  (8168.8s)
+EXIT=0

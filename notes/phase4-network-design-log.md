@@ -582,14 +582,93 @@ trained network. adr-005: the learned agent must beat it before any result is
 reported.
 -->
 
-## The factored-head independence check
+## The factored-head independence check — the risk materialised
 
-<!--
-adr-005 records the conditional-independence assumption as the main Axis-2 risk
-and requires it to be checked explicitly and logged, not assumed away. The
-fallbacks, in order: condition rotation logits on the chosen cell; then the flat
-1950-logit head. Note the flat head does NOT fix aliasing.
--->
+**EXP-011, run 2026-09-01, 2h16. The registered rule fires.** On the 5×3 the flat
+head beats the factored one and the arms do not overlap:
+
+| | factored | flat | gap |
+|---|--:|--:|--:|
+| top-1 optimality after 400 PUCT sims | **66.8%** | **73.7%** | **+7.0** |
+| supervised top-1 agreement | 58.6–60.8% | 65.6–68.6% | **+8.0** |
+| random-legal-move floor | | 39.6% | |
+
+Per seed: factored `67.2, 66.6, 66.2, 65.8, 68.0`, flat `74.2, 74.2, 75.6, 71.8,
+72.8`. Every factored seed sits below every flat seed. Paired *t* **+6.96**
+[+4.81, +9.11]; between-seed spread 1.5% against a 7.0-point gap.
+
+### The finding is about mitigation (a), not about which head is bigger
+
+adr-005 lists three mitigations *in order* and the first is "rely on MCTS to
+correct the prior, which is exactly what MCTS is for". The entry was rewritten
+after red-team specifically so the primary metric could test it. It did:
+
+- supervised gap **+8.0** points
+- gap after 400 PUCT simulations **+7.0** points
+
+**Search closed about an eighth of the deficit.** Mitigation (a) is not merely
+insufficient here — at this budget on this board it is close to inert. That is a
+sharper statement than "the flat head wins", and it is the one the write-up
+should carry.
+
+### Not an artefact of the schedule
+
+Final *training* policy loss: factored **2.616**, flat **2.375**. The factored arm
+is worse on the data it was fitted to, not only on held-out data, so this is an
+expressiveness ceiling rather than a generalisation gap or an early-stopping
+accident. More epochs do not close it.
+
+### What it does not establish, and this matters
+
+The flat arm has **879,381** parameters against **332,965**; 1,170 logits against
+34. **The experiment cannot separate "cell, tile and rotation are not
+conditionally independent" from "34 logits is not enough capacity."** adr-005's
+question — is the factored head *too costly* — is answered either way, which is
+why the design was pitched at the pipeline level. But the *mechanism* is open,
+and nothing written later may claim otherwise.
+
+Fallback (b), rotation logits conditioned on the chosen cell, is the probe that
+would settle it: it removes the specific independence the ADR names while adding
+far less capacity than (c). If (b) recovers most of the gap the mechanism was
+independence; if it does not, it was capacity.
+
+### The margin, recorded rather than repaired
+
+The registered rule reads on the point estimate and the seed spread: 7.0 > 5 and
+7.0 > 1.5, so it fires as written. **But the paired-*t* interval reaches +4.81,
+just under the 5-point margin.** Under the stricter criterion EXP-010's red-team
+imposed on *its* falsifier — the interval must exclude the margin — this would be
+marginal rather than decisive.
+
+That stricter form was never written into EXP-011's rule, and it is not being
+retrofitted now. Rewriting a decision rule after seeing the numbers is what
+pre-registration exists to prevent, and it is no more legitimate for pointing at
+the weaker conclusion. Both numbers are in the artefact.
+
+### The claim that did not survive
+
+adr-005's Phase 3 amendment asserts that "a sizeable share of the rotation
+factor's output is not modelling a choice at all". Measured over 2,500 positions
+and 51,250 `(cell, tile)` pairs: **21.6%** across all tiles, **11.4%** over
+multi-orbit tiles only. The larger figure counts `P6`, whose orbit is 1 and for
+which the property is vacuous — the definitional artefact the registration
+required both figures in order to expose.
+
+**11.4% is not a sizeable share.** The rotation factor has more to model than the
+amendment supposed, so this is *not* why the factored head lost.
+
+### Consequences carried forward
+
+- **Fallback (b) must be registered and run** — the rule says so, and the ADR
+  pre-specified the order.
+- **R5 rises from 4 to 6** in the risk register: this is no longer a risk that
+  might bite.
+- **H3's 5×3 member now carries an architecture-selection caveat**, the repair
+  the registration pre-committed to for exactly this branch: the architecture was
+  chosen by fitting Axis 1 ground truth on 5×3 positions, and H3 later reports
+  agreement against Axis 1 on a set including the 5×3.
+- **Nothing here is evidence about the 5×5.** The measurement is on a 15-cell
+  board with 8-tile hands.
 
 ## agents/az_agent.py — and a determinism trap the gate walks into
 
