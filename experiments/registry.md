@@ -27,8 +27,8 @@ Freely editable (append-only in practice).
 | EXP-009 | 2026-08-30 | — | 1 | WIN/LOSS mix per layer: the parity split, measured instead of inferred | 5×3-h1, all 16 layers, exhaustive | — | **complete** | **Uniformity breaks at `t = 5`.** Layers 0–4 are uniform — every one of the 12,841,920 configurations at `t = 4` is a P1 win, every one of the 713,440 at `t = 3` a P2 loss — then the parities converge monotonically to 50/50. Confirms EXP-002's criticality boundary and EXP-004's compression ratios from a third direction, and retires the parity question. 70.8 s. [`exp009-parity-5x3-h1.json`](../results/exp009-parity-5x3-h1.json) |
 | EXP-007 | 2026-08-07 | — | 1 | True reachable closure per layer, and what one-step-back predecessor counting misses | 5×3, 15 cells, hands 8 + 7, both arms | — | registered; 3×3 pilot run | **The registered rule runs on the complete 5×3 only** and has not. The 3×3 pilot is instrument shakedown, not the result: [`exp007-3x3-h1.json`](../results/exp007-3x3-h1.json), [`exp007-3x3-h2.json`](../results/exp007-3x3-h2.json). Row added retrospectively on 2026-08-30 — the experiment was registered in full below but never listed here. |
 | EXP-010 | 2026-08-30 | — | 2 | Deduplicated (by-position) MCTS expansion against the naive by-action tree, with a multiplicity-corrected control | 5×3-**h2** (V5 `51192b4d…`), 3,000 WIN positions stratified over `t = 5..14`, uniform prior + rollout leaves, 3 arms, primary at budget 400 | 17 | **complete** | **`B − A = +4.77` pts** [+3.47, +6.06] at the primary budget; falsifier did not fire; every registered prediction held. **The benefit is prior mass, not visit-splitting** — arm C keeps all 540 children, corrects only the priors, and recovers the whole effect (`B − C = −0.77`, not distinguishable from zero). Concentrated where a decision exists: **+8.9** pts on odd layers (floor 16.2%) against **+0.6** on even (floor 66.8%), with layers 12–14 saturated. Aliased mass **27.5%**, tree overhead **+19.6%** (inference cost absent — no network). 22.7 min. [`exp010-mcts-dedup-5x3-h2.json`](../results/exp010-mcts-dedup-5x3-h2.json) |
-| EXP-011 | 2026-08-30 | — | 2 | Is the factored policy head too costly *in the pipeline*? (risk R5) | 5×3-**h2** (V5 `51192b4d…`), 2,500 WIN positions, 2,000 train / 500 held out, 5 seeds per arm, primary = top-1 optimality after 400 PUCT sims; arms **34** vs **1,170** logits (amended 2026-08-31) | 23 | **complete** | **The rule fires: fallback (b) is to be registered and run.** Flat beats factored **+7.0** pts on the primary metric (73.7% vs 66.8%, floor 39.6%), paired *t* **+6.96** [+4.81, +9.11], between-seed spread **1.5%** — the five seeds of each arm do not overlap. **Mitigation (a) is close to inert**: 400 PUCT simulations closed only ~1 point of the **+8.0** supervised gap. Factored is worse on *training* loss too (2.616 vs 2.375), so this is expressiveness, not generalisation. **Cannot separate independence from capacity** — 34 logits against 1,170, 0.33 M params against 0.88 M; (b) is the probe that would. Rotation is inert on only **11.4%** of multi-orbit (cell, tile) pairs, so the ADR's "sizeable share" claim is *not* the reason. Interval reaches +4.81, just under the 5-pt margin — recorded, not repaired. H3's 5×3 member now carries an architecture-selection caveat. [`exp011-factored-head-5x3-h2.json`](../results/exp011-factored-head-5x3-h2.json) |
-| EXP-012 | 2026-09-01 | — | 2 | Fallback (b) — rotation conditioned on cell — and whether EXP-011 measured independence or capacity | 5×3-**h2** (V5 `51192b4d…`), 2,500 WIN positions, 2,000 train / 500 held out, 5 seeds × 4 arms; **B conditioned (373,369 params) and C capacity-matched factored (373,810) differ by 0.12%**, so B − C isolates the structure | 29 | **registered, not yet run** | |
+| EXP-011 | 2026-08-30 | — | 2 | Is the factored policy head too costly *in the pipeline*? (risk R5) | 5×3-**h2** (V5 `51192b4d…`), 2,500 WIN positions, 2,000 train / 500 held out, 5 seeds per arm, primary = top-1 optimality after 400 PUCT sims; arms **34** vs **1,170** logits (amended 2026-08-31) | 23 | **complete** | **The rule fires: fallback (b) is to be registered and run.** Flat beats factored **+7.0** pts on the primary metric (73.7% vs 66.8%, floor 39.6%), paired *t* **+6.96** [+4.81, +9.11], between-seed spread **1.5%** — the five seeds of each arm do not overlap. **Search did not close the gap**: the post-search deficit is +7.0 against a +8.0 supervised one, so mitigation (a) did not rescue the factored head (the 1-point ratio is a point estimate with no registered contrast behind it — see the correction). Factored is worse on *training* loss too (2.616 vs 2.375), so this is expressiveness, not generalisation. **Cannot separate independence from capacity** — 34 logits against 1,170, 0.33 M params against 0.88 M; (b) is the probe that would. Rotation is inert on only **11.4%** of multi-orbit (cell, tile) pairs, so the ADR's "sizeable share" claim is *not* the reason. Interval reaches +4.81, just under the 5-pt margin — recorded, not repaired. H3's 5×3 member now carries an architecture-selection caveat. [`exp011-factored-head-5x3-h2.json`](../results/exp011-factored-head-5x3-h2.json) |
+| EXP-012 | 2026-09-01 | — | 2 | Fallback (b) — rotation conditioned on cell — and whether the **cell** is what it depends on | 5×3-**h2** (V5 `51192b4d…`), 2,500 WIN positions, 2,000 train / 500 held out, 5 seeds × 5 arms. **B (rot given cell), C (pooled control) and E (rot given tile) are identical in parameters and shape — 373,369 — and differ only in the readout index.** | 29 | **registered; rewritten in full after red-team; not yet run** | |
 
 **Registration basis.** EXP-001 through EXP-005 are registered against the H1/H2
 text at tag `v0.3-hypotheses`. Any post-lock amendment to that text is recorded
@@ -2149,7 +2149,22 @@ every one of the five flat seeds** — the arms do not overlap at all, which is
 what the 1.5% spread against a 7.0-point gap says in a different way.
 
 Paired *t* on seed means: **+6.96** [+4.81, +9.11]. Supervised McNemar over all
-seeds: **+8.0 points** [+6.0, +10.0], 680 discordant of 2,500.
+seeds: **+8.0 points**, 680 discordant.
+
+> **Correction (2026-09-01, red-team).** The interval first published here for the
+> supervised McNemar, `[+6.0, +10.0]`, is **wrong and is withdrawn**. It was
+> computed with `n = 2500`, but those 2,500 rows are 5 seeds × the *same* 500
+> held-out positions — five re-measurements of one sample, not 2,500 independent
+> pairs. Treating the position as the independent unit widens the half-width by
+> about `sqrt(5)`, from ±2.0 to roughly **±4.6** points. The point estimate of
+> **+8.0** stands; the interval does not. The instrument's `mcnemar()` inherits
+> the defect and must cluster on positions before it is reused.
+>
+> **This does not touch the verdict**, which reads on the primary metric's paired
+> *t* over seed means — a test whose unit is the seed and which was computed
+> correctly.
+>
+> **It does weaken one sentence below.** See the note under mitigation (a).
 
 #### The sharpest number is the one about mitigation (a)
 
@@ -2160,10 +2175,21 @@ red-team was so the primary metric could speak to it. It does:
 - supervised gap: **+8.0** points
 - gap after 400 PUCT simulations: **+7.0** points
 
-**400 simulations closed about one point of an eight-point deficit — roughly an
-eighth of it.** Mitigation (a) is not merely insufficient; it is close to inert
-at this budget on this board. That is the finding, and it is a stronger statement
-than "the flat head is better".
+**400 simulations closed about one point of an eight-point deficit.** Mitigation
+(a) did not rescue the factored head: the gap survives the search essentially
+intact, and the post-search gap of **+7.0** [+4.81, +9.11] excludes zero
+comfortably. That is the finding, and it is a stronger statement than "the flat
+head is better".
+
+> **Correction (2026-09-01, red-team).** The first wording said search closed
+> "roughly an eighth" of the deficit and called mitigation (a) "close to inert".
+> **The ratio is a point estimate with no interval on it.** The supervised gap
+> and the post-search gap were never contrasted as a tested difference, and once
+> the supervised interval is widened for clustering (above) a 1-point difference
+> between +8.0 and +7.0 is well inside the noise. What survives is the robust
+> claim — **search did not close the gap** — not the arithmetic of how little it
+> closed. A registered contrast of the two gaps would be needed to say more, and
+> none was registered.
 
 #### Not overfitting, and not early stopping
 
@@ -2288,53 +2314,83 @@ sufficient on its own.
 - **The searcher used for the primary is EXP-010's** — uniform-`c_puct`, rollout
   evaluation, deduplicated expansion. Whatever is wrong with it is wrong here too.
 
-**Artefact.** `results/exp011-policy-head-5x3-h2.json`.
+**Artefact.** `results/exp011-factored-head-5x3-h2.json` (this line first
+named `exp011-policy-head-…`, which was never the filename the instrument writes;
+corrected 2026-09-01).
 
-### EXP-012 — fallback (b), and whether it was ever about independence
+### EXP-012 — fallback (b), and whether the cell is what rotation depends on
 
-- **Registered.** 2026-09-01, before any instrument exists. Nothing has been run.
-- **Why it exists.** EXP-011's decision rule fired: the flat head beat the
-  factored one by **+7.0** points of top-1 optimality after 400 PUCT simulations.
-  adr-005 lists the mitigations in order, and with (a) refuted the next is
-  **(b) — rotation logits conditioned on the chosen cell**. This entry runs it.
+- **Registered.** 2026-09-01. **Rewritten in full the same day after
+  `experiment-redteam`, before any instrument existed.** The first draft is
+  superseded and nothing was run from it. Its central claim was false; see below.
+- **Why it exists.** EXP-011's rule fired. adr-005 lists mitigations in order,
+  (a) is refuted, so the next is **(b) — rotation logits conditioned on the
+  chosen cell**.
 - **Hypothesis.** — none. A result here changes the architecture, not a claim
   about FLIPHEX.
 
-#### The question EXP-011 could not answer, and this one is built to
+#### What the first draft got wrong, and it was the premise
 
-EXP-011 compared a 34-logit factored head against a 1,170-logit flat one, at
-332,965 parameters against 879,381. Its own result section says so plainly: it
-**cannot separate** *"cell, tile and rotation are not conditionally independent"*
-from *"34 logits is not enough capacity"*. Both explain the loss.
+It promised to separate *"cell, tile and rotation are not conditionally
+independent"* from *"34 logits is not enough capacity"*, using a fourth arm that
+matched parameter counts while keeping the factored structure. **That cannot
+work, and not for want of a better control.**
 
-That distinction is not academic here. If the cause was capacity, fallback (b)
-may help for a reason unrelated to what adr-005 argues, and the ADR's stated
-rationale would be wrong even where its remedy works. A remedy adopted for the
-wrong reason is the kind of thing that survives into a write-up as an
-explanation.
+EXP-011's confound lives on the **output width** — the dimension of the score
+function the head can express over the action set — and the first draft's control
+held that constant at 34 while the treatment raised it to 118. It varied the
+wrong axis. Worse, the repair is not to pick a different control: in this
+parameterisation *any* relaxation of the factorisation **adds output dimensions**,
+because relaxing the factorisation is what adding them means. Independence and
+output-width capacity are **the same axis**, and no experiment that varies the
+head's factorisation can separate them.
 
-So the arms are chosen to make one contrast answer it.
+So the question is replaced by one that can be answered, and which is closer to
+what adr-005 actually asserts. The ADR does not say "the head needs more
+capacity"; it says **"the best rotation depends heavily on the cell"**. That is a
+claim about *which variable* rotation depends on, and it is testable at fixed
+capacity.
 
 #### Arms
 
-| arm | head | policy params | total params |
-|---|---|--:|--:|
-| **A — factored** | `cell + tile + rotation`, 34 logits | 16,354 | **332,965** |
-| **B — conditioned** | `cell + tile + rotation given cell` (fallback (b)) | 56,758 | **373,369** |
-| **C — factored, capacity-matched** | A's structure, a hidden layer of width **111** before the three factors | 57,199 | **373,810** |
-| **D — flat** | 1,170 logits (fallback (c)) | 562,770 | **879,381** |
+One rotation tensor of shape `(15, 6)` is shared by three arms. **They are
+identical in parameter count, tensor shape and loss-code path, and differ only in
+the index used to read a row.**
 
-**B and C sit within 0.12% of each other in total parameters.** That is the whole
-design: they differ in *structure* and not in size, so
+| arm | rotation term in the score | total params |
+|---|---|--:|
+| **A — factored** | `rot[r]`, a 6-vector (the incumbent) | 332,965 |
+| **B — rotation given cell** | `rot[cell, r]` — fallback (b) | **373,369** |
+| **C — pooled control** | `mean over rows of rot[·, r]` | **373,369** |
+| **E — rotation given tile** | `rot[tile, r]`, rows 0–12; rows 13–14 unused | **373,369** |
+| **D — flat** | one logit per triple, 1,170 — fallback (c) | 879,381 |
 
-- **B − C** isolates the conditioning — the independence question, asked cleanly.
-- **C − A** isolates capacity inside the factored family, with the independence
-  structure untouched.
-- **D** is fallback (c) and, on a fresh sample, a replication check on EXP-011.
+C carries B's parameters and B's shape while its **function class is exactly
+A's**: pooling collapses the 90 weights to a 6-vector, so its expressive
+dimension over actions is 32, the same as A's. Gradients still reach all 90
+weights. That is the point — C is *"B's parameterisation without the
+conditioning"*.
+
+E's two unused rows are stated rather than trimmed, so that E's parameter count
+stays exactly B's and C's. They receive no gradient.
+
+| contrast | what it asks |
+|---|---|
+| **B − C** | Does conditioning on the cell help, at identical parameters and shape? **adr-005's named mechanism.** |
+| **E − C** | Does conditioning on the *tile* help, on identical terms? |
+| **B − E** | Is the **cell** specifically the right conditioner, as the ADR claims? |
+| **D − B** | Adoption: does (b) reach the flat head? |
+| **C − A** | **Validity precondition** — see below. |
+
+**C − A is a precondition, not a finding.** C and A have the same function class,
+so C − A should be indistinguishable from zero. If C is materially *worse* than
+A, the control is handicapped by its own parameterisation and `B − C` is positive
+by that handicap alone — which would fire the mechanism branch on an artefact.
+**If the C − A interval does not contain zero, every mechanism contrast is
+recorded as unresolved regardless of what it shows.**
 
 Identical tower, optimiser, epochs, batch order and training positions across all
-four, as in EXP-011. Trained independently, tower and head together — the
-deployment configuration.
+five. Trained jointly, tower and head together — the deployment configuration.
 
 #### Ground truth and sample
 
@@ -2342,99 +2398,235 @@ deployment configuration.
 `51192b4d403ac1cb45c22d92ce58bab215843f457f245e7aca6d18744f8a3f43`, verified
 before drawing.
 
-- **2,500 positions, seed 29 — a fresh draw**, disjoint from EXP-010's seed 17
-  and EXP-011's seed 23. Reusing EXP-011's held-out set would make this a second
-  decision on the same data, which is a forking path with no multiplicity
-  control; EXP-011's own entry names that hazard and this avoids it.
-- Stratified uniformly across `t = 5..14`, restricted to WIN positions for the
-  side to move, as in both prior entries.
-- **2,000 train / 500 held-out. Every reported number is on the held-out 500.**
-- **5 seeds per arm**, so 20 training runs. EXP-011 took 2h16 for 10; budget ~5 h.
+- **2,500 positions, seed 29**, stratified uniformly across `t = 5..14`,
+  restricted to WIN positions for the side to move.
+- **2,000 train / 500 held out. Every reported number is on the held-out 500.**
+- **5 seeds per arm**, 25 training runs. EXP-011 took 2h16 for 10; budget ~6 h.
+- **Disjointness is measured, not asserted.** The artefact records a sorted list
+  of the drawn layer indices and the measured intersection with EXP-010's seed-17
+  and EXP-011's seed-23 draws. Both prior entries claimed checkable disjointness
+  while recording only the seed, which makes the check depend on `draw_layer`
+  never changing.
+
+#### Schedule, pinned
+
+EXP-011 left these to the instrument. With five arms whose heads span 16k to 563k
+parameters at one fixed schedule, "capacity" and "optimisation budget at this
+schedule" are not separable unless the schedule is fixed and convergence is
+shown.
+
+**40 epochs, batch 64, Adam at lr 1e-3, weight decay 1e-4** — EXP-011's values, so
+the two entries are readable together.
+
+**Convergence is reported, not assumed.** Per arm and seed: the mean per-epoch
+training-loss improvement over the final five epochs. One seed per arm is re-run
+at 80 epochs; if any arm's held-out primary moves by more than 2 points, the
+schedule is under-trained and the run is reported as such rather than
+interpreted. EXP-011 inferred "more epochs would not close it" from a final loss
+value with no convergence check behind it.
 
 #### Metrics
 
-Unchanged from EXP-011, so the two are readable together:
-
 1. **Primary — top-1 optimality after 400 PUCT simulations**, each head supplying
-   the prior, on the held-out 500, at 5 seeds per arm.
-2. **Secondary — supervised top-1 agreement and cross-entropy** at the position
-   level, aggregating aliased actions.
-3. **Reported beside both** — the random-legal-move floor, and the supervised
-   gap next to the post-search gap, since the size of the difference between them
-   is what measured mitigation (a) last time.
+   the prior, on the held-out 500, 5 seeds per arm.
+2. **Secondary — supervised top-1 agreement and cross-entropy**, position level.
+3. **Reported beside both** — the random-legal-move floor, and a **pre-registered
+   stratified read by layer parity**. EXP-010 measured the effect concentrated on
+   odd layers (+8.9) against even ones (+0.6, floor 66.8%), where a random move
+   is already optimal two thirds of the time. Against contrasts expected at 2–3
+   points, pooling the two dilutes the signal. Registered here so it is a planned
+   read and not a subgroup hunt.
 
-The unit is the **position**, not the action label, for the reason recorded in
-EXP-011.
+The unit is the **position**, not the action label.
+
+#### The test, named
+
+EXP-011 said "the interval" without saying which, and two candidates in its own
+artefact differ by more than 2×.
+
+- **Adoption and mechanism are read on the paired *t* over the 5 seed means**,
+  `t(4) = 2.776`, **conditional on the fixed held-out set**. This interval
+  captures training-seed variance only.
+- **The position-sampling component is reported separately** as a bootstrap
+  **clustered on the 500 positions**, and the write-up quotes the wider of the
+  two.
+- **EXP-011's `mcnemar()` is not reused as written.** It divided by `n = 2500`
+  where those rows are 5 seeds × the same 500 positions, understating the
+  half-width by about `sqrt(5)`. The correction is recorded in EXP-011's result
+  section; the instrument here clusters on positions.
 
 #### Decision rule
 
-Read on the primary metric, held-out, with the between-seed spread alongside.
-**Every threshold below is on the interval, not on the point estimate** — see the
-note that follows.
+**Adoption**, read on `D − B` at α = 0.05, following adr-005's order:
 
-**Adoption**, following adr-005's order:
+- **Interval entirely below 5 points** → **adopt (b)**. The architecture record
+  is amended to the conditioned head; (c) is not run.
+- **Interval entirely above 5 points** → (b) is refuted; **adopt (c)**, the flat
+  head. Recorded now: **(c) does not fix action aliasing** — 1,170 logits over
+  540 legal moves is the same redundancy with more parameters.
+- **Interval spanning 5** → **not a result**; see the extension rule.
 
-- **B reaches within 5 points of D**, the interval excluding a 5-point deficit →
-  **adopt (b)**. The architecture record is amended to the conditioned head and
-  (c) is not run.
-- **B fails to reach within 5 points of D**, the interval excluding it → **(b) is
-  refuted; adopt (c)**, the flat head. Recorded now so it cannot be forgotten:
-  **(c) does not fix action aliasing** — 1,170 logits over 540 legal moves is the
-  same redundancy with more parameters, and only deduplicated expansion addresses
-  it.
-- Interval spanning the 5-point mark → **not a result**. Add seeds; adopt nothing.
+**Operating characteristics, computed in advance.** At the half-width EXP-011
+observed (≈2.1 points on seed means):
 
-**Mechanism**, reported whichever way adoption goes and never used to adopt:
+| `D − B` | verdict |
+|---|---|
+| < 2.9 | adopt (b) |
+| 2.9 – 7.1 | **not a result** |
+| > 7.1 | refute (b), adopt (c) |
 
-- **B − C interval above 0** → the conditioning helps at fixed capacity. The
-  independence assumption was a real cost and adr-005's rationale is supported.
-- **B − C interval containing 0, with C − A above 0** → it was **capacity**, not
-  independence. adr-005's remedy may still be worth adopting; its stated reason
-  would not be.
-- **Both intervals containing 0** → neither mechanism is resolved at this sample.
+Two things follow and are accepted deliberately rather than discovered later.
+The expected `D − B` is roughly 1 to 3.5, so **"not a result" is a likely
+outcome**. And the refutation branch needs B to trail D by more than A did
+(`D − A` was 7.0) — B strictly contains A, so **that branch is close to
+unreachable**. This experiment is powered to *adopt or fail to decide*, not to
+refute.
 
-**Power, stated in advance because EXP-011 showed it matters.** At 5 seeds with a
-between-seed spread of ~1.5 points, the paired-*t* half-width on seed means is
-about 2 points. **A true B − C difference below ~3 points will not be resolved**,
-and if that happens the reported outcome is "not resolved" — not a reinterpretation
-of a near-miss.
+**Extension, bounded.** If the rule does not resolve at 5 seeds, **exactly one**
+extension to **12 seeds** is run and the rule re-read **once**, at Bonferroni
+α = 0.025. No further extension. Unbounded "add seeds until it clears" is
+optional stopping, and it is also the channel by which the mechanism read leaks
+into adoption — when the adoption interval straddles 5, the mechanism contrasts
+are already visible and would inform how hard one pushes.
 
-#### Why the thresholds moved to the interval
+**Arm C is not adoptable.** It exists to be a control. If C is the strongest arm,
+that is recorded and a new entry is registered; nothing is adopted from this one.
+Arm E is likewise diagnostic — it is not one of adr-005's fallbacks.
 
-EXP-011's rule read on the **point estimate**: "worse by more than 5 points and
-the gap exceeding the between-seed spread". It fired at +7.0 — and its paired-*t*
-interval reached +4.81, below the very margin the rule named. The verdict stands,
-because rewriting a locked rule after seeing numbers is what pre-registration
-exists to prevent, but the weakness was real and EXP-010's red-team had already
-identified the same defect in *its* falsifier.
+**Mechanism**, exploratory, at Bonferroni α = 0.025 per contrast, **never used to
+adopt**, and void unless the C − A precondition passes:
 
-Writing the stricter form into a **new** entry, before any data exists, is the
-legitimate way to fix it.
+- `B − C` above zero → conditioning on the cell helps at fixed capacity; the
+  ADR's named mechanism is supported.
+- `B − C` containing zero → it is not supported at this sample.
+- `E − C` above zero **and** `B − E` containing zero → conditioning helps but
+  **the cell is not what matters** — the tile does as well. That would leave
+  adr-005's remedy standing and its stated reason wrong, which is the outcome
+  this design exists to be able to see.
+
+**Power, stated in advance.** ≈2.1-point half-width gives roughly 80% power at a
+true 3-point difference and ~55% at 2 points. **A true `B − C` below ~3 points
+will not resolve**, and "not resolved" is then the reported outcome. Note this
+means the split one might most expect — "conditioning explains 2 points, capacity
+explains 5" — sits below the detectable range **by design**, and no amount of
+reinterpretation after the fact changes that.
+
+**The pairing buys nothing, and that is measured.** Backing the correlation out of
+EXP-011's numbers gives ≈ −0.05 between arms across seeds: despite a shared
+position sample, batch order and MCTS seeds, the paired design produced no
+variance reduction. The power figures above assume independence and are correct
+on that basis, but this design must not be described as paired-and-therefore-
+powered. One repair is available and is taken: `FlipHexNet` constructs the value
+head **after** the policy heads, so a change in head size shifts the RNG stream
+and the value head initialises differently across arms at the same seed.
+Constructing it first makes the entire non-policy network bit-identical across
+arms. The artefact reports `sd(differences)` and the implied correlation.
+
+#### Correctness preconditions
+
+Both must pass before the run counts as evidence.
+
+1. **Each arm's normaliser is verified against brute force.** Arm B's score is
+   **not additively separable**, so the closed form `az/train.py` uses is invalid
+   for it; the correct one is nested,
+   `Z = LSE over empty c of ( cell[c] + LSE over available (t,r) of (tile[t] + rot[c,r]) )`.
+   A and C are separable (a pooled rotation row is a 6-vector); E is separable
+   too, since `rot[tile, r]` folds into the tile-rotation factor. Only B changes.
+   A wrong normaliser does not raise — it optimises the wrong distribution and
+   reads as a slightly worse arm, and it would land on **B specifically**, in the
+   direction that refutes (b). Each arm must reproduce a
+   `logsumexp`-over-generated-moves equivalence on three variants and three
+   depths, matching the existing test's coverage.
+2. **The C − A precondition above.**
+
+#### Threats to validity
+
+EXP-011 had a threats section; this inherits it and adds to it.
+
+- **The targets are exact optimal play; deployment trains on MCTS visit counts.**
+  EXP-011 framed this as a bound on *level*. The sharper risk is a **rank
+  inversion between arms**: a constrained head is a regulariser, and against
+  clean near-deterministic labels extra capacity is pure gain, while against
+  noisy non-stationary self-play targets the ordering can change. Every arm here
+  trains on labels the pipeline never sees. **If the ordering inverts under
+  self-play targets, the architecture shipped by this entry is wrong in the
+  deployed condition while the measurement reads clean.**
+- **The sample is the low-branching tail.** Layers 5–14 of 16, WIN-for-mover
+  only. The factored head's weakness should be largest where the joint
+  cell×tile×rotation structure is richest — near the root, at 540 moves on this
+  board and 1,450 on the 5×5. This measures it where it is **least** stressed,
+  which biases toward accepting the factored family.
+- **`dirichlet_weight = 0` at evaluation.** Deployment puts noise at the root,
+  which partially masks prior differences, so this overstates the prior's
+  influence relative to deployment.
+- **The 5×3 understates (b) specifically.** B's conditioning is 15×6 here and
+  25×6 on the 5×5, and cell–rotation interaction grows with the board. A
+  (b)-loses result here would not license refuting (b) on the 5×5 — which is one
+  more reason the refutation branch is not the one to lean on.
+- **Mechanism claims are network-level, not head-level.** All arms train tower
+  and head jointly, so `B − C` is a difference between two networks whose heads
+  differ, not the isolated effect of a head term. **EXP-011 pre-registered a
+  frozen-shared-tower arm as the diagnostic for exactly this**, and it is
+  declined here deliberately: the adoption decision is a pipeline decision and
+  must be measured in the deployment configuration. The cost is that the
+  mechanism contrasts carry this limitation, and the C arm — identical shapes,
+  identical parameters, same code path — is the mitigation, not a substitute.
+- **Nothing here is evidence about the 5×5.**
 
 #### Anti-circularity
 
-The caveat is already live. EXP-011's rule fired, so H3's 5×3 member carries an
-architecture-selection caveat in its evidence class: the architecture is being
-chosen by fitting Axis 1 ground truth on 5×3 positions, and H3 later reports
-Axis 2's agreement against Axis 1 on a set that includes the 5×3. This entry does
-not deepen the leak — it is the same ternary choice among fallbacks adr-005
-already enumerated — but it does not lift it either.
+The first draft claimed this entry "does not deepen the leak". **That was wrong
+in three ways** and is replaced by a count.
 
-Repair 1 stands and is extended: **H3's 5×3 comparison sample is drawn disjointly
-from seeds 17, 23 and now 29**, all three recorded in their artefacts so the
-disjointness is checkable rather than asserted.
+1. The choice set is not adr-005's three fallbacks. Arms C and E are
+   architectures invented for this experiment; C is explicitly not adoptable and
+   E is diagnostic, but the enumeration is larger than the ADR's.
+2. The selection is **cumulative and conditioned**: EXP-012's arms were chosen
+   after seeing EXP-011's numbers. What adr-004 R1 protects is how much of the
+   deployed architecture is a function of Axis 1's answers on a variant inside
+   H3's comparison set, and that grows with each *decision*, not with each
+   dataset.
+3. Drawing seed 29 disjointly prevents statistical overlap between the selection
+   sample and H3's evaluation sample. It does **not** touch the mechanism of the
+   rule — the architecture is a function of solver labels on the 5×3, and H3
+   reports agreement with the solver on a set including the 5×3. Disjointness is
+   necessary and nowhere near sufficient.
+
+**Therefore:** H3's 5×3 evidence class records **the number of architecture
+decisions taken against 5×3 ground truth** — after this entry, **two**, over a
+choice set of five architectures. The caveat scales with the thing it qualifies
+instead of being a fixed sentence. The clean escape, if one is wanted later, is
+to select on something that is not solver agreement: final self-play training
+loss, or the plain-UCT floor adr-005's Phase 2 amendment already defines.
 
 #### Expected result
 
-Pre-registered so that being wrong costs something:
+Stated as interval claims the design can adjudicate, rather than point guesses
+inside its own blind spot.
 
-1. **D remains the strongest arm**, reproducing EXP-011's flat-over-factored gap
-   on a fresh sample within its interval.
-2. **B lands between A and D**, closer to D than to A.
-3. **C − A is positive but small** — under 3 points. If C alone closes most of
-   the 7-point gap, EXP-011 measured capacity and the independence story was
-   never load-bearing, which would be the most interesting outcome here and the
-   one this design exists to be able to see.
+1. **The `C − A` interval contains zero.** If it does not, the precondition fails
+   and the mechanism contrasts are void — this is the prediction whose failure
+   costs the most.
+2. **`D − B` lands in the "not a result" band (2.9–7.1).** Registered as the
+   modal outcome so that indecision is not later reported as a surprise.
+3. **The `B − C` interval contains zero.** The rotation-inertness measurement in
+   EXP-011 — 11.4% over multi-orbit pairs — already undercut the ADR's claim that
+   much of the rotation factor models no choice; this predicts its other claim,
+   that rotation depends heavily on the *cell*, is also weaker than stated.
+4. **`B − E` contains zero** — cell and tile work about as well as each other as
+   conditioners.
+
+Predictions 3 and 4 together say the ADR's stated mechanism is not what is
+happening. If they hold while `D − B` is small, the honest reading is that the
+flat head's advantage in EXP-011 was width, the conditioning recovers part of it
+for reasons the ADR did not name, and the write-up must say so.
+
+#### Artefact
+
+`results/exp012-conditioned-head-5x3-h2.json`, written by
+`scripts/exp012_conditioned_head.py`. Both named here so the provenance drift in
+EXP-011's entry — which registered a filename the instrument never wrote — is not
+repeated.
 
 
 ## Planned
