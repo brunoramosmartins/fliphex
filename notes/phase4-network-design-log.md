@@ -627,10 +627,18 @@ question — is the factored head *too costly* — is answered either way, which
 why the design was pitched at the pipeline level. But the *mechanism* is open,
 and nothing written later may claim otherwise.
 
-Fallback (b), rotation logits conditioned on the chosen cell, is the probe that
-would settle it: it removes the specific independence the ADR names while adding
-far less capacity than (c). If (b) recovers most of the gap the mechanism was
-independence; if it does not, it was capacity.
+Fallback (b), rotation logits conditioned on the chosen cell, is registered as
+EXP-012.
+
+**Correction (2026-09-01).** This paragraph originally said (b) *"is the probe
+that would settle it — if (b) recovers most of the gap the mechanism was
+independence; if it does not, it was capacity"*. That is **withdrawn as
+impossible rather than unproven**. In this parameterisation any relaxation of the
+factorisation adds output dimensions, because relaxing it is what adding them
+means: independence and output-width capacity are the same axis, and no
+experiment varying the head's factorisation separates them. EXP-012 replaces the
+question with one that is answerable — whether the **cell** is what rotation
+depends on, which is adr-005's actual assertion.
 
 ### The margin, recorded rather than repaired
 
