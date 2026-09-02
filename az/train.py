@@ -54,13 +54,20 @@ two axes are later compared on.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import torch
 from torch import Tensor
 
 from az.encoding import EMPTY_PLANE, N_HAND_PLANES, OWN_HAND_PLANE
-from az.network import N_ROTATIONS, FlatHeadNet, FlipHexNet
+from az.network import (
+    N_ROTATIONS,
+    ConditionedHeadNet,
+    FlatHeadNet,
+    FlipHexNet,
+    RotationReadout,
+)
 from az.replay_buffer import ReplayBuffer, Sample
 from fliphex.state import TILES
 
@@ -206,6 +213,105 @@ def policy_loss(
     return (normaliser - expected).mean()
 
 
+def conditioned_normaliser(
+    cell_logits: Tensor,
+    tile_logits: Tensor,
+    rows: Tensor,
+    planes: Tensor,
+    readout: RotationReadout,
+) -> Tensor:
+    """``log Σ exp(score)`` for EXP-012's three matched arms.
+
+    Only the **cell** readout is genuinely different. Under it the score is
+    ``cell[c] + tile[t] + rows[c, r]``, which is **not additively separable**, so
+    :func:`legal_normaliser`'s two-term split is invalid and the correct form is
+    nested::
+
+        Z = LSE over empty c of ( cell[c] + LSE over available (t,r) of
+                                  (tile[t] + rows[c, r]) )
+
+    A wrong normaliser here would not raise. It would optimise the wrong
+    distribution and read as a slightly weaker arm — on the cell arm specifically,
+    which is the one the adoption rule is about, in the direction that refutes it.
+
+    The pooled readout collapses to a 6-vector and the tile readout folds into
+    the tile–rotation block; both stay separable and are computed as such rather
+    than through the expensive nested path.
+
+    Args:
+        cell_logits: ``(B, n_cells)``.
+        tile_logits: ``(B, 13)``.
+        rows: ``(B, n_cells, 6)``.
+        planes: the input the logits came from.
+        readout: which arm this is.
+
+    Returns:
+        ``(B,)`` normalisers.
+    """
+    batch = rows.shape[0]
+    n_cells = cell_logits.shape[1]
+    empty = planes[:, EMPTY_PLANE].reshape(batch, -1).bool()
+    hand = planes[:, OWN_HAND_PLANE : OWN_HAND_PLANE + N_HAND_PLANES, 0, 0].bool()
+    orbit = ORBIT_MASK.to(planes.device)
+
+    n_rows = rows.shape[1]
+    if readout is RotationReadout.POOLED:
+        pooled = rows.mean(dim=1) * math.sqrt(n_rows)
+        return legal_normaliser(cell_logits, tile_logits, pooled, planes)
+
+    if readout is RotationReadout.TILE:
+        # pair[b, t, r] = tile[t] + rows[t, r]; rows beyond the tile count are
+        # unreachable because `hand` never selects them.
+        pair = tile_logits.unsqueeze(2) + rows[:, :N_HAND_PLANES, :]
+        available = hand.unsqueeze(2) & orbit.unsqueeze(0)
+        pairs = torch.logsumexp(
+            pair.masked_fill(~available, NEG_INF).reshape(batch, -1), dim=1
+        )
+        cells = torch.logsumexp(cell_logits.masked_fill(~empty, NEG_INF), dim=1)
+        return cells + pairs
+
+    # CELL: the inner sum depends on the cell, so it cannot be factored out.
+    cell_rows = rows[:, :n_cells, :]
+    pair = tile_logits[:, None, :, None] + cell_rows[:, :, None, :]
+    available = (hand.unsqueeze(2) & orbit.unsqueeze(0)).unsqueeze(1)
+    inner = torch.logsumexp(
+        pair.masked_fill(~available, NEG_INF).reshape(batch, n_cells, -1), dim=2
+    )
+    return torch.logsumexp((cell_logits + inner).masked_fill(~empty, NEG_INF), dim=1)
+
+
+def conditioned_policy_loss(
+    cell_logits: Tensor,
+    tile_logits: Tensor,
+    rows: Tensor,
+    batch: Batch,
+    readout: RotationReadout,
+) -> Tensor:
+    """Cross-entropy for a conditioned arm, using its own normaliser."""
+    size = len(batch)
+    normaliser = conditioned_normaliser(
+        cell_logits, tile_logits, rows, batch.planes, readout
+    )
+
+    if readout is RotationReadout.CELL:
+        rotation = rows[batch.index, batch.cells, batch.rotations]
+    elif readout is RotationReadout.TILE:
+        rotation = rows[batch.index, batch.tiles, batch.rotations]
+    else:
+        pooled = rows.mean(dim=1) * math.sqrt(rows.shape[1])
+        rotation = pooled[batch.index, batch.rotations]
+
+    scores = (
+        cell_logits[batch.index, batch.cells]
+        + tile_logits[batch.index, batch.tiles]
+        + rotation
+    )
+    expected = torch.zeros(size, device=scores.device, dtype=scores.dtype)
+    expected.index_add_(0, batch.index, batch.probs * scores)
+
+    return (normaliser - expected).mean()
+
+
 def legal_mask(planes: Tensor, n_cells: int) -> Tensor:
     """``(B, n_cells * 13 * 6)`` boolean mask of the legal triples.
 
@@ -264,6 +370,11 @@ def train_step(
     if isinstance(net, FlatHeadNet):
         logits, value = net(batch.planes)
         policy = flat_policy_loss(logits, batch, net.n_cells)
+    elif isinstance(net, ConditionedHeadNet):
+        cell_logits, tile_logits, rows, value = net(batch.planes)
+        policy = conditioned_policy_loss(
+            cell_logits, tile_logits, rows, batch, net.readout
+        )
     else:
         cell_logits, tile_logits, rotation_logits, value = net(batch.planes)
         policy = policy_loss(cell_logits, tile_logits, rotation_logits, batch)

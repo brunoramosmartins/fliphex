@@ -43,6 +43,9 @@ selected using ground truth the two axes are later compared against.
 
 from __future__ import annotations
 
+import math
+from enum import StrEnum
+
 import torch
 from torch import Tensor, nn
 
@@ -109,19 +112,13 @@ class FlipHexNet(nn.Module):
         )
         self.tower = nn.Sequential(*(ResidualBlock(filters) for _ in range(blocks)))
 
-        # -- policy head: three factors, 1x1 conv down then one linear each ----
-        self.policy_conv = nn.Sequential(
-            nn.Conv2d(filters, 32, 1, bias=False),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.Flatten(),
-        )
-        policy_features = 32 * self.n_cells
-        self.cell_head = nn.Linear(policy_features, self.n_cells)
-        self.tile_head = nn.Linear(policy_features, N_HAND_PLANES)
-        self.rotation_head = nn.Linear(policy_features, N_ROTATIONS)
-
-        # -- value head -------------------------------------------------------
+        # -- value head, built FIRST ------------------------------------------
+        # Deliberately ahead of the policy heads. Constructing it after them
+        # means a change in head size shifts the RNG stream, so two architectures
+        # sharing a seed get different value heads — and then a comparison
+        # between heads silently includes a difference in the value head as well.
+        # Built first, everything that is not the policy head is bit-identical
+        # across architectures at a given seed.
         self.value_head = nn.Sequential(
             nn.Conv2d(filters, 1, 1, bias=False),
             nn.BatchNorm2d(1),
@@ -132,6 +129,19 @@ class FlipHexNet(nn.Module):
             nn.Linear(64, 1),
             nn.Tanh(),
         )
+
+        # -- policy head: three factors, 1x1 conv down then one linear each ----
+        self.policy_conv = nn.Sequential(
+            nn.Conv2d(filters, 32, 1, bias=False),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.Flatten(),
+        )
+        policy_features = 32 * self.n_cells
+        self.policy_features = policy_features
+        self.cell_head = nn.Linear(policy_features, self.n_cells)
+        self.tile_head = nn.Linear(policy_features, N_HAND_PLANES)
+        self.rotation_head = nn.Linear(policy_features, N_ROTATIONS)
 
     def forward(self, x: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor]:
         """Return ``(cell_logits, tile_logits, rotation_logits, value)``.
@@ -156,6 +166,114 @@ class FlipHexNet(nn.Module):
     def count_parameters(self) -> int:
         """Return the number of trainable parameters."""
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
+class RotationReadout(StrEnum):
+    """How EXP-012's three matched arms read a row from one ``(n_cells, 6)``
+    rotation tensor. The tensor, its parameter count and its shape are identical
+    across all three; only this index differs."""
+
+    #: Fallback (b): the row is chosen by the cell being played.
+    CELL = "cell"
+    #: The control: no row is chosen — they are pooled, so the function class
+    #: collapses to the plain factored head's while the parameters stay.
+    POOLED = "pooled"
+    #: The diagnostic: the row is chosen by the tile being played.
+    TILE = "tile"
+
+
+class ConditionedHeadNet(FlipHexNet):
+    """The same tower, with rotation logits laid out as ``(n_cells, 6)``.
+
+    EXP-012's arms B, C and E are three instances of this class differing only in
+    :class:`RotationReadout`. They are identical in parameter count and tensor
+    shape, which is what lets ``B − C`` isolate the conditioning rather than the
+    size — the separation EXP-011 could not make.
+
+    Two details are load-bearing rather than incidental:
+
+    **The pooled readout is scaled by ``sqrt(n_cells)``.** ``Linear`` initialises
+    its rows independently, so a plain mean of ``n_cells`` rows starts at
+    ``1/sqrt(n_cells)`` of a single row's standard deviation — the control's
+    rotation term would begin at a quarter of the treatment's scale on a 15-cell
+    board. Identical parameter counts do not imply identical initialisation of
+    the *function*. The scaling leaves the function class untouched.
+
+    **The equivalence of the pooled arm to the plain factored head depends on the
+    optimiser being Adam.** Pooling gives each row ``1/n_cells`` of the gradient a
+    single row would receive; Adam's per-parameter normalisation is scale
+    invariant, so every row takes the same step and the pooled logit moves at the
+    plain head's rate. Under plain SGD it would train ``n_cells`` times slower and
+    the control would fail for a reason with nothing to do with the design.
+
+    On the tile readout, note that rows beyond the deck receive no gradient: the
+    5x3-h2 deck holds 8 tiles of 13, so 7 of 15 rows are dead there. That arm is
+    **not** capacity-matched to the other two, and the registration records the
+    deficit rather than hiding it.
+    """
+
+    def __init__(
+        self,
+        n_cols: int = 5,
+        n_rows: int = 5,
+        *,
+        readout: RotationReadout = RotationReadout.CELL,
+        **kwargs,
+    ) -> None:
+        super().__init__(n_cols, n_rows, **kwargs)
+        self.readout = RotationReadout(readout)
+        # The tensor must have a row for every index any readout can produce:
+        # cells for the cell readout, tiles for the tile one. Sizing it to the
+        # larger keeps all three arms parameter-identical on every board -- on a
+        # 9-cell board a 9-row tensor cannot be indexed by a 13-tile deck at all,
+        # and sizing per readout would break the very matching the arms exist for.
+        self.rotation_rows = max(self.n_cells, N_HAND_PLANES)
+        del self.rotation_head
+        self.rotation_head = nn.Linear(
+            self.policy_features, self.rotation_rows * N_ROTATIONS
+        )
+
+    def forward(self, x: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor]:
+        """Return ``(cell_logits, tile_logits, rotation_rows, value)``.
+
+        ``rotation_rows`` is ``(batch, n_cells, 6)`` for every readout. Reducing
+        it is the caller's job, because the reduction *is* the arm.
+        """
+        features = self.tower(self.stem(x))
+        policy = self.policy_conv(features)
+        rows = self.rotation_head(policy).view(-1, self.rotation_rows, N_ROTATIONS)
+        return (
+            self.cell_head(policy),
+            self.tile_head(policy),
+            rows,
+            self.value_head(features).squeeze(-1),
+        )
+
+    def reduce_rows(self, rows: Tensor, index: Tensor, cells: Tensor, tiles: Tensor):
+        """Per-move rotation logits, gathered for a flattened ragged batch.
+
+        Args:
+            rows: ``(batch, n_cells, 6)``.
+            index: ``(m,)`` which batch row each move belongs to.
+            cells: ``(m,)`` cell of each move.
+            tiles: ``(m,)`` tile of each move.
+
+        Returns:
+            ``(m, 6)``.
+        """
+        if self.readout is RotationReadout.CELL:
+            return rows[index, cells]
+        if self.readout is RotationReadout.TILE:
+            return rows[index, tiles]
+        pooled = rows.mean(dim=1) * math.sqrt(self.rotation_rows)  # (batch, 6)
+        return pooled[index]
+
+    def pooled_vector(self, rows: Tensor) -> Tensor:
+        """``(batch, 6)`` — the pooled arm's effective rotation vector."""
+        return rows.mean(dim=1) * math.sqrt(self.rotation_rows)
+
+    def __repr__(self) -> str:
+        return f"ConditionedHeadNet(readout={self.readout.value})"
 
 
 class FlatHeadNet(FlipHexNet):

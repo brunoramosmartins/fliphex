@@ -347,3 +347,146 @@ def test_the_flat_head_is_bigger_where_it_matters():
     assert factored_logits == 34
     assert flat.flat_head.out_features == 1170
     assert flat.count_parameters() > factored.count_parameters()
+
+
+# -- EXP-012's three matched arms ---------------------------------------------
+
+
+@pytest.mark.parametrize("readout", ["cell", "pooled", "tile"])
+@pytest.mark.parametrize("variant", [FULL, SMALL, TINY])
+@pytest.mark.parametrize("plies", [0, 3, 7])
+def test_each_conditioned_normaliser_equals_brute_force(readout, variant, plies):
+    """The precondition EXP-012 registers.
+
+    The cell readout's score is not additively separable, so the two-term split
+    the factored head uses is invalid for it. A wrong normaliser does not raise:
+    it optimises the wrong distribution and reads as a slightly weaker arm --
+    on the arm the adoption rule is about, in the direction that refutes it.
+    """
+    import math as _math
+
+    from az.network import RotationReadout
+    from az.train import conditioned_normaliser
+
+    torch.manual_seed(plies + variant.n_cells)
+    board, state = advance(variant, plies)
+    moves = legal_moves(board, state)
+    mode = RotationReadout(readout)
+
+    cell = torch.randn(1, variant.n_cells)
+    tile = torch.randn(1, 13)
+    rows = torch.randn(1, max(variant.n_cells, 13), 6)
+    planes = _planes(board, state)
+
+    if mode is RotationReadout.CELL:
+
+        def term(m):
+            return rows[0, m.cell, m.rotation]
+    elif mode is RotationReadout.TILE:
+
+        def term(m):
+            return rows[0, m.tile, m.rotation]
+    else:
+        pooled = rows.mean(dim=1) * _math.sqrt(rows.shape[1])
+
+        def term(m):
+            return pooled[0, m.rotation]
+
+    brute = torch.logsumexp(
+        torch.stack([cell[0, m.cell] + tile[0, m.tile] + term(m) for m in moves]),
+        dim=0,
+    )
+    closed = conditioned_normaliser(cell, tile, rows, planes, mode)
+
+    assert closed[0].item() == pytest.approx(brute.item(), abs=1e-4)
+
+
+def test_the_three_arms_have_identical_parameter_counts():
+    """B - C isolates the conditioning only if the size is held fixed."""
+    from az.network import ConditionedHeadNet, RotationReadout
+
+    counts = set()
+    for readout in RotationReadout:
+        torch.manual_seed(0)
+        counts.add(ConditionedHeadNet(5, 3, readout=readout).count_parameters())
+
+    assert counts == {373369}
+
+
+def test_everything_but_the_policy_head_is_identical_across_architectures():
+    """The value head is constructed first, so a head-size change cannot shift
+    the RNG stream and give two arms different value heads at one seed."""
+    from az.network import ConditionedHeadNet, FlatHeadNet, RotationReadout
+
+    nets = []
+    for build in (
+        lambda: FlipHexNet(5, 3),
+        lambda: FlatHeadNet(5, 3),
+        lambda: ConditionedHeadNet(5, 3, readout=RotationReadout.CELL),
+    ):
+        torch.manual_seed(0)
+        nets.append(build())
+
+    reference = nets[0]
+    for other in nets[1:]:
+        for module in ("stem", "tower", "value_head", "policy_conv"):
+            for a, b in zip(
+                getattr(reference, module).parameters(),
+                getattr(other, module).parameters(),
+                strict=True,
+            ):
+                assert torch.equal(a, b), module
+
+
+def test_the_pooled_arm_matches_the_factored_arms_initial_scale():
+    """A plain mean would start the rotation term at 1/sqrt(15) of A's scale."""
+    from az.network import ConditionedHeadNet, RotationReadout
+
+    torch.manual_seed(0)
+    pooled_net = ConditionedHeadNet(5, 3, readout=RotationReadout.POOLED)
+    torch.manual_seed(0)
+    factored = FlipHexNet(5, 3)
+
+    x = torch.zeros(64, 30, 5, 3)
+    x[:, 2] = 1.0
+    pooled_net.eval()
+    factored.eval()
+    with torch.no_grad():
+        _, _, rows, _ = pooled_net(x)
+        pooled = pooled_net.pooled_vector(rows)
+        _, _, plain, _ = factored(x)
+
+    ratio = pooled.std().item() / plain.std().item()
+    assert 0.5 < ratio < 2.0, f"scale ratio {ratio:.2f}; a plain mean gives ~0.26"
+
+
+def test_the_pooled_arm_has_the_factored_arms_function_class():
+    """Pooling collapses 90 weights to a 6-vector: expressive dimension 32."""
+    from az.network import ConditionedHeadNet, RotationReadout
+
+    torch.manual_seed(0)
+    net = ConditionedHeadNet(5, 3, readout=RotationReadout.POOLED)
+    x = torch.zeros(4, 30, 5, 3)
+    x[:, 2] = 1.0
+    net.eval()
+    with torch.no_grad():
+        _, _, rows, _ = net(x)
+
+    assert net.pooled_vector(rows).shape == (4, 6)
+
+
+@pytest.mark.parametrize("readout", ["cell", "pooled", "tile"])
+def test_a_conditioned_step_trains_and_reaches_every_live_parameter(readout):
+    from az.network import ConditionedHeadNet, RotationReadout
+
+    torch.manual_seed(0)
+    net = ConditionedHeadNet(3, 3, readout=RotationReadout(readout))
+    optimiser = torch.optim.Adam(net.parameters(), lr=1e-2)
+    batch = make_batch([a_sample(TINY, 0), a_sample(TINY, 2)], 3, 3)
+
+    first = train_step(net, optimiser, batch)
+    for _ in range(20):
+        last = train_step(net, optimiser, batch)
+
+    assert last["policy"] < first["policy"]
+    assert [n for n, p in net.named_parameters() if p.grad is None] == []
