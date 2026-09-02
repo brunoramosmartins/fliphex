@@ -1,0 +1,59 @@
+nohup: ignoring input
+drew 2500; train 2000, held out 500
+   A_factored seed 0: search 69.6%  supervised 62.0%  train loss 2.5685
+   A_factored seed 1: search 67.6%  supervised 59.2%  train loss 2.5911
+   A_factored seed 2: search 68.8%  supervised 60.2%  train loss 2.5798
+   A_factored seed 3: search 68.8%  supervised 59.0%  train loss 2.5813
+   A_factored seed 4: search 65.4%  supervised 60.2%  train loss 2.5726
+       B_cell seed 0: search 74.8%  supervised 66.4%  train loss 2.4901
+       B_cell seed 1: search 75.2%  supervised 67.0%  train loss 2.5014
+       B_cell seed 2: search 72.2%  supervised 66.0%  train loss 2.4908
+       B_cell seed 3: search 71.0%  supervised 64.8%  train loss 2.4847
+       B_cell seed 4: search 73.6%  supervised 66.2%  train loss 2.4922
+     C_pooled seed 0: search 71.4%  supervised 61.8%  train loss 2.5738
+     C_pooled seed 1: search 71.6%  supervised 59.8%  train loss 2.6015
+     C_pooled seed 2: search 68.8%  supervised 61.0%  train loss 2.5865
+     C_pooled seed 3: search 69.0%  supervised 62.2%  train loss 2.5797
+     C_pooled seed 4: search 69.4%  supervised 61.6%  train loss 2.5852
+       E_tile seed 0: search 70.8%  supervised 61.8%  train loss 2.5062
+       E_tile seed 1: search 69.8%  supervised 59.6%  train loss 2.5238
+       E_tile seed 2: search 67.0%  supervised 60.4%  train loss 2.5063
+       E_tile seed 3: search 71.0%  supervised 60.6%  train loss 2.5217
+       E_tile seed 4: search 71.0%  supervised 59.6%  train loss 2.5050
+       D_flat seed 0: search 79.6%  supervised 71.6%  train loss 2.3315
+       D_flat seed 1: search 76.8%  supervised 70.6%  train loss 2.3456
+       D_flat seed 2: search 77.6%  supervised 71.6%  train loss 2.3349
+       D_flat seed 3: search 75.4%  supervised 66.4%  train loss 2.3281
+       D_flat seed 4: search 76.2%  supervised 68.4%  train loss 2.3269
+frozen-tower condition (B, C, E on A's tower)
+  frozen   B_cell seed 0: search 68.0%
+  frozen C_pooled seed 0: search 69.4%
+  frozen   E_tile seed 0: search 68.8%
+  frozen   B_cell seed 1: search 67.6%
+  frozen C_pooled seed 1: search 67.0%
+  frozen   E_tile seed 1: search 69.4%
+  frozen   B_cell seed 2: search 69.2%
+  frozen C_pooled seed 2: search 67.6%
+  frozen   E_tile seed 2: search 68.2%
+  frozen   B_cell seed 3: search 68.4%
+  frozen C_pooled seed 3: search 67.0%
+  frozen   E_tile seed 3: search 69.0%
+  frozen   B_cell seed 4: search 69.4%
+  frozen C_pooled seed 4: search 67.2%
+  frozen   E_tile seed 4: search 68.6%
+
+   A_factored 68.0%
+       B_cell 73.4%
+     C_pooled 70.0%
+       E_tile 69.9%
+       D_flat 77.1%
+        floor 39.4%
+
+D - B  +3.8% [+1.8%, +5.7%]
+verdict  not a result: the interval spans the margin; one bounded extension is due
+C - A  +2.0% [-0.4%, +4.4%]  TOST at +/-2%: FAIL
+  -> mechanism contrasts are UNRESOLVED regardless of value
+   B_minus_C +3.3% [+2.2%, +4.5%]
+   E_minus_C -0.1% [-2.7%, +2.5%]
+   B_minus_E +3.4% [+0.3%, +6.6%]
+written  results/exp012-conditioned-head-5x3-h2.json  (31815.1s)
