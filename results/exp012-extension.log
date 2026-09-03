@@ -1,0 +1,22 @@
+nohup: ignoring input
+drew train 2000, held out 500
+guard: receipt from commit f05fb44f392f accepted (digest aa8690a5eee5)
+leg 2: the single bounded extension, seeds 5-11 for B_cell, D_flat
+       B_cell seed 5: search 74.4%  supervised 66.8%  loss 2.4902  (941s)
+       B_cell seed 6: search 73.4%  supervised 65.2%  loss 2.5025  (980s)
+       B_cell seed 7: search 71.4%  supervised 65.8%  loss 2.5182  (979s)
+       B_cell seed 8: search 74.6%  supervised 65.4%  loss 2.5023  (931s)
+       B_cell seed 9: search 74.0%  supervised 65.8%  loss 2.4985  (904s)
+       B_cell seed 10: search 72.2%  supervised 68.4%  loss 2.4902  (892s)
+       B_cell seed 11: search 71.8%  supervised 64.2%  loss 2.4988  (852s)
+       D_flat seed 5: search 75.0%  supervised 66.6%  loss 2.3419  (873s)
+       D_flat seed 6: search 74.2%  supervised 67.4%  loss 2.3495  (907s)
+       D_flat seed 7: search 75.8%  supervised 68.8%  loss 2.3554  (919s)
+       D_flat seed 8: search 76.0%  supervised 68.2%  loss 2.3482  (898s)
+       D_flat seed 9: search 77.0%  supervised 71.6%  loss 2.3462  (939s)
+       D_flat seed 10: search 78.6%  supervised 69.6%  loss 2.3259  (1092s)
+       D_flat seed 11: search 76.2%  supervised 68.2%  loss 2.3412  (980s)
+
+D - B at 12 seeds  +3.32% [+1.88%, +4.75%]  hw 1.44%
+VERDICT  ADOPT (b): the conditioned head reaches the flat head
+written  results/exp012-extension-5x3-h2.json  (14017.2s)

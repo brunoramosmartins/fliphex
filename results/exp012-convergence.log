@@ -1,0 +1,11 @@
+nohup: ignoring input
+drew train 2000, held out 500
+guard: retraining B_cell seed 0 at 40 epochs and comparing hits element-wise
+guard passed in 771s: 500/500 positions identical, loss 2.490095, digest aa8690a5eee5
+leg 1: convergence, seed 0 per arm at 80 epochs, paired by McNemar against the 40-epoch row
+   A_factored  40ep 69.6% -> 80ep 67.4%   McNemar -2.2% [-5.6%, +1.2%] (77 discordant)   loss 2.5685 -> 2.5387  (1121s)
+       B_cell  40ep 74.8% -> 80ep 73.6%   McNemar -1.2% [-4.3%, +1.9%] (62 discordant)   loss 2.4901 -> 2.4437  (1103s)
+     C_pooled  40ep 71.4% -> 80ep 71.4%   McNemar +0.0% [-3.4%, +3.4%] (76 discordant)   loss 2.5738 -> 2.5423  (963s)
+       E_tile  40ep 70.8% -> 80ep 71.0%   McNemar +0.2% [-2.8%, +3.2%] (59 discordant)   loss 2.5062 -> 2.4698  (921s)
+       D_flat  40ep 79.6% -> 80ep 76.4%   McNemar -3.2% [-6.4%, +0.0%] (68 discordant)   loss 2.3315 -> 2.2984  (991s)
+written  results/exp012-convergence-5x3-h2.json  (6797.1s)
