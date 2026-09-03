@@ -2817,6 +2817,303 @@ for reasons the ADR did not name, and the write-up must say so.
 EXP-011's entry — which registered a filename the instrument never wrote — is not
 repeated.
 
+#### Result (2026-09-02) — the rule does not resolve at 5 seeds
+
+Run `scripts/exp012_conditioned_head.py`, 8h50 (31,815 s), artefact
+[`exp012-conditioned-head-5x3-h2.json`](../results/exp012-conditioned-head-5x3-h2.json),
+log [`exp012-run.log`](../results/exp012-run.log). The verdict below is applied
+by a separate script, `scripts/exp012_analysis.py`, so that it is reproducible
+from the raw artefact rather than from an 8.8-hour run.
+
+| arm | params | top-1 after 400 sims | sd | supervised | final train loss |
+|---|--:|--:|--:|--:|--:|
+| A_factored | 332,965 | 68.0% | 1.6 | 60.1% | 2.5787 |
+| B_cell | 373,369 | **73.4%** | 1.8 | 66.1% | 2.4918 |
+| C_pooled | 373,369 | 70.0% | 1.4 | 61.3% | 2.5853 |
+| E_tile | 373,369 | 69.9% | 1.7 | 60.4% | 2.5126 |
+| D_flat | 879,381 | **77.1%** | 1.6 | 69.7% | 2.3334 |
+| random legal | — | 39.4% | — | — | — |
+
+`D − B = +3.76 pts [+1.78, +5.74]` at t(4), α = 0.05. **The interval spans the
+5-point margin: not a result.** That was registered as the modal outcome, and the
+branch it selects is the one bounded extension — reported below.
+
+**The pairing worked this time, and that was a registered repair.** `sd(differences)`
+is 1.60 against arm sds of 1.6–1.8, implying a between-arm correlation of
+**+0.554**. EXP-011 measured ≈ −0.05 and this entry recorded that its power
+figures therefore assume independence. Constructing the value head **before** the
+policy heads, so the entire non-policy network is bit-identical across arms at
+one seed, is what changed, and it is now measured rather than argued.
+
+#### The validity precondition failed, and it could not have passed
+
+`C − A = +2.00 pts [−0.43, +4.43]`, half-width 2.43. TOST at δ = 2: **FAIL**.
+
+The number that matters is not the estimate. **The half-width alone (2.43)
+exceeds δ (2.00)**, so no point estimate whatsoever — not even exactly zero —
+could have cleared this gate at five seeds. The test was unpassable before any
+data existed.
+
+The cause is in this entry's own text. δ was set at 2 points *because* that was
+the forecast half-width. An equivalence test whose δ equals its expected
+half-width passes only if the estimate lands near-exactly on zero **and** the
+noise comes in under its own forecast. The observed `sd(differences)` was 1.95
+against the ~1.5 the forecast implied, and the gate closed. **This is a design
+defect, not a property of the arms**, and it is the second time in two entries
+that a validity check has been written in a form that could not do its job — the
+first was the "interval contains zero" form this TOST replaced.
+
+Consequence, applied without discretion: **every mechanism contrast is
+UNRESOLVED, regardless of what it shows.**
+
+One observation is recorded and explicitly does **not** rescue the entry. The
+gate's stated rationale above is that *if C is materially worse than A, the
+control is handicapped and `B − C` is positive by that handicap alone*. C came
+out **+2.0 points better** than A. The violation is in the opposite direction to
+the artefact the gate exists to prevent, which makes `B − C` conservative rather
+than inflated. That is post-hoc reasoning about a failed gate; it is a candidate
+for a future registered entry and it changes nothing here.
+
+#### Mechanism: joint and frozen disagree, and not in the anticipated direction
+
+Recorded for completeness. **All six intervals are void** under the precondition.
+
+| contrast | joint (deployment) | frozen tower (head-level) |
+|---|--:|--:|
+| B − C | +3.32 [+2.18, +4.46] | +0.88 [−1.10, +2.86] |
+| E − C | −0.12 [−2.71, +2.47] | +1.16 [−0.53, +2.85] |
+| B − E | +3.44 [+0.29, +6.59] | −0.28 [−1.94, +1.38] |
+
+Frozen, the three arms land at **68.5% / 67.6% / 68.8%** — on top of A's own
+joint 68.0%. **On a tower trained for the factored head, no head architecture
+makes any difference at all.**
+
+This entry registered the disagreement case in advance and named the direction it
+expected: *"the mechanism visible frozen and absent jointly"*, the tower absorbing
+a head's limitation. **The observed disagreement is the exact inverse.** Two
+readings fit and neither is decided here:
+
+1. The head only pays when it can rewrite the features — conditioning is a
+   property of the co-adapted network, not of the head.
+2. An A-optimal tower supplies no cell-conditional features, so a real mechanism
+   would be invisible under freezing regardless.
+
+The frozen condition was added after red-team pass 2 to *remove* a confound. It
+introduced a different one, and the honest statement is that it did not resolve
+what it was added to resolve.
+
+#### The training-loss diagnostic, registered for exactly this
+
+Registered so that "no mechanism" could be told apart from "not enough data":
+
+- **B** fits the training set better than C (2.4918 vs 2.5853) **and** beats it
+  held-out. Not a data-efficiency limit — expressiveness that realises.
+- **E** fits better than C (2.5126) but is level with it held-out (69.9 vs 70.0).
+  That is fitting without generalising, and it is where the data-efficiency
+  reading applies.
+- **D** is far below all of them at 2.3334 and best held-out, consistent with
+  EXP-011: width.
+
+#### Layer parity — the effect is on the odd layers
+
+| arm | odd | even |
+|---|--:|--:|
+| A_factored | 48.2% | 86.3% |
+| B_cell | 56.3% | 89.1% |
+| C_pooled | 50.9% | 87.7% |
+| E_tile | 51.2% | 87.2% |
+| D_flat | 61.0% | 92.0% |
+
+`B − A` is **+8.1** on odd layers against +2.8 on even; `D − B` is **+4.7**
+against +2.9. The pooled figures are a mixture, and where the position actually
+carries a decision the flat head's lead is larger than the headline.
+
+#### Two registered reads the instrument never wrote
+
+Both were recovered offline by `scripts/exp012_analysis.py`, because per-position
+hits were saved:
+
+- **The bootstrap clustered on the 500 positions.** For `D − B` its half-width is
+  1.98, indistinguishable from the seed-mean interval's 1.98; for `C − A` it is
+  **narrower** (1.64 vs 2.43). The registered rule is to quote the wider, so the
+  seed-mean interval stands in both cases. The dominant variance is training-seed
+  variance, not position sampling — which is what a fixed shared held-out set
+  should produce.
+- **`sd(differences)` and the implied correlation**, reported above.
+
+A third registered read — the 80-epoch re-run — was **not** recoverable and had
+never been implemented. It is discharged in the next section.
+
+#### Result — convergence (2026-09-02): 40 epochs is the generalisation limit
+
+Run `scripts/exp012_followup.py --leg convergence`, 1h53 (6,797 s), artefact
+[`exp012-convergence-5x3-h2.json`](../results/exp012-convergence-5x3-h2.json).
+Seed 0 per arm at 80 epochs, paired by McNemar against the 40-epoch row on the
+same 500 positions. The registry does not name a seed; seed 0, the first
+registered, is named here.
+
+| arm | 40 ep | 80 ep | McNemar | train loss 40 → 80 |
+|---|--:|--:|--:|--:|
+| A_factored | 69.6% | 67.4% | −2.2 [−5.6, +1.2] | 2.5685 → 2.5387 |
+| B_cell | 74.8% | 73.6% | −1.2 [−4.3, +1.9] | 2.4901 → 2.4437 |
+| C_pooled | 71.4% | 71.4% | +0.0 [−3.4, +3.4] | 2.5738 → 2.5423 |
+| E_tile | 70.8% | 71.0% | +0.2 [−2.8, +3.2] | 2.5062 → 2.4698 |
+| D_flat | 79.6% | 76.4% | −3.2 [−6.4, +0.0] | 2.3315 → 2.2984 |
+
+**Every interval contains zero: doubling the schedule moves no arm.** But
+training loss fell in all five while held-out rose in none, and four of five
+point estimates are negative. That is the signature of the arms sitting **at or
+past** their generalisation optimum at 40 epochs, not short of it.
+
+**This corrects a reading taken from the trajectory alone.** The per-epoch
+improvement over the final five epochs was 0.0060–0.0087 across arms at 40
+epochs on seed 0 and is still 0.0014–0.0032 at 80, so by the registered criterion
+the loss is indeed descending throughout — and the first reading of that was "no
+arm converged". (The 5-seed means at 40 epochs are lower, 0.0029–0.0043; seed 0
+sits at the high end, which makes it the harder seed on which to argue that more
+epochs would not help.) The trajectory answers
+whether *optimisation* has finished, not whether *generalisation* has, and
+generalisation finished first. The 40-epoch schedule is defensible and `D − B` is
+not an artefact of the optimisation budget.
+
+Two further readings, both weak and labelled as such. D degrades most (−3.2, the
+only interval touching zero at its upper end), so on seed 0 `D − B` narrows from
++4.8 to +2.8 with more training — the opposite of "D leads because it needs more
+epochs than it got". One seed at ±3 is inside noise and this is not treated as a
+finding. And the **arm ordering is preserved at 80 epochs** (D > B > C ≈ E > A),
+so the ranking-inversion threat did not materialise under more training; it
+remains live under self-play targets, which is a different condition.
+
+#### Result — the bounded extension (2026-09-03): adopt (b), by a quarter of a point
+
+Run `scripts/exp012_followup.py --leg extension`, 3h54 (14,017 s), artefact
+[`exp012-extension-5x3-h2.json`](../results/exp012-extension-5x3-h2.json). Seeds
+5–11 for **B and D only**: adoption is read on `D − B`, and extending arms whose
+contrasts are void would spend compute making unresolved numbers precise.
+
+**`D − B = +3.32 pts [+1.88, +4.75]`** at n = 12, t(11) = 2.593, α = 0.025.
+Entirely below the 5-point margin.
+
+> **The rule fires: adopt fallback (b).** The architecture record in adr-005 is to
+> be amended to the conditioned head. Fallback (c) is not run.
+
+**It clears by 0.25 points**, and that is the number this result should be
+remembered by. The indecision band at n = 12 with the observed variance is
+3.56–6.44; the estimate landed at 3.32.
+
+The 5-seed projection was optimistic on both axes. It assumed `sd(differences)`
+would hold at 1.60 and gave [+2.57, +4.95]; the sd rose to **1.92** — five seeds
+understated the variance — and the point estimate fell 0.44. The real interval is
+both wider and lower than projected. At an uncorrected α = 0.05 the interval is
+[+2.10, +4.54], so the significance level did not decide this; the margin did.
+
+**The merge is guarded, not assumed.** Merging seeds 5–11 with rows 0–4 is only
+legitimate if the pipeline still produces those rows, so `B_cell` seed 0 — the
+conditioned path with the nested normaliser — was retrained and its hit vector
+compared **element-wise**: 500/500 positions identical, training loss matching to
+1e-9. A mean comparison would not have been evidence, since two runs can score
+74.8% on different positions; the guard's failure path was validated on a
+poisoned vector with two positions swapped in opposite directions, leaving the
+mean unchanged.
+
+#### What the adoption does not establish
+
+Three limits, each already recorded above this section and none weakened by the
+verdict.
+
+1. **D still leads B by 3.3 points** (76.5% vs 73.2% at 12 seeds). The margin is a
+   tolerance — the price adr-005 was willing to pay for the factored structure —
+   not a claim of equivalence.
+2. **The mechanism is unresolved.** adr-005's remedy is adopted while its stated
+   reason, *"the best rotation depends heavily on the cell"*, is **not verified**.
+   The precondition that would have licensed reading `B − C` failed.
+3. **This is an adoption of *this* B.** The entry records above that
+   `Linear(480, 90)` is fifteen unshared 480→6 maps at 43,290 parameters, and that
+   a 1×1 convolution over `policy_conv`'s spatial map gives full cell
+   conditioning in **198**. The entry's own sentence — "a null on B is a null on
+   *this* B" — holds symmetrically for an adoption. The efficient form is
+   unmeasured and is registered as the follow-up.
+
+#### The margin changed role and was never rejustified
+
+Recorded as the principal threat to this verdict.
+
+Five points was EXP-011's **detection threshold** — a difference smaller than
+this is not worth acting on. In this entry it is an **adoption tolerance** — a
+loss up to this is an acceptable price for the factored structure. Those are
+different quantities and the number was carried across without being rewritten.
+
+Red-team pass 2 raised this and it was left unaddressed, which was a cheap
+omission while it was hypothetical. **A decision that closes by a quarter of a
+point against that constant makes it load-bearing.** Any future entry that
+re-reads adoption on this margin must justify it in its adoption sense first.
+
+#### Every registered prediction, scored
+
+| # | prediction | outcome |
+|---|---|---|
+| 1 | `C − A` contains zero | The interval does contain zero — but the **registered form is TOST**, and it failed, unpassably. Scored as **failed**: the operative test is the registered one. |
+| 2 | `D − B` lands in the 2.9–7.1 "not a result" band | **Correct** (+3.76). Indecision was registered as modal and was not a surprise. |
+| 3 | `B − C` contains zero | **Wrong jointly** (+3.32, entirely above zero); right frozen (+0.88). Both void. |
+| 4 | `B − E` contains zero | **Wrong jointly** (+3.44); right frozen (−0.28). Both void. |
+
+The entry's own summary of 3 and 4 — *"together they say the ADR's stated
+mechanism is not what is happening"* — cannot be claimed. The joint contrasts
+point the other way and the frozen ones cannot arbitrate, because the
+precondition that made either readable never passed.
+
+#### Anti-circularity — the count after this entry
+
+**Two** architecture decisions have now been taken against 5×3 ground truth
+(EXP-011 refuting the factored head as sufficient; EXP-012 adopting the
+conditioned head), over an *adoptable* choice set of **three** (A stands, B, D).
+Five architectures were trained; C and E were declared non-adoptable in advance
+and are diagnostics. H3's 5×3 evidence class carries this count.
+
+#### Threats to validity, added by the result
+
+The entry's own threats stand. These are added by what happened.
+
+- **The verdict is a function of one constant that was reused across roles.** See
+  above. The interval's upper limit is +4.75, so the adoption survives any margin
+  above 4.75 points and flips below it. A margin of 4.7 — a 6% change in a number
+  that was never rejustified for the role it is playing — reverses the verdict.
+- **Five seeds understated the variance by 20%** (1.60 → 1.92). Any future power
+  calculation on this pipeline that uses a 5-seed sd will be optimistic.
+- **The frozen-tower condition introduced a confound while removing one.** It
+  cannot distinguish "no head-level mechanism" from "an A-optimal tower supplies
+  no features the mechanism could use".
+- **Convergence was read on one seed per arm.** The McNemar half-widths are ±3
+  points, so the 80-epoch comparison detects only large movements. "No arm moved"
+  means no arm moved by more than about 3 points.
+- **The adopted head is the inefficient implementation**, and the efficient one
+  differs by 218× in parameter count in the part of the network the decision is
+  about. It is not obvious that the two behave alike, and nothing here tests it.
+
+#### Artefacts
+
+| file | produced by |
+|---|---|
+| [`exp012-conditioned-head-5x3-h2.json`](../results/exp012-conditioned-head-5x3-h2.json) | `scripts/exp012_conditioned_head.py` |
+| [`exp012-convergence-5x3-h2.json`](../results/exp012-convergence-5x3-h2.json) | `scripts/exp012_followup.py --leg convergence` |
+| [`exp012-extension-5x3-h2.json`](../results/exp012-extension-5x3-h2.json) | `scripts/exp012_followup.py --leg extension` |
+| [`exp012-guard-receipt.json`](../results/exp012-guard-receipt.json) | the reproduction guard, recording commit and digest |
+
+The verdict is applied by `scripts/exp012_analysis.py` from the artefacts, not by
+the run.
+
+#### Follow-ups this entry creates
+
+1. **adr-005 amendment** — the architecture record moves to the conditioned head.
+   Required by the decision rule; the Axis 2 architecture may only change by ADR.
+2. **A new entry for the convolutional form of (b)** — 198 parameters against
+   43,290, full cell conditioning, named in this entry as the obvious follow-up
+   and deliberately not run.
+3. **An entry that can actually read the mechanism**, if the mechanism is still
+   wanted. It needs an equivalence gate whose δ is not equal to its own forecast
+   half-width, and a head-level condition that does not freeze the tower into one
+   arm's optimum.
+
 
 ## Planned
 
