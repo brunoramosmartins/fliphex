@@ -41,10 +41,12 @@ inert, so orientation is not part of the state (adr-003).
 parameters**. Start at the small end; grow only if training plateaus below the
 heuristic baseline.
 
-**Factored policy head.** Rather than 1950 logits, the head emits three
+~~**Factored policy head.** Rather than 1950 logits, the head emits three
 factors — 25 cell logits, 13 tile logits, 6 rotation logits — combined as
 `log p(cell) + log p(tile) + log p(rotation)`, then masked to legal moves and
-renormalised. 44 logits instead of 1950.
+renormalised. 44 logits instead of 1950.~~
+**Superseded** — the head is now conditioned: rotation is a `25 × 6` tensor read
+at the move's cell. See the Phase 4 mitigation-(b) amendment below.
 
 **Value head.** Single `tanh` output in `[-1, 1]`. Since draws are impossible,
 the training target `z` is always exactly `±1`.
@@ -84,6 +86,11 @@ Z/2 mirror; augmentation is still rejected, on measured grounds.
   plateaus, condition rotation logits on the chosen cell; (c) fall back to a
   flat 1950-logit head, which is the safe design.
   **This must be checked explicitly in Phase 4 and logged**, not assumed away.
+  **Checked and logged (2026-09-03).** (a) was measured and did not rescue the
+  factored head (EXP-011); (b) was measured and is **adopted** (EXP-012); (c) is
+  not run. The ladder is spent — see the Phase 4 mitigation-(b) amendment. Note
+  that the clause *"the best rotation depends heavily on the cell"* is the part
+  that remains **unverified**: the remedy is adopted, its stated reason is not.
 - No data augmentation means more self-play games for the same signal.
 - Constant planes for hand contents are a wasteful encoding (13 planes of 25
   identical values each). Accepted for v1 because it keeps the tower
@@ -103,6 +110,11 @@ Z/2 mirror; augmentation is still rejected, on measured grounds.
 default on parameter-efficiency grounds, but explicitly retained as the
 fallback if the independence assumption proves too costly. The comparison
 between the two is a legitimate experiment for Phase 4.
+**Run (EXP-011, EXP-012).** The flat head is the strongest arm on both
+occasions, and it is still not adopted: the conditioned head comes within 3.3
+points of it at a quarter of the parameters on the 5×5 (467,839 against
+1,879,201), which is inside the margin this ADR's structure was worth. Retained as a fallback; no longer expected to be
+taken.
 
 **Reuse `pgx` or `open_spiel`.** Would supply tested self-play plumbing. Rejected
 for v1: the roadmap's stated skill goal is "implemented from first principles",
@@ -247,6 +259,12 @@ conditioning rotation on cell, then the flat 1950-logit head — but note the fl
 head does **not** fix this: 1,950 logits over 1,450 actions is the same aliasing
 with more parameters. Only deduplication addresses it.
 
+**Update (2026-09-03).** The first of those fallbacks is now adopted and the
+second is not run; see the Phase 4 mitigation-(b) amendment. The sentence above
+about "a sizeable share of the rotation factor" was also measured, and it did not
+hold: EXP-011 found rotation inert on **11.4%** of multi-orbit (tile, rotation)
+pairs, not a sizeable share.
+
 **Not evidence about the game.** The collapse was measured on reachable positions
 by random playout. It says nothing about H1, H2 or H3.
 
@@ -307,7 +325,9 @@ encoding is the more valuable of the two properties.
 
 **Consequence for the sizing target.** The tower is now measured at **352,495**
 parameters on the 5×5 (332,965 on the 5×3, 324,319 on the 3×3), still below the
-0.5–1.5 M band this ADR targets. That band was an estimate made before the
+0.5–1.5 M band this ADR targets. (Those are the factored head's counts. The
+conditioned head adopted on 2026-09-03 brings the 5×5 to **467,839**, still below
+the band.) That band was an estimate made before the
 factored head existed; 44 output logits instead of 1,950 removes the projection
 that carried most of the difference. The instruction — start at the small end,
 grow only if training plateaus below the heuristic baseline — is unchanged.
@@ -315,6 +335,167 @@ grow only if training plateaus below the heuristic baseline — is unchanged.
 Pinned by `tests/test_az_encoding.py`, whose
 `test_the_opponents_joker_is_visible_when_the_second_player_moves` fails loudly
 if the opponent block is ever narrowed back to 12.
+
+## Amendment — Phase 4 (2026-09-03): mitigation (b) is adopted; the policy head is conditioned
+
+**The input, the tower, the value head and the MCTS are unchanged. The policy
+head changes, and the reason this ADR gave for needing it is *not* established.**
+
+### What the Decision section now says
+
+The Decision's **Factored policy head** paragraph is superseded:
+
+> ~~Rather than 1950 logits, the head emits three factors — 25 cell logits, 13
+> tile logits, 6 rotation logits — combined as
+> `log p(cell) + log p(tile) + log p(rotation)`, then masked to legal moves and
+> renormalised. 44 logits instead of 1950.~~
+
+**Conditioned policy head.** The head emits 25 cell logits, 13 tile logits, and a
+`25 × 6` **rotation tensor** read at the row of the move's cell. A move scores
+`cell[c] + tile[t] + rotation[c, r]`, masked to legal moves and renormalised.
+Cell and tile remain factored; **rotation is conditioned on the cell** and is no
+longer independent of it.
+
+The normaliser is no longer separable and must not be computed as if it were.
+The correct closed form is nested:
+
+```
+Z = LSE over empty c of ( cell[c] + LSE over available (t, r) of ( tile[t] + rotation[c, r] ) )
+```
+
+A separable normaliser here does not raise. It optimises the wrong distribution
+and reads as a slightly worse head, in the direction that would have refuted this
+very amendment.
+
+### Why: the ladder in Consequences is now spent to (b)
+
+The Negative consequences list three mitigations in order. Both of the first two
+have now been measured, and the entry for each is in `experiments/registry.md`.
+
+**(a) rely on MCTS to correct the prior — did not rescue the factored head.**
+EXP-011 measured the flat head at 73.7% against the factored head's 66.8% on
+top-1 optimality after 400 PUCT simulations, a gap of **+7.0 points**
+[+4.81, +9.11] over five seeds. The supervised gap before any search was +8.0.
+Search closed one point of eight. That is the direct test of (a), and it failed.
+
+**(b) condition rotation logits on the chosen cell — adopted.** EXP-012 trained
+the conditioned head against the flat head at twelve seeds:
+
+| head | top-1 after 400 sims (5×3) | seeds |
+|---|--:|--:|
+| factored (incumbent) | 68.0% | 5 |
+| **conditioned (adopted)** | **73.2%** | 12 |
+| flat | 76.5% | 12 |
+| random legal move | 39.4% | — |
+
+Only the two arms the adoption is read on were extended to twelve seeds; the
+incumbent's figure is its five-seed mean, and it is shown for scale rather than
+as a term in the contrast.
+
+`flat − conditioned = +3.32 points [+1.88, +4.75]`, entirely below the 5-point
+margin the experiment registered as the price worth paying for a factored
+structure. **The rule fires and (b) is adopted.**
+
+**(c) fall back to a flat 1950-logit head — not run, and now unlikely to be.**
+Two reasons, both recorded before the result. It does not fix action aliasing:
+1,170 logits over 540 legal moves on the 5×3 is the same redundancy with more
+parameters. And on the 5×5 it costs **1,879,201** parameters against the
+conditioned head's **467,839** — above the 0.5–1.5 M band this ADR targets, where
+(b) sits comfortably inside it.
+
+| board | factored | conditioned | flat |
+|---|--:|--:|--:|
+| 5×5 (shipped) | 352,495 | **467,839** (+32.7%) | 1,879,201 |
+| 5×3 | 332,965 | 373,369 (+12.1%) | 879,381 |
+| 3×3 | 324,319 | 345,127 (+6.4%) | 519,105 |
+
+### What this amendment does **not** establish
+
+This matters more than the adoption, because the sentence being amended is one of
+this ADR's own claims.
+
+**The stated mechanism is unverified.** The Consequences section asserts that
+*"the best rotation depends heavily on the cell"*, and that assertion is
+**exactly what EXP-012 could not read**. The experiment carried a validity
+precondition — a pooled control with the conditioned head's parameter count and
+shape but the factored head's function class — and that precondition **failed its
+equivalence test unpassably**: the interval's half-width alone exceeded the
+tolerance, so no result whatsoever could have cleared it. Every mechanism
+contrast is therefore recorded as unresolved.
+
+**The remedy is adopted; the reason this ADR gives for it is not confirmed.** Two
+independent findings sit against the stated reason and neither is decisive:
+
+- EXP-011 measured rotation to be **inert on only 11.4%** of multi-orbit
+  (tile, rotation) pairs, against this ADR's implicit claim that much of the
+  rotation factor models no real choice.
+- EXP-012's frozen-tower condition put the conditioned, pooled and tile-indexed
+  heads on one shared tower trained for the factored head. All three landed at
+  **67.6–68.8%**, on top of the factored head's own 68.0%. On a tower trained for
+  the factored head, **no head architecture makes any difference**. Whether that
+  means conditioning is a property of the co-adapted network rather than of the
+  head, or that an incumbent-optimal tower simply supplies no features a
+  conditioned head could use, is not decided.
+
+So: the head is conditioned because conditioning **works**, measured end to end
+in the deployment configuration. It is not conditioned because the
+cell–rotation dependence was demonstrated. A future entry that wants the
+mechanism needs an equivalence gate whose tolerance is not equal to its own
+forecast half-width, and a head-level condition that does not freeze the tower
+into one arm's optimum.
+
+### The adopted head is not the efficient implementation of (b)
+
+`Linear(policy_features, 25 × 6)` is twenty-five independent maps with **no
+weight sharing across cells** — it learns "which rotation, given which cell"
+twenty-five separate times.
+
+The tower is convolutional and `policy_conv` already produces a spatial map
+before its flatten. A **1×1 convolution from 32 to 6 channels** on that map gives
+per-cell rotation logits from shared weights over each cell's own features:
+**198 parameters**, fully cell-conditioned, and statistically efficient in
+precisely the way the adopted form is not. It also would not carry the adopted
+form's data-efficiency handicap — a rotation row for cell `c` receives gradient
+only on plies where `c` is empty.
+
+It was named in EXP-012's registration as the obvious follow-up and deliberately
+not run, so **this amendment adopts the inefficient implementation knowingly**.
+The follow-up is registered. If it measures at least as well, this ADR should be
+amended again to the convolutional form; the decision here is "conditioned, not
+factored", and the parameterisation is the part still open.
+
+### Two caveats on the evidence, stated at full strength
+
+**The verdict cleared by a quarter of a point.** The interval's upper limit is
++4.75 against a 5-point margin. That margin was EXP-011's *detection threshold*
+and became EXP-012's *adoption tolerance* without being rejustified for the new
+role. A margin of 4.7 reverses the decision. This is recorded as the principal
+threat in the registry entry and it is repeated here because it qualifies the
+amendment, not just the experiment.
+
+**All of it is 5×3 evidence, and this ADR governs the 5×5.** The direction is
+favourable and that is why the amendment is taken: the conditioned head's tensor
+is `15 × 6` on the 5×3 and `25 × 6` on the 5×5, and cell–rotation interaction
+grows with the board, so the 5×3 **understates** (b) specifically. But
+"understates in the expected direction" is an argument, not a measurement, and
+nothing here is evidence about the shipped board.
+
+### Anti-circularity
+
+Under [adr-004](adr-004-solver-approach.md) R1, this is the **second** Axis 2
+architecture decision taken against Axis 1's exact ground truth on the 5×3, over
+an adoptable choice set of three (factored stands, conditioned, flat). H3's 5×3
+evidence class records the count, and the count is the thing that measures the
+leak — drawing a disjoint sample prevents statistical overlap but does not touch
+the mechanism, since the architecture is a function of solver labels on a variant
+inside H3's own comparison set.
+
+Pinned by `tests/test_az_train.py`:
+`test_each_conditioned_normaliser_equals_brute_force` checks the nested
+normaliser against `logsumexp` over generated moves across three readouts, three
+variants and three depths, and
+`test_the_three_arms_have_identical_parameter_counts` pins the matching that made
+the comparison legitimate.
 
 ## Related
 
