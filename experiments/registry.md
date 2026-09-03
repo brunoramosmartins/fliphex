@@ -3115,6 +3115,338 @@ the run.
    arm's optimum.
 
 
+### EXP-013 — the efficient parameterisation of (b): does sharing weights across cells cost anything?
+
+**Registered 2026-09-03, before the instrument exists.** Follow-up 2 of EXP-012.
+
+#### What this asks, and what has already been committed
+
+adr-005 now specifies a conditioned policy head, adopted by EXP-012 and amended
+into the ADR on 2026-09-03. **That amendment adopted an implementation both it
+and EXP-012 record as the inefficient one**, and both name this experiment as the
+obligation that follows.
+
+The adopted form is `Linear(policy_features, n_cells × 6)`: as many independent
+maps as there are cells, with **no weight sharing**, learning "which rotation,
+given which cell" once per cell. The tower is convolutional and `policy_conv`
+already produces a `(32, n_cells)` spatial map. A **1×1 convolution from 32 to 6
+channels** on that map produces per-cell rotation logits from weights shared
+across cells, reading each cell's own 32-dimensional features.
+
+| board | rotation head: factored (superseded) | linear-conditioned (adopted) | **1×1 conv** |
+|---|--:|--:|--:|
+| 5×5 (shipped) | 4,806 | 120,150 | **198** |
+| 5×3 (measured here) | 2,886 | 43,290 | **198** |
+
+The convolutional form is **218× smaller in the component the whole decision is
+about**, and on the 5×5 it makes the conditioned network *smaller than the
+factored incumbent it replaced* — 347,887 against 352,495. If it is not worse,
+adr-005's parameter-efficiency thesis is served better by it than by the head
+currently written into the ADR.
+
+**The question is narrow and it is a parameterisation question, not a
+mechanism question.** Both arms compute the same score,
+`cell[c] + tile[t] + rotation[c, r]`, over the same nested normaliser. They
+differ only in how `rotation[c, r]` is produced.
+
+#### The two arms
+
+| arm | rotation rows from | rotation parameters (5×3) |
+|---|---|--:|
+| **L_linear** | `Linear(480, 15 × 6)` — the adopted head, EXP-012's arm B | 43,290 |
+| **V_conv** | `Conv2d(32, 6, kernel_size=1)` over the pre-flatten `(32, 15)` map | 198 |
+
+**The linear arm is not retrained.** Its twelve rows already exist — EXP-012's
+`B_cell` at seeds 0–11, on this sample, this schedule and this code. Reusing them
+halves the run, and the reproduction guard built for EXP-012's extension is
+exactly the instrument that makes the reuse legitimate rather than assumed.
+
+#### Why the conv form is not obviously equal, and could be better
+
+Two forces pull in opposite directions and the entry does not pre-judge them.
+
+**Against the conv form.** Shared weights cannot express cell-specific behaviour
+that is not a function of that cell's own feature vector. If the right rotation
+at A1 depends on something the tower does not put into A1's 32 channels, the
+unshared form can memorise it and the shared form cannot.
+
+**For the conv form, and this is the sharper one.** EXP-012 recorded that the
+adopted head carries a **data-efficiency handicap**: the rotation row for cell `c`
+receives gradient only on plies where `c` is empty, about **36.7%** of positions.
+Shared weights receive gradient from **every cell on every position**. The conv
+form should therefore be better exactly where EXP-012 found the signal
+concentrated — the **odd layers**, where `B − A` was +8.1 against +2.8 on even
+layers.
+
+The registered prediction is that the conv form is **not worse**, and it is
+plausible that it is better. The design is one-sided for that reason; see the
+test.
+
+#### The initialisation must be measured, not assumed
+
+EXP-012's pooled control needed a `sqrt(15)` correction because `Linear`
+initialises rows independently and a mean of fifteen rows starts at a quarter of
+one row's scale. **Identical function class did not imply identical initial
+function**, and it was the one systematic difference in that entry.
+
+The same trap is live here and is worse, because the two arms differ in input
+dimensionality: the linear form's rotation logit is a dot product over 480
+features, the conv form's over **32**. Default initialisation bounds are
+`1/sqrt(fan_in)` in both cases, so the two logits start at different scales by
+construction.
+
+**Registered as a step, not an assumption.** Before any arm is trained, the
+standard deviation of the rotation logit at initialisation is measured for both
+forms over 1,000 sampled positions, and the conv form's output is scaled by a
+fixed constant chosen to match. The measured constants and the two standard
+deviations go in the artefact. Scaling the output leaves the function class
+untouched. An unreported mismatch here would read as "the shared form is worse"
+for a reason that has nothing to do with sharing.
+
+#### Ground truth and sample
+
+Identical to EXP-011 and EXP-012, so the three entries are readable together, and
+required identical because the linear arm's rows are reused rather than retrained.
+
+`data/subgame-solutions/5x3-h2.json`, V5 checksum
+`51192b4d403ac1cb45c22d92ce58bab215843f457f245e7aca6d18744f8a3f43`, termination
+`exhausted`. Sampler seed **29**, layers 5–14, 250 WIN-for-mover positions per
+layer, shuffled, split 2,000 train / 500 held out.
+
+#### Schedule, pinned
+
+**40 epochs, batch 64, Adam at lr 1e-3, weight decay 1e-4**, with the rotation
+parameters in a `weight_decay = 0` group in **both** arms — as in EXP-012, so the
+decay-to-signal ratio does not differ across parameterisations. That matters more
+here than there: decay applied equally to 43,290 and to 198 parameters is not the
+same intervention.
+
+**40 epochs is now justified rather than inherited.** EXP-012's convergence leg
+re-ran one seed per arm at 80 epochs: every McNemar interval contained zero,
+training loss fell in all five arms, and held-out rose in none. The arms sit at
+or past their generalisation optimum at 40. **No convergence re-run is registered
+here** — the question was asked and answered on this pipeline, this sample and
+this schedule.
+
+#### Metrics
+
+1. **Primary — top-1 optimality after 400 PUCT simulations**, each head supplying
+   the prior, on the held-out 500, 12 seeds per arm.
+2. **Secondary, and non-solver — final training loss**, per arm and seed.
+3. **Reported beside both** — the random-legal-move floor, and the stratified
+   read by **layer parity**, which is where the registered prediction lives.
+
+The unit is the **position**.
+
+#### The test, named — non-inferiority, not equivalence
+
+Read on the paired *t* over the twelve seed means, conditional on the fixed
+held-out set, with the bootstrap clustered on the 500 positions reported beside
+it and **the wider of the two quoted** — EXP-012's rule, and its instrument
+omitted it, so it is named here as an output the artefact must contain.
+
+**The shape is one-sided.** The hypothesis is directional: the conv form must not
+be materially *worse*. An equivalence test would spend power ruling out the
+conv form being better, which is an outcome nobody needs protection from.
+
+`V_conv − L_linear`, non-inferiority margin **δ = 1.7 points**, one-sided
+α = 0.05, `t(11) = 1.796`.
+
+#### The margin is derived, and its derivation imports an interval
+
+EXP-012's principal threat is that its 5-point margin changed role — detection
+threshold to adoption tolerance — and was carried across without being
+rejustified. **This entry does not reuse it.**
+
+adr-005 adopted a head that concedes **3.3 points** to the flat head, under a
+tolerance of **5.0**. A parameterisation that gives back more than the remaining
+**1.7 points** would push the shipped architecture outside the tolerance the
+adoption decision was actually taken under. That is the derivation:
+`δ = 5.0 − 3.3 = 1.7`.
+
+**And the derivation is not clean, which is stated rather than hidden.** The 3.3
+is a point estimate with interval [1.88, 4.75]. A reader who takes the
+conservative end derives `δ = 5.0 − 4.75 = 0.25`, which is not measurable at any
+affordable seed count; the optimistic end gives `δ = 3.12`. **δ = 1.7 is the
+point-estimate derivation and it inherits that uncertainty.** It is registered
+with the range visible so that no later write-up can present it as a clean
+consequence of the adoption.
+
+#### Feasibility, checked before the fact — the repair for EXP-012's defect
+
+EXP-012's validity gate was **unpassable**: its δ equalled its forecast
+half-width, so no point estimate could clear it. That failure mode is checked
+here explicitly and the check is registered as a project-wide rule.
+
+Measured on this exact pipeline, `sd(differences)` between arms across seeds is
+1.60 (5 seeds), 1.92 (12 seeds) and 1.95. **The conservative figure 1.95 is used.**
+
+| quantity | value |
+|---|--:|
+| `sd(differences)`, assumed | 1.95 |
+| standard error at n = 12 | 0.563 |
+| one-sided half-width, `t(11) = 1.796` | **1.011** |
+| margin δ | 1.700 |
+| **room the point estimate has** | **0.689** |
+
+The test passes when the observed `V_conv − L_linear` exceeds **−0.689 points**.
+That number is positive, which is the whole point: the gate is passable, and by
+how much is known before the run.
+
+> **Registered as a standing rule for this project.** No equivalence or
+> non-inferiority test may be registered whose δ does not exceed its forecast
+> half-width, and the *room* — δ minus that half-width — must be tabulated in the
+> entry. A gate that cannot be passed is not a gate.
+
+#### Power, at the registered margin
+
+Approximate, treating the estimated sd as known:
+
+| true `V_conv − L_linear` | probability the gate passes |
+|---|--:|
+| +1.0 (conv better) | >99% |
+| 0.0 (a true tie) | **89%** |
+| −0.5 | 63% |
+| −1.0 | 29% |
+| −1.7 (the margin itself) | 4% — α, which is 5% exactly under the *t*; the gap is the normal approximation |
+
+At a true tie the design resolves nine times in ten, and it correctly refuses
+when the conv form is a full point worse. **A true difference between −0.5 and
+−1.0 will often not resolve**, and "not resolved" is then the reported outcome.
+
+#### Decision rule
+
+Read on the one-sided interval for `V_conv − L_linear`.
+
+- **Lower limit above −1.7** → **adopt the convolutional form.** adr-005 is
+  amended again; the rotation head becomes the 1×1 convolution. Parsimony breaks
+  a tie in a decision whose stated purpose is parameter efficiency, and the
+  saving is 119,952 parameters on the shipped board.
+- **Lower limit at or below −1.7** → **the adopted linear form stands.** Recorded
+  as a finding, not a non-result: it would mean unshared per-cell weights buy
+  something the shared form cannot express, which contradicts the efficiency
+  argument that motivated this entry.
+- **Additionally, if the interval lies entirely above zero** → the conv form is
+  not merely non-inferior but better, and see below.
+
+**Twelve seeds, and no extension.** EXP-012 ran five and needed its one permitted
+extension, at three hours, to clear by a quarter of a point — and its five-seed
+`sd` understated the twelve-seed value by 20%. This design is powered at twelve
+from the measured variance up front. **If it does not resolve, that is the
+result**, and the incumbent stands by incumbency. Registering an extension here
+would be registering optional stopping with extra steps.
+
+#### What this entry does not re-read
+
+**It does not re-read EXP-012's adoption.** That rule permitted one extension and
+it is spent. If the conv form comes out **materially better** than the linear
+form, the 3.3-point gap to the flat head was measured against a parameterisation
+that is no longer the shipped one, and a **fresh adoption entry** is required —
+registered separately, not read out of this one. This is written down now so that
+a favourable result cannot be quietly converted into a stronger claim about the
+flat-head comparison.
+
+#### Correctness preconditions
+
+Both must pass before the run counts as evidence.
+
+1. **The reproduction guard runs *after* the `az/network.py` change, not before.**
+   Its entire purpose here is to catch that change perturbing the incumbent arm
+   whose rows are being reused. `B_cell` seed 0 is retrained and its held-out hit
+   vector compared **element-wise** against EXP-012's artefact — a mean
+   comparison is not evidence, since two runs can score the same on different
+   positions. Any mismatch voids the reuse and the linear arm must be retrained
+   in full.
+2. **The conv arm's normaliser is verified against brute force.** The score is
+   the same non-separable form as the adopted head, so the nested closed form
+   applies unchanged — but "applies unchanged" is a claim about code that must be
+   checked, on three variants and three depths, matching the existing test's
+   coverage. A wrong normaliser does not raise; it optimises the wrong
+   distribution and reads as a worse arm, and it would land on **V_conv
+   specifically**, in the direction that keeps the incumbent.
+
+Also asserted, as in EXP-012: stem, tower, `policy_conv` and value head are
+**bit-identical across both arms at one seed**. Restructuring `policy_conv` to
+expose the pre-flatten map must not shift the RNG stream. `nn.Flatten` holds no
+parameters, so moving it to the call site should be inert — *should be* is why it
+is asserted rather than reasoned about.
+
+#### Threats to validity
+
+Inherits EXP-011's and EXP-012's. Added here:
+
+- **The 5×3 has 15 cells and the shipped board has 25.** Weight sharing gets
+  *more* attractive as cells multiply — 25 unshared maps against one shared one —
+  so a conv-form win here understates the 5×5 case, and a conv-form loss here
+  would be the more transferable result. The asymmetry is in the direction that
+  makes a negative result the more informative one, which is unusual and worth
+  saying.
+- **The two arms are not parameter-matched, deliberately.** Every previous entry
+  in this family matched parameters to isolate a mechanism. This one is a
+  parameterisation question and matching would destroy it: the 218× difference
+  *is* the treatment. It follows that a conv-form win is confounded with
+  regularisation-by-fewer-parameters, and the entry cannot separate "sharing is
+  the right inductive bias" from "43,290 parameters was too many". **That
+  separation is not attempted and no sentence may claim it.**
+- **Reusing the linear arm's rows means one arm's numbers predate the other's
+  code.** The guard checks reproduction on one cell of twelve. A defect that
+  perturbs only seeds 3 and 7 would pass it. The guard is a strong check, not a
+  proof.
+- **Targets are exact optimal play; deployment trains on MCTS visit counts.** The
+  rank-inversion risk EXP-012 records applies unchanged, and applies with more
+  force to a regularisation-flavoured comparison: fewer parameters help more
+  against noisy targets than against clean ones, so a conv-form tie here could be
+  a conv-form win in deployment, unmeasured either way.
+
+#### Anti-circularity
+
+Under [adr-004](../docs/adr/adr-004-solver-approach.md) R1 this is the **third**
+architecture decision taken against 5×3 ground truth, over an adoptable choice
+set of **four** (factored, linear-conditioned, conv-conditioned, flat).
+
+**The refinement argument does not exempt it.** One could argue this only chooses
+between two implementations of a decision already taken, and therefore adds no
+new family. It still makes the shipped architecture a function of solver labels
+on a variant inside H3's comparison set, and R1 counts *decisions*, not families.
+The count is three.
+
+**A partial repair is registered.** Final training loss — a non-solver quantity —
+is a pre-registered secondary. **If the two disagree in direction, this entry
+adopts nothing** and the disagreement is the finding. That uses the non-solver
+signal as a check on the solver-selected decision rather than as a second
+selector, which is the only use of it that does not simply move the leak.
+
+#### Expected result
+
+1. **The gate passes**: `V_conv − L_linear` lands above −0.689 and the
+   convolutional form is adopted.
+2. **The point estimate is non-negative**, on the data-efficiency argument: the
+   shared weights train on every cell of every position against the unshared
+   form's 36.7%.
+3. **Any advantage concentrates on the odd layers**, where EXP-012 measured the
+   head effect at +8.1 against +2.8.
+4. **Training loss is higher for the conv form** — 198 parameters fit the training
+   set less well than 43,290 — **while held-out is not worse.** If that pair
+   holds, it is the clean statement of the entry: the unshared parameters were
+   fitting the training set and not the game.
+
+Prediction 4 is the one that can most cleanly be wrong, and it is the one worth
+watching: if the conv form fits training *better*, the data-efficiency story is
+doing more work than the capacity story and the entry should say so.
+
+#### Artefact
+
+`results/exp013-conv-rotation-5x3-h2.json`, written by
+`scripts/exp013_conv_rotation.py`, with the verdict applied by
+`scripts/exp013_analysis.py` from the artefact rather than by the run. The
+network class is `az/network.py::ConvRotationNet`. All four named before the
+instrument exists.
+
+**Estimated cost.** Twelve training runs plus evaluation at ~920 s each, plus the
+reproduction guard at ~770 s: **≈ 3.4 h**. The linear arm's twelve rows are
+reused, which is the half that is not paid.
+
+
 ## Planned
 
 Sketched in Phase 0 so the phases have targets. IDs are allocated on
