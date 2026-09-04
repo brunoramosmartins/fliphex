@@ -45,8 +45,10 @@ heuristic baseline.
 factors — 25 cell logits, 13 tile logits, 6 rotation logits — combined as
 `log p(cell) + log p(tile) + log p(rotation)`, then masked to legal moves and
 renormalised. 44 logits instead of 1950.~~
-**Superseded** — the head is now conditioned: rotation is a `25 × 6` tensor read
-at the move's cell. See the Phase 4 mitigation-(b) amendment below.
+**Superseded** — the head is now conditioned: rotation is read at the move's cell
+from a **1×1 convolution** over `policy_conv`'s spatial map, 198 parameters. See
+the two Phase 4 amendments below; the first adopted conditioning, the second
+replaced its parameterisation.
 
 **Value head.** Single `tanh` output in `[-1, 1]`. Since draws are impossible,
 the training target `z` is always exactly `±1`.
@@ -86,11 +88,14 @@ Z/2 mirror; augmentation is still rejected, on measured grounds.
   plateaus, condition rotation logits on the chosen cell; (c) fall back to a
   flat 1950-logit head, which is the safe design.
   **This must be checked explicitly in Phase 4 and logged**, not assumed away.
-  **Checked and logged (2026-09-03).** (a) was measured and did not rescue the
-  factored head (EXP-011); (b) was measured and is **adopted** (EXP-012); (c) is
-  not run. The ladder is spent — see the Phase 4 mitigation-(b) amendment. Note
+  **Checked and logged (2026-09-03, revised 2026-09-04).** (a) was measured and
+  did not rescue the factored head (EXP-011); (b) was measured and is **adopted**
+  (EXP-012), in its *efficient* parameterisation from 2026-09-04 (EXP-013); (c)
+  is not run. The ladder is spent — see the two Phase 4 amendments below. Note
   that the clause *"the best rotation depends heavily on the cell"* is the part
-  that remains **unverified**: the remedy is adopted, its stated reason is not.
+  that remains **unverified**: the remedy is adopted, its stated reason is not,
+  and EXP-013's prediction about *where* the efficient form would win also
+  failed. Two adoptions rest on effects neither experiment could explain.
 - No data augmentation means more self-play games for the same signal.
 - Constant planes for hand contents are a wasteful encoding (13 planes of 25
   identical values each). Accepted for v1 because it keeps the tower
@@ -110,11 +115,16 @@ Z/2 mirror; augmentation is still rejected, on measured grounds.
 default on parameter-efficiency grounds, but explicitly retained as the
 fallback if the independence assumption proves too costly. The comparison
 between the two is a legitimate experiment for Phase 4.
-**Run (EXP-011, EXP-012).** The flat head is the strongest arm on both
-occasions, and it is still not adopted: the conditioned head comes within 3.3
-points of it at a quarter of the parameters on the 5×5 (467,839 against
-1,879,201), which is inside the margin this ADR's structure was worth. Retained as a fallback; no longer expected to be
-taken.
+**Run (EXP-011, EXP-012, EXP-013).** The flat head is the strongest arm every
+time, and it is still not adopted. The conditioned head came within **3.3**
+points of it, inside the tolerance this ADR's structure was worth; the
+convolutional parameterisation adopted on 2026-09-04 narrows that to **2.37**
+points at **347,887** parameters on the 5×5 against the flat head's 1,879,201 —
+under a fifth. Retained as a fallback; no longer expected to be taken.
+
+Recorded so it is not read as more than it is: the 2.37 figure is **descriptive**.
+EXP-012's adoption rule permitted one extension and it is spent, so reopening the
+comparison against the flat head requires a newly registered entry.
 
 **Reuse `pgx` or `open_spiel`.** Would supply tested self-play plumbing. Rejected
 for v1: the roadmap's stated skill goal is "implemented from first principles",
@@ -326,8 +336,9 @@ encoding is the more valuable of the two properties.
 **Consequence for the sizing target.** The tower is now measured at **352,495**
 parameters on the 5×5 (332,965 on the 5×3, 324,319 on the 3×3), still below the
 0.5–1.5 M band this ADR targets. (Those are the factored head's counts. The
-conditioned head adopted on 2026-09-03 brings the 5×5 to **467,839**, still below
-the band.) That band was an estimate made before the
+conditioned head adopted on 2026-09-03 brought the 5×5 to 467,839; the
+convolutional form adopted on 2026-09-04 brings it to **347,887**, *below* the
+factored figure and well inside the band.) That band was an estimate made before the
 factored head existed; 44 output logits instead of 1,950 removes the projection
 that carried most of the difference. The instruction — start at the small end,
 grow only if training plateaus below the heuristic baseline — is unchanged.
@@ -464,6 +475,10 @@ The follow-up is registered. If it measures at least as well, this ADR should be
 amended again to the convolutional form; the decision here is "conditioned, not
 factored", and the parameterisation is the part still open.
 
+**Closed (2026-09-04).** It measured at least as well. The convolutional form is
+adopted by the next amendment, one day after this one; the sentence above is the
+condition that was met, not a reversal.
+
 ### Two caveats on the evidence, stated at full strength
 
 **The verdict cleared by a quarter of a point.** The interval's upper limit is
@@ -496,6 +511,164 @@ normaliser against `logsumexp` over generated moves across three readouts, three
 variants and three depths, and
 `test_the_three_arms_have_identical_parameter_counts` pins the matching that made
 the comparison legitimate.
+
+## Amendment — Phase 4 (2026-09-04): the rotation head is a 1×1 convolution
+
+**This supersedes yesterday's amendment after one day.** That is the condition
+the previous amendment set for itself, not a reversal: it adopted the
+unshared parameterisation *knowingly*, named the convolutional form as the
+obvious follow-up, and wrote that "if it measures at least as well, this ADR
+should be amended again". EXP-013 measured it. It does.
+
+### What the Decision section now says
+
+The rotation term is produced by a **1×1 convolution from 32 to 6 channels** over
+the `(32, n_cols, n_rows)` map `policy_conv` already computes before its flatten,
+read at the move's cell. Cell and tile logits are unchanged, the score is
+unchanged — `cell[c] + tile[t] + rotation[c, r]` — and the nested normaliser is
+unchanged. **Only the parameterisation of `rotation[c, r]` changes**, from
+`n_cells` unshared maps to one shared map applied per cell.
+
+| head | rotation params | 5×5 network total |
+|---|--:|--:|
+| factored (superseded 2026-09-03) | 4,806 | 352,495 |
+| linear-conditioned (superseded here) | 120,150 | 467,839 |
+| **1×1 convolution (adopted)** | **198** | **347,887** |
+| flat (never adopted) | — | 1,879,201 |
+
+**Full cell conditioning now costs less than not conditioning.** The adopted
+network is 4,608 parameters *below* the factored head this ADR shipped with, and
+119,952 below the head it carried yesterday. For an ADR whose stated thesis is
+parameter efficiency on a 25-ply game, that is the outcome the Context section
+was arguing for.
+
+### The evidence
+
+EXP-013, twelve seeds, 5×3-h2, 500 held-out positions, top-1 optimality after 400
+PUCT simulations. The incumbent's twelve rows were **reused** from EXP-012 under
+a reproduction guard that retrained its seed 0 after this change to
+`az/network.py` and compared hit vectors element-wise: 500/500 identical,
+training loss matching to 1e-9.
+
+| arm | top-1 | final train loss |
+|---|--:|--:|
+| linear-conditioned | 73.2% | 2.4967 |
+| **1×1 convolution** | **74.2%** | 2.5068 |
+
+`V − L = +0.95 pts`, lower limit **−0.06%** against a **non-inferiority** margin
+of **−1.70%**, one-sided at `t(11) = 1.796`.
+
+**The margin was derived, not reused.** This ADR adopted a head conceding 3.3
+points to the flat head under a 5.0-point tolerance, so 1.7 is what a
+parameterisation may give back before the architecture leaves the tolerance the
+adoption was taken under. The 3.3 carries [1.88, 4.75], so a conservative reader
+derives 0.25 instead — and **the observed lower limit of −0.06% clears even
+that**. This is the one decision in the EXP-011/012/013 sequence where the
+conservative reading does not change the verdict.
+
+### What this amendment does **not** establish
+
+**The convolution is not better. It is not worse.** The test was one-sided by
+design and it passed; the two-sided read is `+0.95 [−0.29, +2.19]` and contains
+zero, with seven of twelve seeds favouring the convolution. Parsimony breaks the
+tie, in a decision whose stated purpose is parameter efficiency. Nothing here
+licenses "the convolution wins".
+
+**Why it wins the tie is unknown, and the entry predicted the wrong place.** The
+argument for the shared form was data efficiency: a rotation row for cell `c` in
+the unshared head receives gradient only on plies where `c` is empty — about
+**36.7%** of positions — while shared weights see every cell on every position.
+That predicted the advantage would concentrate on the **odd** layers, where
+EXP-012 measured the head effect at +8.1 against +2.8. It came out **flat across
+parity**: +0.8 odd, +1.1 even. The prediction failed in the place it should have
+been most visible, and nothing replaces it.
+
+**So the mechanism is now doubly unexplained.** EXP-012 adopted conditioning
+without establishing *why* conditioning helps — its validity precondition failed
+unpassably. EXP-013 adopts the efficient form without establishing why the
+efficient form suffices. **Two consecutive architecture decisions on this ADR
+work for reasons neither experiment could show.** That is recorded here rather
+than in a threats section because it qualifies the architecture, not one
+measurement.
+
+**The win is confounded with regularisation.** The two arms were deliberately not
+parameter-matched — the 218× difference *is* the treatment — so "sharing is the
+right inductive bias" and "43,290 parameters was too many" cannot be told apart.
+The registration says so and this amendment inherits it.
+
+**All of it is 5×3.** Weight sharing gets *more* attractive as cells multiply —
+25 unshared maps against one shared one — so a convolutional win on 15 cells
+understates the 25-cell case. That is the favourable direction, and it is an
+argument, not a measurement.
+
+### One diagnostic the entry did produce
+
+The only non-solver evidence: the two heads played **200 games** head-to-head at
+seed 0, seats alternating. The convolution took **106 (53.0%, [46.1%, 59.8%])**.
+The interval crosses 50%, so it neither confirms nor contradicts — it is one seed
+pair, and it is recorded at that weight.
+
+### The initialisation had to be measured
+
+The two heads' rotation logits are dot products over **480** features and **32**
+respectively, and default initialisation bounds go as `1/sqrt(fan_in)`. Measured
+over 500 positions and three seeds before training:
+
+```
+incumbent rotation-logit sd 0.04354, convolution 0.09021 -> scale 0.4826
+```
+
+**The convolution starts at 2.07× the incumbent's scale.** Left alone, the
+comparison would have measured an initialisation difference and attributed it to
+weight sharing. The output is scaled by a fixed measured constant, which leaves
+the function class untouched. This is the same trap the pooled control hit with
+its `sqrt(n_cells)` in EXP-012, and larger — the general lesson stands: **equal
+parameter counts, equal shapes and equal function classes do not imply equal
+initial functions.**
+
+### A repair the adoption of (b) had left undone
+
+Found while building EXP-013 and recorded here because it concerns whether the
+architecture this ADR specifies can actually be *played*.
+
+`NetworkEvaluator` computed priors through the factored `masked_log_policy`,
+which expects a 6-wide rotation vector, and `az/player.py` and `az/selfplay.py`
+both constructed it by name. **Self-play, the evaluator gate and the agents were
+therefore still factored-only after the 2026-09-03 amendment moved the
+architecture record.** The adoption changed the ADR and the training path and
+left the play path behind; it raised rather than misbehaving quietly.
+
+Repaired with a `ConditionedNetworkEvaluator` and an `evaluator_for(net, board)`
+factory that both call sites use. Pinned by two tests: that every head type
+receives a normalised prior over legal moves from one forward pass, and that the
+evaluator's distribution is the one `conditioned_policy_loss` optimises — without
+which a network could be trained on one distribution and played on another with
+nothing raising.
+
+**The architecture has still never run a self-play loop.** Everything measured in
+EXP-011, EXP-012 and EXP-013 trains on exact solver labels. The pipeline this
+head was chosen for has not yet trained on its own visit counts.
+
+### Anti-circularity
+
+Under [adr-004](adr-004-solver-approach.md) R1, this is the **third** Axis 2
+architecture decision taken against Axis 1's exact ground truth on the 5×3, over
+an adoptable choice set of **four** (factored, linear-conditioned,
+convolutional-conditioned, flat). The refinement argument — that this only picks
+between two implementations of a decision already taken — does not exempt it: R1
+counts decisions, not families. H3's 5×3 evidence class carries the count.
+
+The head-to-head match above is the only selection evidence in the sequence that
+does not come from solver agreement, and it was weak enough to be a veto and
+nothing more.
+
+Pinned by `tests/test_az_train.py`:
+`test_the_conv_rotation_normaliser_equals_brute_force`,
+`test_the_conv_rows_are_the_convolution_at_that_cells_position` (the cell
+ordering — a mismatch would raise nowhere and simply read rotation logits from
+the wrong cell),
+`test_the_conv_arm_shares_every_non_rotation_parameter_with_the_adopted_head`,
+and `test_the_conv_rotation_head_is_198_parameters_on_every_board`.
 
 ## Related
 
