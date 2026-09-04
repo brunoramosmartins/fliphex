@@ -3520,6 +3520,191 @@ instrument exists.
 reproduction guard at ~770 s: **≈ 3.4 h**. The linear arm's twelve rows are
 reused, which is the half that is not paid.
 
+#### Result (2026-09-04) — the rule fires: adopt the convolutional form
+
+Run `scripts/exp013_conv_rotation.py`, 4h20 (15,596 s), artefact
+[`exp013-conv-rotation-5x3-h2.json`](../results/exp013-conv-rotation-5x3-h2.json),
+log [`exp013-run.log`](../results/exp013-run.log). Verdict applied by
+`scripts/exp013_analysis.py`, which recomputes every quantity from `results` and
+refuses to print if it disagrees with what the run stored. It agreed.
+
+| arm | rotation params (5×3) | top-1 after 400 sims | sd | supervised | final train loss |
+|---|--:|--:|--:|--:|--:|
+| L_linear (adopted 2026-09-03) | 43,290 | 73.2% | 1.4 | 66.0% | 2.4967 |
+| **V_conv** | **198** | **74.2%** | 1.2 | 67.8% | 2.5068 |
+| random legal | — | 39.4% | — | — | — |
+
+**`V_conv − L_linear = +0.95 pts`, lower limit −0.06%** against a margin of
+−1.70%, at `t(11) = 1.796`. The clustered bootstrap on the 500 held-out positions
+gives −0.05%; the seed-mean interval is the wider and is quoted, and the two
+agree on the branch.
+
+> **The rule fires: adopt the convolutional form.** adr-005's rotation head
+> becomes a 1×1 convolution. On the shipped 5×5 that is **347,887** parameters
+> against the linear-conditioned head's 467,839 and the factored head's 352,495 —
+> **full cell conditioning for less than not conditioning**, and 119,952
+> parameters saved against the form the ADR carried for one day.
+
+#### The feasibility repair worked on its first use
+
+This is the part worth keeping.
+
+| | forecast | observed |
+|---|--:|--:|
+| `sd(differences)` | 1.95 | **1.94** |
+| one-sided half-width | 1.011 | **1.011** |
+| δ | 1.700 | 1.700 |
+| **room** | **+0.689** | **+0.689** |
+
+EXP-012's validity gate was **unpassable** — its δ equalled its forecast
+half-width, so no point estimate whatsoever could have cleared it, and every
+mechanism contrast in that entry is void as a result. The standing rule this
+entry introduced — *no equivalence or non-inferiority test may be registered
+whose δ does not exceed its forecast half-width, with the room tabulated* — was
+applied here for the first time, and the forecast landed to the second decimal.
+
+The analysis script recomputes the room from the **observed** spread and refuses
+to print an adoption if it is not positive, so a run that turned out noisier than
+forecast could not have produced a verdict at all.
+
+#### What the adoption does not establish
+
+**The convolutional form is not better. It is not worse.** The registered test is
+one-sided and it passed; the two-sided read is `+0.95 [−0.29, +2.19]` and
+**contains zero**. Seven of twelve seeds favour the conv form, five the linear
+one. No sentence in any artefact may say the convolution won.
+
+**The pairing bought nothing here.** Implied between-arm correlation **−0.108**,
+against the **+0.554** EXP-012 measured on `D − B`. Constructing the value head
+before the policy heads was that entry's registered repair and it is now clear
+that it fixed *that pair of arms*, not pairing in general. The forecast `sd` was
+taken conservatively and happened to be right anyway; a future entry must not
+assume the pairing is worth variance reduction.
+
+**The arms are not parameter-matched, deliberately, so the win is confounded.**
+The 218× difference *is* the treatment. This entry cannot separate "sharing is
+the right inductive bias" from "43,290 parameters was too many", and it was
+registered as unable to.
+
+**It does not re-read EXP-012's adoption.** Descriptively the gap to the flat
+head narrows from **+3.32** to **+2.37** points. That number is recorded and
+**not acted on**: EXP-012's rule permitted one extension and it is spent, and
+this entry registered in advance that a materially better conv form requires a
+fresh adoption entry rather than a re-read. The narrowing is a reason to consider
+registering one, not a result about it.
+
+#### Every registered prediction, scored — three of four
+
+| # | prediction | outcome |
+|---|---|---|
+| 1 | the gate passes, above −0.689 | **holds** — +0.95 |
+| 2 | the point estimate is non-negative | **holds** — +0.95 |
+| 3 | any advantage concentrates on the **odd** layers | **fails** — +0.8 odd against **+1.1 even** |
+| 4 | conv fits training worse while generalising no worse | **holds** — 2.5068 vs 2.4967, and +0.95 held-out |
+
+**Prediction 3 is the informative failure.** It was derived from the
+data-efficiency argument: shared weights receive gradient from every cell on
+every position against the unshared form's 36.7%, so the gain should appear where
+the head effect is largest — the odd layers, where EXP-012 measured `B − A` at
++8.1 against +2.8. The advantage came out **flat across parity, marginally
+larger on the even layers**.
+
+That weakens data efficiency as the mechanism and **replaces it with nothing.**
+The design cannot arbitrate, having been registered as unable to separate sharing
+from size. What can be said is that the *reason* given for expecting the
+convolution to win is not visible in the place it should have been most visible.
+
+**Prediction 4 holding is the clean statement of the entry:** 198 parameters fit
+the training set worse than 43,290 and generalise better. The unshared parameters
+were fitting the training set and not the game.
+
+#### The initialisation match was not cosmetic
+
+Measured over 500 held-out positions and three seeds before any training:
+
+```
+incumbent rotation-logit sd 0.04354, conv 0.09021 -> scale 0.4826
+```
+
+**The conv arm's rotation logits start at 2.07× the incumbent's.** The two heads
+differ in input dimensionality — 480 features against 32 — and default
+initialisation bounds go as `1/sqrt(fan_in)`, so equal weight scales give unequal
+logit scales. Without the constant, the comparison would have measured an
+initialisation difference and attributed it to weight sharing. This is the same
+trap EXP-012's pooled control hit with its `sqrt(15)`, and larger.
+
+#### The head-to-head did not veto
+
+`conv 106/200 = 53.0% [46.1%, 59.8%]`, seats alternating. The interval crosses
+50%, so the veto — registered as firing only when the interval lies **entirely**
+below 50% — does not fire. It agrees in direction with the primary without adding
+strong evidence, which is what one seed pair is worth.
+
+Recorded plainly: this is the **only** non-solver evidence in the entry, it is
+weak, and the amendment that introduced it exists because the originally
+registered secondary was neither non-solver nor coherent.
+
+#### The reproduction guard, and what it licensed
+
+```
+guard passed in 694s: 500/500 positions identical, digest aa8690a5eee5
+```
+
+Run **after** the change to `az/network.py`, retraining EXP-012's `B_cell` at
+seed 0 and comparing hit vectors element-wise. All 500 positions identical and
+the training loss matching to 1e-9, which is what makes reusing that arm's twelve
+rows legitimate rather than assumed — and what halved the run.
+
+The analysis script independently recomputes the digest from the incumbent rows
+**as stored in this artefact** and refuses to proceed if it differs from the one
+the guard reported. Without that, the guard could have compared against one thing
+while something else was written down, and the reuse argument would cover nothing.
+
+#### Threats to validity, added by the result
+
+The entry's own threats stand. These are added by what happened.
+
+- **The mechanism is now doubly unexplained.** EXP-012 could not read why
+  conditioning helps; this entry predicted *where* the efficient form's advantage
+  should appear and was wrong. Two entries have adopted architecture changes that
+  work for reasons neither could establish.
+- **The margin is derived from a point estimate that carries an interval.**
+  δ = 1.7 comes from 5.0 − 3.3, and the 3.3 carries [1.88, 4.75]. The
+  conservative derivation is δ = 0.25, at which the observed lower limit of
+  −0.06% would **still** pass — which is worth stating, because it is the one
+  place in this family of entries where the conservative reading does not change
+  the verdict.
+- **Nothing is measured on the 5×5**, where weight sharing should be *more*
+  attractive: 25 unshared maps against one shared one. A conv win here understates
+  the shipped case, which is the favourable direction, but it remains an argument.
+- **The adopted head has never played a full self-play loop.** Building this
+  entry exposed that `NetworkEvaluator` could not drive the conditioned head at
+  all; the repair is tested but the architecture's first real training run is
+  still ahead of it.
+
+#### Artefacts
+
+| file | produced by |
+|---|---|
+| [`exp013-conv-rotation-5x3-h2.json`](../results/exp013-conv-rotation-5x3-h2.json) | `scripts/exp013_conv_rotation.py` |
+| [`exp013-run.log`](../results/exp013-run.log) | the same run |
+
+Verdict applied from the artefact by `scripts/exp013_analysis.py`, which was
+smoked on nine synthetic artefacts — the four verdict branches and five guards,
+each on an input built to trip it.
+
+#### Follow-ups this entry creates
+
+1. **adr-005 amendment** — the rotation head becomes the 1×1 convolution.
+   Required by the decision rule; the Axis 2 architecture may only change by ADR.
+2. **A fresh adoption entry against the flat head**, if wanted. The gap narrowed
+   to +2.37 and EXP-012's extension is spent, so the question can only be reopened
+   by registering it anew.
+3. **The first self-play run on the adopted architecture.** Everything measured
+   in EXP-011, EXP-012 and EXP-013 trains on exact solver labels; the pipeline the
+   architecture was chosen for has never trained on its own visit counts with this
+   head.
+
 
 ## Planned
 
