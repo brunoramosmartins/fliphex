@@ -46,7 +46,7 @@ import torch
 
 from az.encoding import encode
 from az.mcts import MCTS, ExpansionMode, policy_target
-from az.network import FlipHexNet, NetworkEvaluator
+from az.network import FlipHexNet, evaluator_for
 from az.replay_buffer import Sample, samples_from_game
 from fliphex.moves import Move, apply_move
 from fliphex.rules import is_terminal, outcome
@@ -128,7 +128,7 @@ def play_game(
     state = variant.initial_state()
     rng = random.Random(seed)
     record = GameRecord()
-    evaluator = NetworkEvaluator(net, board) if net is not None else None
+    evaluator = evaluator_for(net, board) if net is not None else None
 
     ply = 0
     while not is_terminal(state):

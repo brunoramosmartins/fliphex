@@ -490,3 +490,245 @@ def test_a_conditioned_step_trains_and_reaches_every_live_parameter(readout):
 
     assert last["policy"] < first["policy"]
     assert [n for n, p in net.named_parameters() if p.grad is None] == []
+
+
+# -- EXP-013's convolutional parameterisation ---------------------------------
+
+
+@pytest.mark.parametrize("variant", [FULL, SMALL, TINY])
+@pytest.mark.parametrize("plies", [0, 3, 7])
+def test_the_conv_rotation_normaliser_equals_brute_force(variant, plies):
+    """EXP-013's first correctness precondition.
+
+    The convolutional arm computes the same non-separable score as the adopted
+    head, so the nested closed form applies unchanged -- but "applies unchanged"
+    is a claim about code. A wrong normaliser does not raise: it optimises the
+    wrong distribution and reads as a weaker arm, and it would land on the
+    treatment arm specifically, in the direction that keeps the incumbent.
+    """
+    from az.network import ConvRotationNet, RotationReadout
+    from az.train import conditioned_normaliser
+
+    torch.manual_seed(plies + variant.n_cells)
+    board, state = advance(variant, plies)
+    moves = legal_moves(board, state)
+
+    net = ConvRotationNet(variant.n_cols, variant.n_rows).eval()
+    planes = _planes(board, state)
+    with torch.no_grad():
+        cell, tile, rows, _ = net(planes)
+
+    brute = torch.logsumexp(
+        torch.stack(
+            [
+                cell[0, m.cell] + tile[0, m.tile] + rows[0, m.cell, m.rotation]
+                for m in moves
+            ]
+        ),
+        dim=0,
+    )
+    closed = conditioned_normaliser(cell, tile, rows, planes, RotationReadout.CELL)
+
+    assert closed[0].item() == pytest.approx(brute.item(), abs=1e-4)
+
+
+@pytest.mark.parametrize("variant", [FULL, SMALL, TINY])
+def test_the_conv_rows_are_the_convolution_at_that_cells_position(variant):
+    """The cell ordering must match the board's, or every row is misattributed.
+
+    ``az.encoding`` lays cell ``c`` at flat index ``c`` within each plane, so
+    reshaping to ``(n_cols, n_rows)`` puts cell ``c`` at ``(c // n_rows,
+    c % n_rows)``. The convolution's ``flatten(2)`` must walk the same order. A
+    mismatch would not raise anywhere: rotation logits would simply be read from
+    the wrong cell, and the arm would look worse for a reason that is a bug.
+    """
+    from az.network import ConvRotationNet
+
+    torch.manual_seed(0)
+    net = ConvRotationNet(variant.n_cols, variant.n_rows).eval()
+    x = torch.randn(1, 30, variant.n_cols, variant.n_rows)
+
+    with torch.no_grad():
+        spatial = net.policy_conv[:3](net.tower(net.stem(x)))
+        conv = net.rotation_head(spatial)
+        _, _, rows, _ = net(x)
+
+    for i in range(variant.n_cols):
+        for j in range(variant.n_rows):
+            cell = i * variant.n_rows + j
+            assert torch.equal(rows[0, cell], conv[0, :, i, j] * net.rotation_scale)
+
+
+def test_the_conv_arm_shares_every_non_rotation_parameter_with_the_adopted_head():
+    """EXP-013 reuses the adopted arm's measured rows rather than retraining.
+
+    That is only legitimate if the two arms differ in the rotation head alone.
+    Constructing the conv arm through the parent keeps the RNG stream identical
+    through everything built before it, which is the same discipline the value
+    head's construction order enforces.
+    """
+    from az.network import ConditionedHeadNet, ConvRotationNet, RotationReadout
+
+    torch.manual_seed(0)
+    linear = ConditionedHeadNet(5, 3, readout=RotationReadout.CELL)
+    torch.manual_seed(0)
+    conv = ConvRotationNet(5, 3)
+
+    for module in (
+        "stem",
+        "tower",
+        "value_head",
+        "policy_conv",
+        "cell_head",
+        "tile_head",
+    ):
+        left = getattr(linear, module).state_dict()
+        right = getattr(conv, module).state_dict()
+        assert left.keys() == right.keys()
+        for key in left:
+            assert torch.equal(left[key], right[key]), f"{module}.{key} differs"
+
+
+def test_the_conv_rotation_head_is_198_parameters_on_every_board():
+    """The claim the entry rests on: 218x smaller, and board-independent."""
+    from az.network import ConditionedHeadNet, ConvRotationNet, RotationReadout
+
+    for variant in (FULL, SMALL, TINY):
+        torch.manual_seed(0)
+        conv = ConvRotationNet(variant.n_cols, variant.n_rows)
+        torch.manual_seed(0)
+        linear = ConditionedHeadNet(
+            variant.n_cols, variant.n_rows, readout=RotationReadout.CELL
+        )
+
+        conv_head = sum(p.numel() for p in conv.rotation_head.parameters())
+        linear_head = sum(p.numel() for p in linear.rotation_head.parameters())
+
+        assert conv_head == 198
+        assert linear_head > conv_head
+        assert conv.count_parameters() < linear.count_parameters()
+
+    # On the shipped board the conditioned network is smaller than the factored
+    # head it replaced -- full cell conditioning for less than not conditioning.
+    torch.manual_seed(0)
+    assert ConvRotationNet(5, 5).count_parameters() == 347_887
+    assert FlipHexNet(5, 5).count_parameters() == 352_495
+
+
+def test_a_conv_rotation_step_trains_and_reaches_every_parameter():
+    from az.network import ConvRotationNet
+
+    torch.manual_seed(0)
+    net = ConvRotationNet(3, 3)
+    optimiser = torch.optim.Adam(net.parameters(), lr=1e-2)
+    batch = make_batch([a_sample(TINY, 0), a_sample(TINY, 2)], 3, 3)
+
+    first = train_step(net, optimiser, batch)
+    for _ in range(20):
+        last = train_step(net, optimiser, batch)
+
+    assert last["policy"] < first["policy"]
+    assert [n for n, p in net.named_parameters() if p.grad is None] == []
+
+
+def test_rotation_scale_multiplies_the_rows_and_nothing_else():
+    """The scale exists to match initial logit magnitude across arms.
+
+    It must be a pure output scaling -- if it touched the cell or tile logits it
+    would no longer leave the function class alone.
+    """
+    from az.network import ConvRotationNet
+
+    torch.manual_seed(0)
+    plain = ConvRotationNet(5, 3, rotation_scale=1.0).eval()
+    torch.manual_seed(0)
+    scaled = ConvRotationNet(5, 3, rotation_scale=2.5).eval()
+    x = torch.randn(2, 30, 5, 3)
+
+    with torch.no_grad():
+        c1, t1, r1, v1 = plain(x)
+        c2, t2, r2, v2 = scaled(x)
+
+    assert torch.equal(c1, c2)
+    assert torch.equal(t1, t2)
+    assert torch.equal(v1, v2)
+    assert torch.allclose(r2, r1 * 2.5)
+
+
+def test_the_evaluator_factory_matches_the_head_and_the_search_can_drive_it():
+    """The deployment path must be able to play the adopted architecture.
+
+    Before EXP-013 this was false: ``az/player.py`` and ``az/selfplay.py`` both
+    hard-coded the factored evaluator, whose ``masked_log_policy`` expects a
+    6-wide rotation vector. Handed the conditioned head adr-005 adopted, it
+    raised -- so self-play, the gate and the agents were all still
+    factored-only after the architecture record had moved.
+    """
+    from az.network import (
+        ConditionedHeadNet,
+        ConditionedNetworkEvaluator,
+        ConvRotationNet,
+        FlatHeadNet,
+        FlatNetworkEvaluator,
+        NetworkEvaluator,
+        RotationReadout,
+        evaluator_for,
+    )
+
+    board = SMALL.board()
+    state = SMALL.initial_state()
+    moves = legal_moves(board, state)
+
+    torch.manual_seed(0)
+    cases = [
+        (FlipHexNet(5, 3), NetworkEvaluator),
+        (
+            ConditionedHeadNet(5, 3, readout=RotationReadout.CELL),
+            ConditionedNetworkEvaluator,
+        ),
+        (
+            ConditionedHeadNet(5, 3, readout=RotationReadout.POOLED),
+            ConditionedNetworkEvaluator,
+        ),
+        (ConvRotationNet(5, 3), ConditionedNetworkEvaluator),
+        (FlatHeadNet(5, 3), FlatNetworkEvaluator),
+    ]
+    for net, expected in cases:
+        evaluator = evaluator_for(net, board)
+        assert type(evaluator) is expected, f"{type(net).__name__} -> {type(evaluator)}"
+
+        priors = evaluator.prior(board, state, moves)
+        assert len(priors) == len(moves)
+        assert sum(priors) == pytest.approx(1.0, abs=1e-5)
+        assert all(p > 0.0 for p in priors)
+        assert -1.0 <= evaluator.evaluate(board, state) <= 1.0
+        # One forward for both hooks: the cache is keyed on state identity.
+        assert evaluator.forwards == 1
+
+
+def test_the_conditioned_evaluator_agrees_with_the_training_path():
+    """The prior the search sees must be the distribution training optimises.
+
+    Two code paths compute the same score -- the evaluator for play and
+    ``conditioned_policy_loss`` for training. If they drift, the network is
+    trained on one distribution and played on another, and nothing raises.
+    """
+    from az.network import (
+        ConvRotationNet,
+        evaluator_for,
+        masked_conditioned_log_policy,
+        to_tensor,
+    )
+
+    board, state = advance(SMALL, 5)
+    moves = legal_moves(board, state)
+
+    torch.manual_seed(0)
+    net = ConvRotationNet(5, 3).eval()
+    with torch.no_grad():
+        cell, tile, rows, _ = net(to_tensor(encode(board, state), 5, 3))
+        direct = masked_conditioned_log_policy(net, cell[0], tile[0], rows, moves)
+
+    priors = evaluator_for(net, board).prior(board, state, moves)
+    for got, want in zip(priors, direct.exp().tolist(), strict=True):
+        assert got == pytest.approx(want, abs=1e-6)

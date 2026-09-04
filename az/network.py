@@ -276,6 +276,94 @@ class ConditionedHeadNet(FlipHexNet):
         return f"ConditionedHeadNet(readout={self.readout.value})"
 
 
+class ConvRotationNet(ConditionedHeadNet):
+    """The cell-conditioned head, parameterised by a 1x1 convolution.
+
+    EXP-013's treatment arm. It computes exactly the score the adopted head
+    computes — ``cell[c] + tile[t] + rotation[c, r]``, under the same nested
+    normaliser — and differs only in how ``rotation[c, r]`` is produced.
+
+    The adopted head is ``Linear(32 * n_cells, n_cells * 6)``: as many
+    independent maps as there are cells, no weight sharing, 43,290 parameters on
+    the 5x3 and 120,150 on the 5x5. ``policy_conv`` already produces a
+    ``(32, n_cols, n_rows)`` spatial map before its flatten, so a **1x1
+    convolution from 32 to 6 channels** on that map gives per-cell rotation
+    logits from weights shared across cells, reading each cell's own 32 features:
+    **198 parameters on every board**. On the 5x5 that makes the conditioned
+    network *smaller* than the factored head it replaced, 347,887 against
+    352,495.
+
+    **Why it subclasses rather than bypasses.** Inheriting means the RNG stream
+    is consumed identically through the stem, tower, value head, ``policy_conv``,
+    cell head and tile head, so those are bit-identical to the adopted arm at a
+    given seed and the only stream difference is the final head. That is the same
+    discipline the value head's construction order enforces. The parent's
+    ``Linear`` rotation head is built and immediately discarded, which wastes an
+    allocation and is worth it: it also keeps ``isinstance`` routing in
+    :mod:`az.train` and the ``CELL`` branch of the normaliser working unchanged,
+    rather than duplicating either.
+
+    **``policy_conv`` is read at ``[:3]``, not restructured.** Moving its
+    ``nn.Flatten`` to the call site would have worked — flatten holds no
+    parameters, so it consumes no RNG — but slicing needs no edit to
+    :class:`FlipHexNet` at all, and EXP-013 reuses the adopted arm's already
+    measured rows rather than retraining them. Not touching the incumbent's class
+    is worth more than the tidier structure.
+
+    **``rotation_scale`` is measured, not guessed.** The adopted head's rotation
+    logit is a dot product over ``32 * n_cells`` features and this one's is over
+    **32**, and default initialisation bounds go as ``1/sqrt(fan_in)``, so the two
+    start at different scales by construction. EXP-012's pooled control needed a
+    ``sqrt(n_cells)`` correction for the same class of reason. The constant is
+    measured over sampled positions before training and passed in; scaling the
+    output leaves the function class untouched.
+    """
+
+    def __init__(
+        self,
+        n_cols: int = 5,
+        n_rows: int = 5,
+        *,
+        rotation_scale: float = 1.0,
+        **kwargs,
+    ) -> None:
+        super().__init__(n_cols, n_rows, readout=RotationReadout.CELL, **kwargs)
+        # The convolution emits exactly one row per cell, so the parent's
+        # max(n_cells, 13) sizing does not apply. The CELL readout only ever
+        # indexes cells, and the normaliser's CELL branch slices to n_cells.
+        self.rotation_rows = self.n_cells
+        del self.rotation_head
+        self.rotation_head = nn.Conv2d(32, N_ROTATIONS, 1)
+        self.register_buffer(
+            "rotation_scale", torch.tensor(float(rotation_scale)), persistent=True
+        )
+
+    def forward(self, x: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor]:
+        """Return ``(cell_logits, tile_logits, rotation_rows, value)``.
+
+        ``rotation_rows`` is ``(batch, n_cells, 6)``, the same contract the
+        adopted head honours, so every consumer is unchanged.
+        """
+        features = self.tower(self.stem(x))
+        # policy_conv is (Conv2d, BatchNorm2d, ReLU, Flatten); the head needs the
+        # map before the flatten and the cell/tile heads need it after.
+        spatial = self.policy_conv[:3](features)
+        policy = self.policy_conv[3](spatial)
+        # (B, 6, n_cols, n_rows) -> (B, n_cells, 6). flatten(2) walks
+        # (n_cols, n_rows) row-major, which is the board's own cell order:
+        # az.encoding lays cell c at flat index c within each plane.
+        rows = self.rotation_head(spatial).flatten(2).transpose(1, 2)
+        return (
+            self.cell_head(policy),
+            self.tile_head(policy),
+            rows * self.rotation_scale,
+            self.value_head(features).squeeze(-1),
+        )
+
+    def __repr__(self) -> str:
+        return f"ConvRotationNet(scale={float(self.rotation_scale):.4f})"
+
+
 class FlatHeadNet(FlipHexNet):
     """The same tower, with one logit per ``(cell, tile, rotation)`` triple.
 
@@ -490,6 +578,104 @@ class FlatNetworkEvaluator(NetworkEvaluator):
     def prior(self, board: Board, state: GameState, moves: list[Move]) -> list[float]:
         self._ensure(state)
         return flat_masked_log_policy(self._logits, moves).exp().tolist()
+
+
+def masked_conditioned_log_policy(
+    net: ConditionedHeadNet,
+    cell_logits: Tensor,
+    tile_logits: Tensor,
+    rows: Tensor,
+    moves: list[Move],
+) -> Tensor:
+    """Log-probabilities over ``moves`` for a conditioned head.
+
+    The score is ``cell[c] + tile[t] + rotation[c, r]``, where the rotation term
+    comes from the arm's own readout. Unlike the factored head's, this sum is
+    **not** separable, which is why the reduction is delegated to the net rather
+    than assumed here.
+
+    Args:
+        net: The conditioned network, which owns the readout.
+        cell_logits: ``(n_cells,)`` for a single position.
+        tile_logits: ``(13,)``.
+        rows: ``(1, n_cells, 6)`` — the batch dimension is kept because
+            ``reduce_rows`` gathers across it.
+        moves: The legal moves. Must be non-empty.
+
+    Returns:
+        ``(len(moves),)`` log-probabilities.
+
+    Raises:
+        ValueError: If ``moves`` is empty.
+    """
+    if not moves:
+        raise ValueError("no legal moves: a terminal position has no policy")
+    device = cell_logits.device
+    index = torch.zeros(len(moves), dtype=torch.long, device=device)
+    cells = torch.tensor([m.cell for m in moves], device=device)
+    tiles = torch.tensor([m.tile for m in moves], device=device)
+    rotations = torch.tensor([m.rotation for m in moves], device=device)
+    rotation = net.reduce_rows(rows, index, cells, tiles)[
+        torch.arange(len(moves), device=device), rotations
+    ]
+    return torch.log_softmax(cell_logits[cells] + tile_logits[tiles] + rotation, dim=0)
+
+
+class ConditionedNetworkEvaluator(NetworkEvaluator):
+    """:class:`NetworkEvaluator` for a :class:`ConditionedHeadNet`.
+
+    Without this the search cannot drive the head adr-005 adopted on
+    2026-09-03: the base evaluator calls :func:`masked_log_policy`, which expects
+    a 6-wide rotation vector and gets an ``n_cells x 6`` tensor. It raises rather
+    than misbehaving quietly, which is the only good thing about the situation —
+    :mod:`az.selfplay`, :mod:`az.gate` and :mod:`agents` all reach the network
+    through this class, so the whole deployment path was still factored-only
+    after the architecture record moved.
+
+    Same one-entry cache, same reason: the search asks for the priors and the
+    leaf value on the same state, one line apart.
+    """
+
+    def _ensure(self, state: GameState) -> None:
+        if self._state is state:
+            return
+        was_training = self.net.training
+        self.net.eval()
+        try:
+            with torch.no_grad():
+                x = to_tensor(
+                    encode(self.board, state), self.board.n_cols, self.board.n_rows
+                )
+                cell, tile, rows, value = self.net(x)
+        finally:
+            self.net.train(was_training)
+        self._state = state
+        self._cell, self._tile = cell[0], tile[0]
+        self._rows = rows
+        self._value = float(value[0])
+        self.forwards += 1
+
+    def prior(self, board: Board, state: GameState, moves: list[Move]) -> list[float]:
+        self._ensure(state)
+        log_priors = masked_conditioned_log_policy(
+            self.net, self._cell, self._tile, self._rows, moves
+        )
+        return log_priors.exp().tolist()
+
+
+def evaluator_for(net: FlipHexNet, board: Board) -> NetworkEvaluator:
+    """The evaluator matching ``net``'s head.
+
+    Every caller that builds an evaluator must go through this. Hard-coding
+    :class:`NetworkEvaluator` is what left the deployment path unable to play the
+    adopted architecture; a factory makes the head a property of the network
+    rather than a fact each call site has to remember.
+    """
+    if isinstance(net, FlatHeadNet):
+        return FlatNetworkEvaluator(net, board)
+    if isinstance(net, ConditionedHeadNet):
+        return ConditionedNetworkEvaluator(net, board)
+    return NetworkEvaluator(net, board)
 
 
 @torch.no_grad()

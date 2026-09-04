@@ -3416,6 +3416,80 @@ adopts nothing** and the disagreement is the finding. That uses the non-solver
 signal as a check on the solver-selected decision rather than as a second
 selector, which is the only use of it that does not simply move the leak.
 
+#### Amendment (2026-09-03, before the run) — the secondary was not a secondary
+
+Found while building the instrument, with no data in existence. Registered here
+rather than fixed silently, because the defect is in the anti-circularity repair
+and that is the part of the entry most worth being able to trust.
+
+**Defect 1 — final training loss is not a non-solver quantity.** The training
+targets are optimal moves read from the exact solver. A loss computed against
+solver labels cannot check a solver-selected decision; it is the same evidence in
+a different unit. The section above called it "a non-solver quantity" and it is
+not one.
+
+**Defect 2 — the direction rule contradicted this entry's own prediction.** The
+repair said the entry adopts nothing if the primary and the secondary "disagree
+in direction". Expected result 4 predicts the conv arm fits training **worse**
+(198 parameters against 43,290) while generalising **no worse** — the textbook
+outcome for a smaller model, and the cleanest possible statement of the entry.
+The rule as written would have scored exactly that as a disagreement and refused
+to adopt. **The registered rule and the registered prediction could not both be
+satisfied.**
+
+**The replacement — head-to-head play.** The two arms at seed 0 play a match of
+**200 games**, seats alternating, 400 simulations, temperature for the first four
+plies so the games are not replays of one another. The winner is decided by the
+game, not by agreement with the solver, which puts it genuinely outside Axis 1.
+
+- **It costs no extra training.** The reproduction guard already trains the
+  incumbent at seed 0; its net is kept and played. Only match time is added,
+  about 30 minutes.
+- **It is one seed pair and therefore weak**, so it is used only as a veto and
+  only when decisive: the check fires when the conv arm's Wilson interval lies
+  **entirely below 50%**. At 200 games that is roughly a win rate under 43%. A
+  single seed pair cannot overturn a twelve-seed primary on noise.
+
+**Training loss stays, as a reported diagnostic and never as a gate.**
+Prediction 4 is read against it.
+
+#### A defect in the shipped pipeline, found by building this entry
+
+Not a result of EXP-013 and recorded because it was found here.
+
+`az/network.py::NetworkEvaluator` computes priors through the **factored**
+`masked_log_policy`, which expects a 6-wide rotation vector. Handed the
+conditioned head adr-005 adopted on 2026-09-03, it raises. Both `az/player.py`
+and `az/selfplay.py` constructed it by name, so **self-play, the evaluator gate
+and the agents were all still factored-only after the architecture record had
+moved.** The adoption changed the ADR and the training path and left the play
+path behind.
+
+It fails loudly rather than quietly, which is the only good thing about it. The
+repair is a `ConditionedNetworkEvaluator` and an `evaluator_for(net, board)`
+factory that both call sites now use, pinned by two tests — one that every head
+type gets the right evaluator and produces a normalised prior over legal moves,
+and one that the evaluator's distribution matches the one
+`conditioned_policy_loss` optimises. Without the second, a network could be
+trained on one distribution and played on another with nothing raising.
+
+**This does not perturb the reused rows.** EXP-012's instrument scored arms
+through its own `_ArmEvaluator`, never through `NetworkEvaluator`, so the repair
+cannot touch the incumbent's twelve rows — and the reproduction guard is what
+checks that claim rather than asserting it.
+
+#### One registered precondition turned out to be unnecessary
+
+The correctness preconditions above anticipate restructuring `policy_conv` to
+expose its pre-flatten map, and require asserting that the restructuring does not
+shift the RNG stream. **No restructuring was needed:** `policy_conv` is a
+`Sequential` and the map is available as `policy_conv[:3](features)`, with the
+flatten applied as `policy_conv[3]`. `FlipHexNet` is untouched.
+
+That strictly strengthens the reuse argument — the incumbent's class did not
+change at all — and the bit-identity assertion is kept anyway, as a test, because
+"untouched" is a claim about code.
+
 #### Expected result
 
 1. **The gate passes**: `V_conv − L_linear` lands above −0.689 and the

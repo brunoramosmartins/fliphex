@@ -22,7 +22,7 @@ from __future__ import annotations
 import random
 
 from az.mcts import MCTS, ExpansionMode, policy_target
-from az.network import FlipHexNet, NetworkEvaluator
+from az.network import FlipHexNet, evaluator_for
 from fliphex.board import Board
 from fliphex.moves import Move
 from fliphex.state import GameState
@@ -73,7 +73,7 @@ class SearchPlayer:
         """Return the move to play. ``state`` must be non-terminal."""
         prior = evaluate = None
         if self.net is not None:
-            evaluator = NetworkEvaluator(self.net, board)
+            evaluator = evaluator_for(self.net, board)
             prior, evaluate = evaluator.prior, evaluator.evaluate
 
         search = MCTS(
