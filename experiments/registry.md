@@ -3706,6 +3706,143 @@ each on an input built to trip it.
    head.
 
 
+### EXP-014 — pipeline shakedown: does the loop close on the adopted architecture?
+
+**Registered 2026-09-04, before the run.**
+
+#### What this is, and what it is not
+
+**It is a pre-flight check on the instrument, not evidence about the game.** No
+number produced here may be quoted about H1, H2 or H3, and no architecture or
+hyperparameter decision may be taken from it. It exists because the training loop
+`az/loop.py` was written today, the head it will run was adopted yesterday, and
+the two have never met at full scale.
+
+The alternative to running it is committing **≈ 60 hours** to a pipeline whose
+first end-to-end execution would be that run.
+
+#### Why it exists — three things are unexercised
+
+1. **The loop has never run at deployment scale.** Its tests use a 3×3 board,
+   four games, four simulations and an in-process worker. The real run is a 5×5
+   board, 200 games, 400 simulations and eight spawned processes.
+2. **`workers > 1` was broken until today.** `_init_worker` rebuilt every network
+   as a factored head, which is correct only while the factored head is the only
+   head. The repair is tested at two workers on a 3×3; it has not been run at
+   eight workers on the shipped board.
+3. **R8 carries one figure that was never measured.** Its own text says the
+   4.31× parallel speedup and the ~705 games/hour that follow from it were
+   measured **engine-only, with torch not yet competing for those cores**. The
+   59.6-hour budget for H3's five seeds rests on that figure. This entry closes
+   it.
+
+#### Configuration
+
+The **shipped 5×5**, because a shakedown on a smaller board would validate
+neither the throughput figure nor the memory profile of the run it is clearing.
+
+| | |
+|---|---|
+| variant | 5×5, `h1` |
+| architecture | `ConvRotationNet`, adr-005 as amended 2026-09-04 |
+| generations | 3 |
+| games per generation | 20 |
+| simulations | **400** — deployment's value, since the point is the real cost |
+| gate | every 2 generations, 20 games, threshold 0.55 |
+| steps / batch | 400 / 64 |
+| buffer capacity | 20,000, crossing generations |
+| workers | 8, spawn |
+| seed | 1 |
+
+Small in generations and games, **identical in shape** to the registered run.
+
+#### Four checks, each with its pass criterion
+
+| # | check | passes when |
+|---|---|---|
+| C1 | the loop closes | 3 generations complete; a checkpoint and 3 history rows exist |
+| C2 | parallel self-play runs the adopted head | 8 workers produce a full generation with no worker error |
+| C3 | the gate decides | both gates return a result with a Wilson interval and a seat split |
+| C4 | **a real kill resumes indistinguishably** | see below |
+
+**Any check failing stops the 60-hour run.** That is the entry's only decision
+rule and it is one-directional: passing does not license anything, it removes an
+objection.
+
+#### C4 — the kill is real, and that is the point
+
+`tests/test_az_loop.py` simulates interruption by calling `run` twice. That
+cannot catch a **torn write**: a process killed between writing the payload and
+writing the manifest, or halfway through either. `atomic_write` and "manifest
+last" exist for exactly that, and **neither has ever been exercised by an actual
+kill**.
+
+Procedure:
+
+1. Run the shakedown straight through. Record the SHA-256 of the final
+   challenger and champion `state_dict`s.
+2. Delete the run directory. Run it again, and `kill -9` the process **during the
+   first gate** — the longest uninterruptible unit, and the only place the
+   mid-match checkpoint path is reachable.
+3. Resume. Let it finish.
+4. **The two digests must be equal.**
+
+Not "the losses look similar" and not "it continued without crashing". Equal.
+
+A caveat registered in advance so it is not discovered as a surprise: this
+compares two runs of the same code, so a defect present in both cancels out. The
+loop's unit tests already have that weakness and it was measured — removing
+`restore_rng` leaves them green. **C4 tests durability under a real kill, which
+those tests cannot reach; it does not re-test determinism, which they can.**
+
+#### The one measurement: throughput, and what may be done with it
+
+Reported: games/hour composed (self-play with the network in the loop, at eight
+workers), seconds per generation, and peak resident memory.
+
+This is a **cost** measurement, not a strength one, so acting on it is not
+circular. What it may change and what it may not:
+
+- **May change:** `workers`, and the games-per-generation or generation count of
+  the registered run, by dated amendment.
+- **May not change:** the **five seeds**. If the composed rate makes the schedule
+  unaffordable, the seed count is the *last* thing cut and only in an amendment
+  that states the power consequence explicitly. Cutting seeds is the cheapest way
+  to make a budget work and the fastest way to make a comparison meaningless.
+
+If the composed rate is materially below the engine-only 705 games/hour — and it
+will be, since the network is now in the loop — **R8's residual is closed with
+the real number** rather than left as a known-optimistic estimate.
+
+#### What may and may not be decided from this
+
+- **May not:** anything about the architecture, the head, the schedule's
+  statistical parameters, or the game.
+- **May:** whether the 60-hour run starts, and the compute parameters above.
+
+Nothing here is measured against solver ground truth, so **the anti-circularity
+count is unchanged at three** (EXP-011, EXP-012, EXP-013). That is deliberate:
+the shakedown is the one Phase 4 entry that touches the pipeline without touching
+the leak, and keeping it that way is worth more than any sanity check against
+known values would have been.
+
+#### Expected result
+
+All four checks pass, and the composed throughput comes in **below** 705
+games/hour — the engine-only figure has no network in it. A composed rate near
+the engine-only one would be the surprising outcome and would mean the network's
+cost is being hidden somewhere.
+
+The registered run's cost is then recomputed from the measured rate, before it
+starts rather than after.
+
+#### Artefact
+
+`results/exp014-shakedown-5x5.json`, written by `scripts/exp014_shakedown.py`,
+with the run's own per-generation history at `data/az-runs/shakedown/history.jsonl`.
+Named before the instrument exists.
+
+
 ## Planned
 
 Sketched in Phase 0 so the phases have targets. IDs are allocated on
