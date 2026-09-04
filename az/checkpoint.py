@@ -81,7 +81,7 @@ from az.replay_buffer import ReplayBuffer
 
 #: Bumped when the on-disk layout changes incompatibly. A resume that finds a
 #: different version refuses rather than guessing.
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 
 #: Written last; a checkpoint without it is a crashed write, not a checkpoint.
 MANIFEST = "manifest.json"
@@ -103,6 +103,12 @@ class TrainingState:
         torch_rng: ``torch.get_rng_state()`` for initialisation and dropout.
         gate_wins: Challenger wins so far in a part-finished gate.
         gate_games: Games played so far in a part-finished gate.
+        gate_first_wins: Of those wins, how many came in the first seat.
+            ``run_gate`` requires all three to resume: the total alone restores
+            the right win rate and a fabricated per-seat breakdown, and the seat
+            split is what shows a seat effect rather than averaging it away.
+            Added in format version 2, when the training loop became the first
+            caller able to interrupt a gate.
         meta: Free-form run metadata — seed, variant name, schedule. Recorded so
             an artefact can be traced to the run that produced it.
     """
@@ -117,6 +123,7 @@ class TrainingState:
     torch_rng: torch.Tensor
     gate_wins: int = 0
     gate_games: int = 0
+    gate_first_wins: int = 0
     meta: dict[str, Any] = field(default_factory=dict)
 
 
@@ -212,6 +219,7 @@ class Checkpoint:
             "torch_rng": state.torch_rng,
             "gate_wins": state.gate_wins,
             "gate_games": state.gate_games,
+            "gate_first_wins": state.gate_first_wins,
             "meta": state.meta,
         }
         buffer_path = self.root / f".{self.PAYLOAD}.tmp"
@@ -229,6 +237,7 @@ class Checkpoint:
                     "buffer_size": len(state.buffer),
                     "gate_wins": state.gate_wins,
                     "gate_games": state.gate_games,
+                    "gate_first_wins": state.gate_first_wins,
                     "meta": state.meta,
                 },
                 indent=2,
