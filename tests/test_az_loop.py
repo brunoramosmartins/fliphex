@@ -35,6 +35,7 @@ def a_config(tmp_path, **overrides) -> LoopConfig:
         buffer_capacity=200,
         gate_every=1,
         gate_games=4,
+        gate_checkpoint_every=2,
         gate_simulations=4,
         workers=1,
         root=tmp_path / "run",
@@ -298,3 +299,86 @@ def test_the_rng_snapshot_is_insurance_and_the_loop_says_so(tmp_path):
         "longer fully seed-derived and the checkpoint's RNG snapshot has become "
         "load-bearing -- update az/loop.py's Resume section, which says it is not"
     )
+
+
+# -- resuming from inside a gate ----------------------------------------------
+
+
+def _mid_gate_state(config, **overrides):
+    """A checkpoint written inside a gate, as the mid-gate path writes one."""
+    checkpoint = Checkpoint(config.root)
+    state = checkpoint.load()
+    state.generation = 0
+    state.last_gated = -1
+    state.gate_games, state.gate_wins, state.gate_first_wins = 2, 1, 1
+    state.meta = dict(state.meta) | {
+        "pending_row": {
+            "generation": 0,
+            "samples": 40,
+            "buffer": len(state.buffer),
+            "refresh_fraction": 0.2,
+            "policy_loss": 1.0,
+            "value_loss": 1.0,
+            "gated": False,
+        }
+    }
+    for key, value in overrides.items():
+        setattr(state, key, value)
+    checkpoint.save(state)
+    return state
+
+
+def test_a_mid_gate_resume_does_not_replay_the_generation(tmp_path):
+    """The defect EXP-014's C4 caught, at toy scale, on its first run.
+
+    A checkpoint written inside a gate carries a generation whose self-play and
+    training already happened — they are baked into the buffer and the
+    challenger it stores. Replaying them extends the buffer with the same games
+    twice and takes another `steps` gradient steps, so the resumed run is a
+    different run rather than a continuation. Nothing raises; the weights simply
+    diverge, which is invisible without a byte comparison against an
+    uninterrupted run.
+    """
+    config = a_config(tmp_path, generations=1, gate_every=1)
+    run(config, lambda: ConvRotationNet(3, 3))
+
+    before = len(Checkpoint(config.root).load().buffer)
+    _mid_gate_state(config)
+    run(a_config(tmp_path, generations=1, gate_every=1))
+
+    after = Checkpoint(config.root).load()
+    assert len(after.buffer) == before, (
+        "the resume replayed the generation's self-play: the buffer grew, so the "
+        "same games are in it twice"
+    )
+    assert after.generation == 1
+
+
+def test_a_mid_gate_checkpoint_without_its_pending_row_is_refused(tmp_path):
+    """Without it the resumed run cannot write the history row it owes.
+
+    Silently writing a generation with no samples or losses would leave a hole in
+    the record exactly where a run was interrupted, which is the worst place for
+    one.
+    """
+    config = a_config(tmp_path, generations=1, gate_every=1)
+    run(config, lambda: ConvRotationNet(3, 3))
+
+    checkpoint = Checkpoint(config.root)
+    state = checkpoint.load()
+    state.generation, state.last_gated = 0, -1
+    state.gate_games, state.gate_wins, state.gate_first_wins = 2, 1, 1
+    checkpoint.save(state)
+
+    with pytest.raises(ValueError, match="no pending row"):
+        run(a_config(tmp_path, generations=1, gate_every=1))
+
+
+def test_a_gate_cadence_longer_than_the_match_is_refused(tmp_path):
+    """Then no mid-gate checkpoint is ever written and a kill costs the match.
+
+    With the loop's default cadence of 25 and EXP-014's 20-game gate, the path
+    would never fire — which is invisible until something actually kills a run.
+    """
+    with pytest.raises(ValueError, match="gate_checkpoint_every must be in"):
+        a_config(tmp_path, gate_games=20, gate_checkpoint_every=25)

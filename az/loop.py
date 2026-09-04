@@ -86,6 +86,9 @@ from fliphex.variant import Variant
 
 #: How often a part-finished gate writes a checkpoint, in games. Every game would
 #: be 400 writes for one gate; never would put half an hour of match play at risk.
+#: It must not exceed ``gate_games``, or the mid-gate path never fires at all and
+#: a kill during the match silently costs the whole match -- which is invisible
+#: until something actually kills a run. :class:`LoopConfig` enforces it.
 GATE_CHECKPOINT_EVERY = 25
 
 
@@ -113,6 +116,9 @@ class LoopConfig:
         gate_games: Match length. Must be even.
         gate_threshold: Win rate the challenger must clear to be promoted.
         gate_simulations: Simulations per move in the match, matching deployment.
+        gate_checkpoint_every: Games between mid-gate checkpoints. Must be at
+            most ``gate_games``; a larger value means no mid-gate checkpoint is
+            ever written and an interrupted match restarts from zero.
         workers: Self-play processes.
         root: Checkpoint directory.
         history_path: JSONL appended once per generation. Kept outside the
@@ -134,6 +140,7 @@ class LoopConfig:
     gate_games: int = GATE_GAMES
     gate_threshold: float = GATE_THRESHOLD
     gate_simulations: int = 400
+    gate_checkpoint_every: int = GATE_CHECKPOINT_EVERY
     workers: int = 1
     root: Path = field(default_factory=lambda: Path("data/az-runs/default"))
     history_path: Path | None = None
@@ -149,6 +156,13 @@ class LoopConfig:
             )
         if self.gate_every <= 0:
             raise ValueError(f"gate_every must be positive, got {self.gate_every}")
+        if not 0 < self.gate_checkpoint_every <= self.gate_games:
+            raise ValueError(
+                f"gate_checkpoint_every must be in 1..{self.gate_games}, got "
+                f"{self.gate_checkpoint_every}: a cadence longer than the match "
+                "writes no mid-gate checkpoint at all, so an interrupted gate "
+                "restarts from zero and nothing says so"
+            )
 
 
 def optimiser_for(net: FlipHexNet, config: LoopConfig) -> torch.optim.Optimizer:
@@ -311,51 +325,70 @@ def run(
     gate_wins = state.gate_wins
     gate_games_done = state.gate_games
     gate_first_wins = state.gate_first_wins
+    # A checkpoint written *inside* a gate carries a generation whose self-play
+    # and training already happened -- they are baked into the buffer and the
+    # challenger it stores. Replaying them on resume would extend the buffer with
+    # the same games twice and take another `steps` gradient steps, which is not
+    # a continuation of the interrupted run but a different one. The partial row
+    # is carried in `meta` so the history the resumed run writes is the history
+    # the uninterrupted run would have written.
+    mid_gate = gate_games_done > 0
+    pending_row = meta.pop("pending_row", None) if mid_gate else None
+    if mid_gate and pending_row is None:
+        raise ValueError(
+            "the checkpoint is inside a gate but carries no pending row, so the "
+            "generation's self-play and training cannot be accounted for"
+        )
 
     rows: list[dict] = []
     while generation < config.generations:
         started = time.monotonic()
 
-        # -- self-play, by the champion ------------------------------------
-        samples = generate(
-            config.variant,
-            champion,
-            n_games=config.games,
-            simulations=config.simulations,
-            seed=config.seed,
-            generation=generation,
-            workers=config.workers,
-        )
-        refresh = buffer.refresh_fraction(len(samples))
-        buffer.extend(samples)
-
-        # -- training, by the challenger -----------------------------------
-        if len(buffer) < config.batch_size:
-            raise ValueError(
-                f"the buffer holds {len(buffer)} samples and a batch needs "
-                f"{config.batch_size}; one generation of {config.games} games is "
-                "not enough to start"
+        if mid_gate:
+            # Everything below up to the gate already ran before the kill.
+            row = dict(pending_row)
+            mid_gate = False
+        else:
+            # -- self-play, by the champion --------------------------------
+            samples = generate(
+                config.variant,
+                champion,
+                n_games=config.games,
+                simulations=config.simulations,
+                seed=config.seed,
+                generation=generation,
+                workers=config.workers,
             )
-        history = train_generation(
-            challenger,
-            optimiser,
-            buffer,
-            steps=config.steps,
-            batch_size=config.batch_size,
-            n_cols=config.variant.n_cols,
-            n_rows=config.variant.n_rows,
-            value_weight=config.value_weight,
-        )
+            refresh = buffer.refresh_fraction(len(samples))
+            buffer.extend(samples)
 
-        row = {
-            "generation": generation,
-            "samples": len(samples),
-            "buffer": len(buffer),
-            "refresh_fraction": refresh,
-            "policy_loss": statistics.fmean(h["policy"] for h in history),
-            "value_loss": statistics.fmean(h["value"] for h in history),
-            "gated": False,
-        }
+            # -- training, by the challenger -------------------------------
+            if len(buffer) < config.batch_size:
+                raise ValueError(
+                    f"the buffer holds {len(buffer)} samples and a batch needs "
+                    f"{config.batch_size}; one generation of {config.games} games "
+                    "is not enough to start"
+                )
+            history = train_generation(
+                challenger,
+                optimiser,
+                buffer,
+                steps=config.steps,
+                batch_size=config.batch_size,
+                n_cols=config.variant.n_cols,
+                n_rows=config.variant.n_rows,
+                value_weight=config.value_weight,
+            )
+
+            row = {
+                "generation": generation,
+                "samples": len(samples),
+                "buffer": len(buffer),
+                "refresh_fraction": refresh,
+                "policy_loss": statistics.fmean(h["policy"] for h in history),
+                "value_loss": statistics.fmean(h["value"] for h in history),
+                "gated": False,
+            }
 
         # -- the gate, every gate_every generations -------------------------
         due = (generation - last_gated) >= config.gate_every
@@ -371,8 +404,9 @@ def run(
                 first_wins: int,
                 _generation: int = generation,
                 _last_gated: int = last_gated,
+                _row: dict = row,
             ) -> None:
-                if done % GATE_CHECKPOINT_EVERY:
+                if done % config.gate_checkpoint_every:
                     return
                 checkpoint.save(
                     _snapshot(
@@ -383,7 +417,7 @@ def run(
                         champion,
                         optimiser,
                         buffer,
-                        meta,
+                        meta | {"pending_row": _row},
                         gate_wins=wins,
                         gate_games=done,
                         gate_first_wins=first_wins,
