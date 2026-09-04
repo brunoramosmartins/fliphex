@@ -663,6 +663,57 @@ class ConditionedNetworkEvaluator(NetworkEvaluator):
         return log_priors.exp().tolist()
 
 
+def net_spec(net: FlipHexNet) -> dict:
+    """The architecture of ``net``, without its weights.
+
+    A ``state_dict`` says what the parameters *are* and nothing about what shape
+    of network they belong to, so anything that ships weights across a process
+    boundary or writes them to disk must ship this beside them. Self-play workers
+    rebuilt the network as a plain :class:`FlipHexNet` for exactly as long as
+    that was the only head there was; the adopted head then failed to load, and
+    only under ``workers > 1``, which no test exercises.
+
+    ``filters`` and ``blocks`` are read off the built network rather than assumed
+    to be the constructor defaults — a spec that silently rebuilds a different
+    tower is worse than no spec.
+    """
+    spec = {
+        "class": type(net).__name__,
+        "n_cols": net.n_cols,
+        "n_rows": net.n_rows,
+        "filters": net.stem[0].out_channels,
+        "blocks": len(net.tower),
+    }
+    if type(net) is ConditionedHeadNet:
+        spec["readout"] = net.readout.value
+    # ConvRotationNet's rotation_scale is a persistent buffer, so it travels in
+    # the state_dict and does not belong here. It is a measured constant, not an
+    # architectural choice, and duplicating it would create two sources of truth.
+    return spec
+
+
+_NET_CLASSES: dict[str, type] = {
+    cls.__name__: cls
+    for cls in (FlipHexNet, ConditionedHeadNet, ConvRotationNet, FlatHeadNet)
+}
+
+
+def build_net(spec: dict) -> FlipHexNet:
+    """Rebuild the architecture :func:`net_spec` described. Weights not included.
+
+    Raises:
+        ValueError: If the spec names a class this module does not define.
+    """
+    spec = dict(spec)
+    name = spec.pop("class")
+    if name not in _NET_CLASSES:
+        raise ValueError(
+            f"unknown network class {name!r}; known: {sorted(_NET_CLASSES)}"
+        )
+    n_cols, n_rows = spec.pop("n_cols"), spec.pop("n_rows")
+    return _NET_CLASSES[name](n_cols, n_rows, **spec)
+
+
 def evaluator_for(net: FlipHexNet, board: Board) -> NetworkEvaluator:
     """The evaluator matching ``net``'s head.
 

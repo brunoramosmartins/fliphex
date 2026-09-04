@@ -46,7 +46,7 @@ import torch
 
 from az.encoding import encode
 from az.mcts import MCTS, ExpansionMode, policy_target
-from az.network import FlipHexNet, evaluator_for
+from az.network import FlipHexNet, build_net, evaluator_for, net_spec
 from az.replay_buffer import Sample, samples_from_game
 from fliphex.moves import Move, apply_move
 from fliphex.rules import is_terminal, outcome
@@ -195,8 +195,18 @@ def _winner(state: GameState) -> Colour:
 _WORKER: dict = {}
 
 
-def _init_worker(variant: Variant, weights: dict | None, simulations: int) -> None:
+def _init_worker(
+    variant: Variant, spec: dict | None, weights: dict | None, simulations: int
+) -> None:
     """Build one network per worker, not one per game.
+
+    ``spec`` carries the architecture; ``weights`` carries the parameters. A
+    ``state_dict`` alone does not say what shape of network it belongs to, and
+    this used to rebuild a plain :class:`FlipHexNet` regardless. That was
+    correct for exactly as long as the factored head was the only head; the
+    conditioned head adr-005 adopted fails to load into it. The failure appears
+    only under ``workers > 1``, and every test uses the in-process path, so
+    nothing in the suite could have caught it.
 
     Also pins torch to a single thread. Eight workers each spawning six BLAS
     threads oversubscribe six physical cores, and the measured 4.31x speedup
@@ -205,7 +215,7 @@ def _init_worker(variant: Variant, weights: dict | None, simulations: int) -> No
     torch.set_num_threads(1)
     net = None
     if weights is not None:
-        net = FlipHexNet(variant.n_cols, variant.n_rows)
+        net = build_net(spec)
         net.load_state_dict(weights)
         net.eval()
     _WORKER.update(variant=variant, net=net, simulations=simulations)
@@ -259,6 +269,7 @@ def generate(
         ]
     else:
         weights = net.state_dict() if net is not None else None
+        spec = net_spec(net) if net is not None else None
         tasks = [(seed, generation, i) for i in range(n_games)]
         # "spawn", not the default "fork" on Linux. torch runs threads, and
         # forking a multi-threaded process can leave a lock held in the child
@@ -269,7 +280,7 @@ def generate(
         with mp.get_context("spawn").Pool(
             workers,
             initializer=_init_worker,
-            initargs=(variant, weights, simulations),
+            initargs=(variant, spec, weights, simulations),
         ) as pool:
             # map, not imap_unordered: the order of a generation must not depend
             # on which worker happened to finish first.

@@ -732,3 +732,106 @@ def test_the_conditioned_evaluator_agrees_with_the_training_path():
     priors = evaluator_for(net, board).prior(board, state, moves)
     for got, want in zip(priors, direct.exp().tolist(), strict=True):
         assert got == pytest.approx(want, abs=1e-6)
+
+
+# -- shipping a network across a process boundary -----------------------------
+
+
+def test_net_spec_round_trips_every_head_type():
+    """A state_dict does not say what shape of network it belongs to.
+
+    Self-play workers rebuilt the network as a plain FlipHexNet for as long as
+    that was the only head there was. The conditioned head adr-005 adopted does
+    not load into it, and the failure appears only under workers > 1, which no
+    test exercises -- so the spec is what makes the weights meaningful.
+    """
+    from az.network import (
+        ConditionedHeadNet,
+        ConvRotationNet,
+        FlatHeadNet,
+        RotationReadout,
+        build_net,
+        net_spec,
+        to_tensor,
+    )
+
+    board = SMALL.board()
+    state = SMALL.initial_state()
+    x = to_tensor(encode(board, state), 5, 3)
+
+    torch.manual_seed(0)
+    originals = [
+        FlipHexNet(5, 3),
+        ConditionedHeadNet(5, 3, readout=RotationReadout.CELL),
+        ConditionedHeadNet(5, 3, readout=RotationReadout.POOLED),
+        ConditionedHeadNet(5, 3, readout=RotationReadout.TILE),
+        ConvRotationNet(5, 3, rotation_scale=0.4826),
+        FlatHeadNet(5, 3),
+    ]
+    for net in originals:
+        net.eval()
+        rebuilt = build_net(net_spec(net))
+        rebuilt.load_state_dict(net.state_dict())
+        rebuilt.eval()
+
+        assert type(rebuilt) is type(net)
+        assert rebuilt.count_parameters() == net.count_parameters()
+        with torch.no_grad():
+            before, after = net(x), rebuilt(x)
+        for left, right in zip(before, after, strict=True):
+            assert torch.equal(left, right), type(net).__name__
+
+    # The measured scale is a persistent buffer, so it travels in the weights
+    # rather than the spec -- two sources of truth for one constant is how they
+    # drift apart.
+    conv = ConvRotationNet(5, 3, rotation_scale=0.4826)
+    assert "rotation_scale" not in net_spec(conv)
+    restored = build_net(net_spec(conv))
+    restored.load_state_dict(conv.state_dict())
+    assert float(restored.rotation_scale) == pytest.approx(0.4826)
+
+
+def test_net_spec_carries_a_non_default_tower():
+    """Read off the built network, not assumed to be the constructor defaults.
+
+    A spec that silently rebuilds a different tower is worse than no spec: the
+    weights would fail to load, or worse, happen to fit.
+    """
+    from az.network import build_net, net_spec
+
+    torch.manual_seed(0)
+    net = FlipHexNet(5, 3, filters=32, blocks=2)
+    spec = net_spec(net)
+
+    assert spec["filters"] == 32
+    assert spec["blocks"] == 2
+    rebuilt = build_net(spec)
+    rebuilt.load_state_dict(net.state_dict())
+    assert rebuilt.count_parameters() == net.count_parameters()
+
+
+def test_build_net_refuses_an_unknown_class():
+    from az.network import build_net
+
+    with pytest.raises(ValueError, match="unknown network class"):
+        build_net({"class": "NotANet", "n_cols": 5, "n_rows": 3})
+
+
+def test_parallel_self_play_works_with_the_adopted_head():
+    """The regression the spec exists for, exercised on the path that broke.
+
+    Every other self-play test runs in process, where the network object is
+    passed directly and no rebuild happens. This one crosses a process boundary,
+    which is the only place the defect was reachable.
+    """
+    from az.network import ConvRotationNet
+    from az.selfplay import generate
+
+    torch.manual_seed(0)
+    net = ConvRotationNet(3, 3)
+    samples = generate(
+        TINY, net, n_games=2, simulations=4, seed=11, generation=0, workers=2
+    )
+
+    assert samples
+    assert all(s.planes for s in samples)
