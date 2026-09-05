@@ -3842,6 +3842,195 @@ starts rather than after.
 with the run's own per-generation history at `data/az-runs/shakedown/history.jsonl`.
 Named before the instrument exists.
 
+#### Result (2026-09-04) — all four checks pass, and the measurement is the finding
+
+Run `scripts/exp014_shakedown.py`, 48 min (2,861 s), artefact
+[`exp014-shakedown-5x5.json`](../results/exp014-shakedown-5x5.json), log
+[`exp014-run.log`](../results/exp014-run.log). Registered scale, confirmed by the
+artefact's own `is_registered_scale` flag.
+
+| check | result |
+|---|---|
+| C1 the loop closes | **PASS** — 3 generations, 3 history rows, checkpoint at generation 3 |
+| C2 eight workers run the adopted head | **PASS** — 500 samples per generation, no worker error |
+| C3 the gate decides | **PASS** — interval and seat split present |
+| C4 `SIGKILL` mid-gate resumes byte-equal | **PASS** — `1929309feee0` both times |
+
+> **The objection to starting the registered run is removed.** The rule is
+> one-directional: this licenses nothing else, and in particular the run it
+> clears is **not the run that was budgeted** — see below.
+
+#### C4 failed first, and the defect was real
+
+Recorded because it is the entry's whole justification.
+
+On the first execution, at toy scale, **C4 failed**: `1331009c1664` against
+`325477f94bde`. A checkpoint written *inside* a gate carries a generation whose
+self-play and training have already happened — they are baked into the buffer and
+the challenger it stores. The loop re-entered the generation body on resume and
+replayed both, extending the buffer with the same games twice and taking another
+400 gradient steps. **Nothing raises.** The weights simply diverge, which is
+invisible without a byte comparison against an uninterrupted run.
+
+`tests/test_az_loop.py` could not have caught it: it simulates interruption by
+calling `run` twice, and two probes had already shown that comparison passes on
+broken code. The defect needed a real kill at a real checkpoint boundary.
+
+Two smaller defects surfaced the same way. The mid-gate checkpoint cadence was a
+module constant, so a 20-game gate against the loop's default of 25 would have
+written no mid-gate checkpoint at all and the kill would have landed where the
+path had never run — C4 would have tested nothing. And the shakedown's scale
+lived in module constants while its child is a fresh interpreter, so a smaller
+debugging run would silently have been the full one.
+
+All three are fixed and pinned, the mid-gate one by a test probed against the old
+behaviour.
+
+#### Throughput: the registered run is not the run that was budgeted
+
+**145 games/hour composed, 0.21× the engine-only 705.** Peak child RSS 385 MB.
+
+The registered prediction was that the composed rate would come in *below* 705,
+since that figure has no network in it. It came in at a fifth. R8's likelihood
+was dropped to 1 on 2026-08-31 on the grounds that "the binding numbers are now
+measured rather than estimated" — **the binding number was wrong by 4.9×**,
+because it was measured engine-only with torch not competing for the cores, which
+R8's own text says.
+
+**A defect in this entry's metric, stated before its numbers are used.**
+`composed_games_per_hour` divides *self-play* games by *total* elapsed, which
+includes the gate and training — three activities whose per-game costs differ by
+a factor of four. The 145 is not a rate of anything in particular. The
+decomposition below is the usable reading.
+
+#### Where the time goes, decomposed from the run's own generations
+
+Generations 0 and 2 are ungated, generation 1 is gated, and training was timed
+separately on the run's final state. So the split is arithmetic on measurements,
+not an allocation:
+
+| component | cost | per game | rate |
+|---|--:|--:|--:|
+| ungated generation | 224.5 s | — | — |
+| training, 400 steps | 19.7 s | — | 49.3 ms/step |
+| self-play, 20 games at 8 workers | 204.8 s | 10.24 s | 352 games/h |
+| **gate, 20 games serial** | **808.5 s** | **40.42 s** | **89 games/h** |
+
+**Confirmed by a second route**: a direct serial gate on the 5×5 measured
+**39.81 s/game**, against the 40.42 obtained by subtracting the ungated
+generations. The decomposition holds.
+
+Projecting the registered run — 5 seeds × 30 generations × 200 games, gate every
+5, so 6 gates of 400:
+
+| | h/seed | h total | share |
+|---|--:|--:|--:|
+| self-play | 17.1 | 85.3 | 39% |
+| **gate** | **26.9** | **134.8** | **61%** |
+| training | 0.2 | 0.8 | 0% |
+| **total** | **44.2** | **220.9** | — |
+
+Budgeted: 59.6 h. **3.7× over**, and **61% of it in the only part that was not
+parallelised.**
+
+#### What was done about it, and why that is inside the boundary
+
+The gate now plays in a spawned pool. This is an **engineering** change, not a
+schedule one: the entry permits changing `workers` by amendment and forbids
+touching the five seeds, and parallelising a sequential loop touches neither.
+Cutting scope while 61% of the cost sat in an unnecessary queue would have been
+the wrong order — and it is the kind of cut that later reads as "we had to reduce
+the experiment" with nobody remembering why.
+
+It is safe because every game's two seeds are already functions of the match seed
+and the game index alone, so games are independent and order-free. Verified
+identical to the serial path at two, three and four workers, on a chunk that does
+not divide the match length, and for a parallel match resumed serially.
+
+**Measuring the speedup found something the engine-only figures had hidden:**
+
+| workers | gate, games/h | self-play, games/h |
+|--:|--:|--:|
+| 1 | 90 | 88 |
+| **4** | **260** (2.87×) | 271 (3.08×) |
+| **6** | not measured | **331** (3.76×) |
+| 8 | 173 (1.91×) | 327 (3.71×) |
+
+**The gate peaks at four workers and loses 33% at eight, while self-play
+saturates at six with eight within 1%.** Six physical cores — and a gate worker
+holds *two* networks, challenger and champion, against self-play's one, so twice
+the resident model memory and BLAS working set per worker. That mechanism is an
+explanation from structure and was **not measured**; the worker counts were.
+
+`LoopConfig` gains `gate_workers` accordingly, because one shared setting would
+have to pick a loser.
+
+Revised projection, at the measured optima:
+
+| | h/seed | h total |
+|---|--:|--:|
+| self-play (6 workers) | 18.1 | 90.6 |
+| gate (4 workers) | 9.2 | 46.2 |
+| training | 0.2 | 0.8 |
+| **total** | **27.5** | **137.6** |
+
+**220.9 h → 137.6 h**, 83 hours recovered without touching scope. Still **2.3×**
+the 59.6 h budgeted.
+
+#### The configuration this measured was not the best one, and that is the entry's own doing
+
+Stated plainly rather than smoothed over.
+
+This entry registered `workers: 8`, and the follow-up measurements show 8 is 33%
+off the gate's optimum. **The shakedown measured throughput in a configuration it
+had itself fixed suboptimally**, so its headline number describes that
+configuration and not the machine's capability.
+
+Further, the three scaling measurements above were made **after the run and
+outside it**, and were not registered. They are cost measurements, which this
+entry permits acting on, and they are reported here rather than folded into the
+artefact — the artefact records what the registered run measured, and rewriting
+it to describe measurements it did not make would be worse than the asymmetry.
+
+#### One instrument observation that must not be read as a result
+
+Generation 1's gate returned **70.0% [48.1%, 85.5%], promoted**. The interval
+spans the 0.55 threshold, so at 20 games this promotion is noise: `run_gate`
+promotes on the point estimate, which is the registered design and is calibrated
+for **400** games, where this entry's own false-promotion table applies. At 20 it
+is not.
+
+Nothing follows from it. It is recorded because a reader scanning the log will
+see "promoted=True" and should know it means the plumbing works, not that a
+network improved.
+
+#### What this entry decided, and what it did not
+
+- **Decided:** the registered run may start; `gate_workers = 4` and
+  `workers = 6`; the gate is parallelised.
+- **Not decided, and requiring an amendment:** the schedule. At 137.6 h against
+  59.6 h budgeted, generations or games per generation must fall, or the budget
+  must rise. **The five seeds are not the lever**, and may only move in an
+  amendment that states the power consequence.
+- **Not touched:** the architecture, the statistical parameters, anything about
+  the game. The anti-circularity count stays at **three**.
+
+#### R8 needs revisiting
+
+Its residual is closed and the answer is bad. R8 dropped to likelihood 1 on the
+strength of engine-only numbers that were off by 4.9× on throughput and, it now
+turns out, wrong about the worker count too. **The correction is to the row's
+reasoning, not only to its numbers**: "measured rather than estimated" is not a
+reason to lower a likelihood when the measurement omits the dominant cost.
+
+#### Follow-ups this entry creates
+
+1. **A schedule amendment**, computed from 137.6 h.
+2. **R8 revised**, with the composed figure and the reasoning correction.
+3. **The gate's saturation mechanism is unmeasured.** Two networks per worker is
+   a plausible explanation and nothing here tests it; a worker holding one
+   network and swapping weights would distinguish them.
+
 
 ## Planned
 
