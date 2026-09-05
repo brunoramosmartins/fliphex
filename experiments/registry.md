@@ -4032,6 +4032,229 @@ reason to lower a likelihood when the measurement omits the dominant cost.
    network and swapping weights would distinguish them.
 
 
+### EXP-015 — the H3 training run: five seeds against the prior-free floor
+
+**Registered 2026-09-04, before the run.** This is Axis 2's evidence for H3 and
+the largest single piece of compute in the project.
+
+#### Why this entry exists at all
+
+**The run had no registered entry.** It appeared only in the `## Planned` table,
+as *"AZ training run, seed 1, to 1M self-play positions"* — and the plan had
+drifted: what R8 has been budgeting is **5 seeds × 30 generations × 200 games**,
+which is ~150k positions per seed and 750k in total, at a seed count the sketch
+did not mention. The largest thing in the project was the only thing without a
+registration, and the sketch and the budget were not the same experiment.
+
+Registering it now also disposes of the 59.6-hour figure cleanly: that was never
+a commitment, it was an estimate inside R8, and R8 records its correction. This
+entry carries the **measured** cost instead.
+
+#### What H3 asks, and which half this entry answers
+
+H3 has two clauses:
+
+1. *"The learned policy converges to a **stable win-rate across independent
+   seeds**"* — measured as *"per-seed win rate with Wilson 95% CI and variance
+   reported across seeds"*.
+2. *"…and **agrees with the solver's exact verdict** on every member of the
+   pre-declared comparison set"* — 3×3, 5×3, and EXP-006's shipped-5×5 endgame
+   sample at `k ≤ 8`.
+
+**This entry answers clause 1 and produces the artefacts clause 2 will read.**
+The separation is not stylistic; see anti-circularity.
+
+#### The success criterion: the prior-free UCT floor
+
+The reference opponent is **plain UCT with random playouts and no network** —
+`agents/az_agent.py::UCTAgent`, whose docstring already states the rule this
+entry formalises: *"The learned agent must beat this before any result about it
+is reported."* It depends on no training, so a bad run cannot flatter it, and its
+playouts terminate and always yield a decided winner because draws are
+impossible on an odd cell count.
+
+**Primary — equal simulations.** Both agents at **400 simulations per move**,
+**200 games**, seats alternating, per seed. This measures what the *prior* is
+worth, which is what EXP-011, EXP-012 and EXP-013 were all about.
+
+**Criterion: every seed's Wilson 95% interval must lie entirely above 50%.**
+Not a margin — a margin would turn a floor into a strength claim. But "above
+50%" is easier to say than to clear: at 200 games a true **55% gives
+[48.1%, 61.7%] and fails**, while 60% gives [53.1%, 66.5%] and passes. The
+effective bar is therefore around **58%**, which is low without being trivial.
+Recorded because the criterion's wording understates it.
+
+**Stability, made falsifiable.** H3 says "stable across seeds" and its measurement
+column says "variance reported". Reported alone is unfalsifiable, so: **if any of
+the five seeds fails the floor, that is recorded as instability and is not
+averaged away.** The five per-seed rates and their spread go in the artefact
+whatever happens.
+
+**Secondary — equal time.** The same 200 games, with UCT given the simulation
+count it can complete in the network agent's measured per-move wall clock. The
+ratio is measured **before** the match and recorded.
+
+This is the harder bar and it is registered as secondary deliberately, with the
+reason in the open: at 400 simulations the network agent costs ~10.9 s/game while
+prior-free UCT does no forward passes at all, so equal-simulations flatters the
+network by roughly the ratio of those costs. Equal-simulations is the standard
+comparison and answers "is the prior worth anything"; equal-time answers "is the
+network worth what it costs". **Both go in the artefact and the write-up quotes
+both.** Registering only the flattering one is how a floor becomes decoration.
+
+**A reference point, not a criterion.** The generation-0 champion — the
+randomly initialised network, before any training — plays the same
+equal-simulations floor match. It says where the run started. Nothing branches
+on it.
+
+#### What the floor does **not** establish
+
+In the entry rather than in a footnote, because it is the most likely thing to be
+overstated later.
+
+**Beating prior-free UCT is a low bar.** It licenses "the learner learned
+something". It does not license "the learner is good", and no sentence in any
+artefact, note or write-up may convert one into the other. What says how good is
+clause 2's agreement rate against the solver, and that is a **measurement, not a
+gate** — see below.
+
+#### The schedule, and the cost as measured
+
+| | |
+|---|---|
+| variant | shipped **5×5**, `h1` |
+| architecture | `ConvRotationNet`, adr-005 as amended 2026-09-04 |
+| seeds | **5**, run sequentially, one checkpoint root each |
+| generations | 30 |
+| games per generation | 200 |
+| simulations | 400 |
+| gradient steps / batch | 400 / 64 |
+| replay buffer | 20,000, **crossing generations** |
+| gate | every 5 generations, 400 games, threshold 0.55 |
+| workers | self-play **6**, gate **4** |
+
+The worker counts are EXP-014's measured optima and differ by activity: self-play
+saturates at six with eight within 1%, while the gate peaks at four and loses 33%
+at eight.
+
+**Cost, from EXP-014's measurements, not from an estimate:**
+
+| | h/seed | h total |
+|---|--:|--:|
+| self-play | 18.1 | 90.6 |
+| gate | 9.2 | 46.2 |
+| training | 0.2 | 0.8 |
+| floor matches | ~1.6 | ~8 |
+| **total** | **~29** | **≈ 146** |
+
+Machine time, not calendar time. The author's constraint is that the machine runs
+during the day and hibernates at night, which is compatible: EXP-014 verified
+that a **whole suspended process tree — parent, spawned workers and resource
+tracker — resumes to byte-identical weights**, and the loop times with a
+monotonic clock, which pauses with the machine.
+
+A hard stop (a reboot, `wsl --shutdown`, power loss) costs at most one unwritten
+checkpoint: **≈37 minutes** if it lands in a generation's self-play or training,
+**≈5 minutes** inside a gate. About 2% of a seed.
+
+#### Seeds run sequentially, and the first one is a decision point
+
+They are independent, and the machine already saturates at six workers, so two at
+once would only halve each. Sequential also means **the first seed is a
+go/no-go for the remaining 110 hours** rather than a fifth of a result.
+
+**Registered so it is not optional stopping.** After seed 1 completes, its floor
+match is read. If it **fails the floor**, the run stops and this entry reports a
+failure. The check is on the floor alone — a pipeline that does not beat
+prior-free UCT has not learned, and spending 110 more hours to confirm that five
+times is not rigour.
+
+What this explicitly does **not** license: stopping because the result is
+unfavourable in any other respect, looking at clause 2's agreement rate before
+all five seeds are done, or restarting with different hyperparameters. **A
+restart after a floor failure requires a new registered entry**, because
+"retrain until it works" selects on the outcome.
+
+#### Anti-circularity — this is the entry where the leak is closed
+
+Three architecture decisions have been taken against 5×3 solver ground truth
+(EXP-011, EXP-012, EXP-013), over an adoptable choice set of four. That count
+measures how much of Axis 2's *design* is a function of Axis 1's answers.
+
+**This entry adds nothing to it, and the choice of success criterion is why.**
+Under [adr-004](../docs/adr/adr-004-solver-approach.md) R1, neither axis may
+select or terminate the other along the dimension on which they are later
+compared — and H3 *is* the comparison between the solver and the learner on
+solver agreement. So:
+
+- **The run's success criterion is the UCT floor**, which contains no solver
+  information whatsoever.
+- **Solver agreement is H3's measurement**, computed after the run, gating
+  nothing. Neither the stopping rule, the gate, nor the floor consults it.
+
+Two alternatives were considered and are recorded as **disqualified**, not merely
+weaker:
+
+- **Solver agreement as the success criterion** is the exact circularity R1
+  forbids: it would terminate Axis 2 on the dimension of the comparison, and
+  would make the whole run — not one more architecture decision — a function of
+  Axis 1.
+- **Generation-over-generation strength** is a derivative, not a floor: a run
+  improving from terrible to slightly less terrible passes it. It is also what
+  the gate already measures internally, so it is the training signal read back
+  rather than independent evidence.
+
+#### Dependencies and what this cannot close
+
+**H3 cannot close on this entry alone.** Its comparison set includes EXP-006's
+shipped-5×5 endgame sample at `k ≤ 8`, which has not been run. This entry
+produces the trained agents; the agreement rates are a separate read against
+Axis 1 artefacts satisfying R1 (`termination: exhausted`).
+
+#### Threats to validity
+
+- **The architecture has never trained on its own visit counts.** EXP-011,
+  EXP-012 and EXP-013 all trained on exact solver labels. The head was chosen
+  against clean near-deterministic targets and will now meet noisy
+  non-stationary ones, and EXP-012 registered the risk that the ordering between
+  head architectures can **invert** under that change. If it does, the shipped
+  architecture is wrong in the deployed condition while every measurement behind
+  it reads clean.
+- **The buffer crossing generations is an off-policy assumption**, deliberate and
+  registered: most of what a challenger trains on came from older champions.
+  `refresh_fraction` is reported every generation so it stays legible.
+- **The gate promotes on the point estimate**, which is calibrated for 400 games;
+  EXP-014's 20-game gate promoting at 70% [48.1%, 85.5%] is what that rule looks
+  like when the sample is too small, and is recorded there as not a result.
+- **Five seeds is the registered count and it is not large.** EXP-013 measured
+  the between-arm correlation on this pipeline at −0.108, so pairing buys
+  nothing, and EXP-012 found a five-seed `sd` understating the twelve-seed value
+  by 20%. Any variance claim from five seeds should be read with that in mind.
+- **One machine, one run.** Nothing here separates a property of the learner from
+  a property of this laptop's numerics.
+
+#### Expected result
+
+1. **All five seeds clear the equal-simulations floor.** If the prior is worth
+   nothing after 30 generations, something upstream is wrong, and the first-seed
+   check is there to find it in 29 hours rather than 146.
+2. **The equal-time floor is closer, and may not clear.** UCT gets several times
+   the simulations there, and this design has never measured what that is worth.
+   A failure on the secondary while the primary passes is a legitimate and
+   interesting outcome — it would say the network's advantage does not survive
+   being charged for.
+3. **Between-seed spread is the number to watch**, not the mean. H3's clause 1 is
+   about stability, and the mean of five unstable seeds satisfies nothing.
+
+#### Artefact
+
+`results/exp015-h3-training-5x5.json`, written by `scripts/exp015_h3_run.py`,
+with each seed's own per-generation history at
+`data/az-runs/h3-seed<N>/history.jsonl` and its checkpoint alongside. The floor
+matches are written by the same script. Verdict applied from the artefact by
+`scripts/exp015_analysis.py`. All named before the instrument exists.
+
+
 ## Planned
 
 Sketched in Phase 0 so the phases have targets. IDs are allocated on
