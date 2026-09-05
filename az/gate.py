@@ -203,13 +203,14 @@ def play_match_game(
 
 
 def game_players(
-    challenger_net: FlipHexNet,
-    champion_net: FlipHexNet,
+    challenger_net: FlipHexNet | None,
+    champion_net: FlipHexNet | None,
     *,
     index: int,
     simulations: int,
     seed: int,
     temperature_plies: int,
+    champion_simulations: int | None = None,
 ) -> tuple[SearchPlayer, SearchPlayer]:
     """The two players for game ``index``.
 
@@ -227,7 +228,9 @@ def game_players(
         ),
         SearchPlayer(
             champion_net,
-            simulations=simulations,
+            simulations=(
+                simulations if champion_simulations is None else champion_simulations
+            ),
             seed=seed * 3_000_017 + index,
             temperature_plies=temperature_plies,
         ),
@@ -239,13 +242,14 @@ _MATCH: dict = {}
 
 def _init_match_worker(
     variant: Variant,
-    challenger_spec: dict,
-    challenger_weights: dict,
-    champion_spec: dict,
-    champion_weights: dict,
+    challenger_spec: dict | None,
+    challenger_weights: dict | None,
+    champion_spec: dict | None,
+    champion_weights: dict | None,
     simulations: int,
     seed: int,
     temperature_plies: int,
+    champion_simulations: int | None = None,
 ) -> None:
     """Build both networks once per worker, not once per game.
 
@@ -257,12 +261,17 @@ def _init_match_worker(
     oversubscribe six physical cores and the measured speedup does not survive it.
     """
     torch.set_num_threads(1)
-    challenger = build_net(challenger_spec)
-    challenger.load_state_dict(challenger_weights)
-    challenger.eval()
-    champion = build_net(champion_spec)
-    champion.load_state_dict(champion_weights)
-    champion.eval()
+
+    def rebuild(spec, weights):
+        if spec is None:
+            return None  # prior-free UCT: no network for this seat
+        net = build_net(spec)
+        net.load_state_dict(weights)
+        net.eval()
+        return net
+
+    challenger = rebuild(challenger_spec, challenger_weights)
+    champion = rebuild(champion_spec, champion_weights)
     _MATCH.update(
         variant=variant,
         challenger=challenger,
@@ -270,6 +279,7 @@ def _init_match_worker(
         simulations=simulations,
         seed=seed,
         temperature_plies=temperature_plies,
+        champion_simulations=champion_simulations,
     )
 
 
@@ -281,6 +291,7 @@ def _play_indexed(index: int) -> tuple[int, bool]:
         simulations=_MATCH["simulations"],
         seed=_MATCH["seed"],
         temperature_plies=_MATCH["temperature_plies"],
+        champion_simulations=_MATCH["champion_simulations"],
     )
     return index, play_match_game(
         _MATCH["variant"],
@@ -292,8 +303,8 @@ def _play_indexed(index: int) -> tuple[int, bool]:
 
 def run_gate(
     variant: Variant,
-    challenger_net: FlipHexNet,
-    champion_net: FlipHexNet,
+    challenger_net: FlipHexNet | None,
+    champion_net: FlipHexNet | None,
     *,
     simulations: int,
     seed: int,
@@ -306,6 +317,7 @@ def run_gate(
     on_progress: Callable[[int, int, int], None] | None = None,
     workers: int = 1,
     chunk: int = 1,
+    champion_simulations: int | None = None,
 ) -> GateResult:
     """Play the match and decide.
 
@@ -323,6 +335,12 @@ def run_gate(
         start_at: Resume from this game index.
         wins_so_far: Challenger wins already recorded before ``start_at``.
         first_wins_so_far: Of those, how many came in the first seat.
+        champion_simulations: Simulations for the champion seat, when it must
+            differ from the challenger's. Used only by EXP-015's *equal-time*
+            floor, where prior-free UCT is given the simulation count it can
+            complete in the network agent's measured per-move wall clock. Leave
+            ``None`` for every ordinary match, where an unequal budget would
+            confound the comparison rather than define it.
         workers: Processes to play games in. Games are independent given the
             match seed and the index, so parallelising changes nothing about the
             result — only how long it takes. EXP-014 measured a serial gate at
@@ -386,6 +404,7 @@ def run_gate(
                 simulations=simulations,
                 seed=seed,
                 temperature_plies=temperature_plies,
+                champion_simulations=champion_simulations,
             )
             record(
                 index,
@@ -399,15 +418,19 @@ def run_gate(
         # "spawn", not "fork": torch runs threads, and forking a multi-threaded
         # process can leave a lock held in a child with no thread to release it.
         # The failure is a hang, and a hang inside a 400-game gate costs the run.
+        # Either side may be ``None`` -- that is prior-free UCT, the floor
+        # EXP-015 reads its success criterion from. A ``None`` spec travels as
+        # ``None`` and the worker builds no network for that seat.
         initargs = (
             variant,
-            net_spec(challenger_net),
-            challenger_net.state_dict(),
-            net_spec(champion_net),
-            champion_net.state_dict(),
+            net_spec(challenger_net) if challenger_net is not None else None,
+            challenger_net.state_dict() if challenger_net is not None else None,
+            net_spec(champion_net) if champion_net is not None else None,
+            champion_net.state_dict() if champion_net is not None else None,
             simulations,
             seed,
             temperature_plies,
+            champion_simulations,
         )
         with mp.get_context("spawn").Pool(
             workers, initializer=_init_match_worker, initargs=initargs

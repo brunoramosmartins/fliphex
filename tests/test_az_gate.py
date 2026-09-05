@@ -360,3 +360,70 @@ def test_a_non_positive_chunk_is_refused():
             games=4,
             chunk=0,
         )
+
+
+# -- a prior-free seat, and an asymmetric budget ------------------------------
+
+
+def test_the_gate_plays_a_prior_free_seat():
+    """EXP-015's floor is the learned agent against UCT with no network.
+
+    ``None`` has to survive both paths: serial, and through the spawn boundary,
+    where a spec of ``None`` must travel as ``None`` rather than being rebuilt
+    into some default network.
+    """
+    from az.gate import run_gate
+    from az.network import ConvRotationNet
+
+    variant = Variant(3, 3, Arm("h1"))
+    torch.manual_seed(0)
+    net = ConvRotationNet(3, 3).eval()
+
+    serial = run_gate(variant, net, None, simulations=8, seed=3, games=8, threshold=0.5)
+    parallel = run_gate(
+        variant,
+        net,
+        None,
+        simulations=8,
+        seed=3,
+        games=8,
+        threshold=0.5,
+        workers=2,
+        chunk=4,
+    )
+
+    assert serial.games == 8
+    assert serial.as_first + serial.as_second == serial.wins
+    assert (parallel.wins, parallel.as_first) == (serial.wins, serial.as_first)
+
+
+def test_an_asymmetric_simulation_budget_reaches_only_the_champion_seat():
+    """EXP-015's equal-time floor gives UCT more simulations, not the network.
+
+    An unequal budget is a confound in every ordinary match and the defining
+    feature of exactly one, so it must be off by default and must not leak into
+    the challenger's search.
+    """
+    from az.gate import game_players
+    from az.network import ConvRotationNet
+
+    torch.manual_seed(0)
+    net = ConvRotationNet(3, 3).eval()
+
+    challenger, champion = game_players(
+        net, None, index=0, simulations=400, seed=1, temperature_plies=4
+    )
+    assert (challenger.simulations, champion.simulations) == (400, 400)
+
+    challenger, champion = game_players(
+        net,
+        None,
+        index=0,
+        simulations=400,
+        seed=1,
+        temperature_plies=4,
+        champion_simulations=1800,
+    )
+    assert challenger.simulations == 400
+    assert champion.simulations == 1800
+    assert champion.net is None
