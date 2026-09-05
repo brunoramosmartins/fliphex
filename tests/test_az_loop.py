@@ -382,3 +382,30 @@ def test_a_gate_cadence_longer_than_the_match_is_refused(tmp_path):
     """
     with pytest.raises(ValueError, match="gate_checkpoint_every must be in"):
         a_config(tmp_path, gate_games=20, gate_checkpoint_every=25)
+
+
+def test_the_gate_gets_its_own_worker_count(tmp_path):
+    """Self-play and the gate have different measured optima.
+
+    EXP-014 found self-play saturating at six workers, with eight within 1%,
+    while the gate peaks at four and loses 33% at eight — a gate worker holds
+    two networks against self-play's one. One shared setting would have to pick
+    a loser.
+    """
+    assert a_config(tmp_path, workers=6).gate_workers == 6
+    assert a_config(tmp_path, workers=6, gate_workers=4).gate_workers == 4
+
+    with pytest.raises(ValueError, match="gate_workers must be positive"):
+        a_config(tmp_path, gate_workers=0)
+
+
+def test_a_gated_generation_runs_with_gate_workers(tmp_path):
+    """End to end, with self-play and the gate on different worker counts."""
+    config = a_config(tmp_path, generations=1, gate_every=1, workers=1, gate_workers=2)
+    rows = run(config, lambda: ConvRotationNet(3, 3))
+
+    assert rows[0]["gated"]
+    assert (
+        rows[0]["gate_as_first"] + rows[0]["gate_as_second"]
+        == rows[0]["gate_win_rate"] * config.gate_games
+    )

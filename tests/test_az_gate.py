@@ -252,3 +252,111 @@ def test_start_at_must_be_within_the_match(nets):
 
     with pytest.raises(ValueError, match="start_at"):
         run_gate(TINY, challenger, champion, simulations=2, seed=1, games=8, start_at=9)
+
+
+# -- the parallel gate --------------------------------------------------------
+
+
+@pytest.mark.parametrize(("workers", "chunk"), [(2, 4), (3, 5), (4, 8)])
+def test_a_parallel_gate_is_the_same_match_as_a_serial_one(workers, chunk):
+    """Parallelising must change the cost and nothing else.
+
+    EXP-014 measured the serial gate at 61% of the whole training budget and
+    four times the per-game cost of parallel self-play, for no reason but that
+    it ran in one process. That is worth fixing only if the match it plays is
+    identical -- every seed is a function of the match seed and the game index,
+    so games may complete in any order, and results are folded back in index
+    order so seat attribution cannot depend on which worker finished first.
+
+    The ``chunk=5`` case does not divide the match length, which is where an
+    off-by-one in the chunking would show.
+    """
+    from az.gate import run_gate
+    from az.network import ConvRotationNet
+
+    variant = Variant(3, 3, Arm("h1"))
+    torch.manual_seed(0)
+    challenger = ConvRotationNet(3, 3).eval()
+    torch.manual_seed(7)
+    champion = ConvRotationNet(3, 3).eval()
+
+    def go(**kw):
+        return run_gate(
+            variant, challenger, champion, simulations=8, seed=5, games=8, **kw
+        )
+
+    serial = go(workers=1)
+    parallel = go(workers=workers, chunk=chunk)
+
+    assert (parallel.wins, parallel.as_first, parallel.as_second) == (
+        serial.wins,
+        serial.as_first,
+        serial.as_second,
+    )
+    assert parallel.promoted == serial.promoted
+
+
+def test_the_parallel_gate_reports_progress_only_on_contiguous_prefixes():
+    """A resume replays games, so progress must describe a prefix.
+
+    Parallel games finish out of order. Reporting "12 done" when games 3 and 7
+    are still running would checkpoint a state no resume could reconstruct, and
+    would break the seat balance too: game ``i`` takes the first seat when ``i``
+    is even, so only an even-length prefix carries equal seats.
+    """
+    from az.gate import run_gate
+    from az.network import ConvRotationNet
+
+    variant = Variant(3, 3, Arm("h1"))
+    torch.manual_seed(0)
+    challenger = ConvRotationNet(3, 3).eval()
+    torch.manual_seed(7)
+    champion = ConvRotationNet(3, 3).eval()
+
+    ticks = []
+    whole = run_gate(
+        variant,
+        challenger,
+        champion,
+        simulations=8,
+        seed=5,
+        games=8,
+        workers=2,
+        chunk=4,
+        on_progress=lambda done, wins, first: ticks.append((done, wins, first)),
+    )
+    assert [t[0] for t in ticks] == [4, 8]
+
+    done, wins, first = ticks[0]
+    resumed = run_gate(
+        variant,
+        challenger,
+        champion,
+        simulations=8,
+        seed=5,
+        games=8,
+        workers=2,
+        chunk=4,
+        start_at=done,
+        wins_so_far=wins,
+        first_wins_so_far=first,
+    )
+    assert (resumed.wins, resumed.as_first) == (whole.wins, whole.as_first)
+
+
+def test_a_non_positive_chunk_is_refused():
+    from az.gate import run_gate
+    from az.network import ConvRotationNet
+
+    torch.manual_seed(0)
+    net = ConvRotationNet(3, 3).eval()
+    with pytest.raises(ValueError, match="chunk must be positive"):
+        run_gate(
+            Variant(3, 3, Arm("h1")),
+            net,
+            net,
+            simulations=4,
+            seed=1,
+            games=4,
+            chunk=0,
+        )

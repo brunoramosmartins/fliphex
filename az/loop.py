@@ -116,10 +116,20 @@ class LoopConfig:
         gate_games: Match length. Must be even.
         gate_threshold: Win rate the challenger must clear to be promoted.
         gate_simulations: Simulations per move in the match, matching deployment.
-        gate_checkpoint_every: Games between mid-gate checkpoints. Must be at
-            most ``gate_games``; a larger value means no mid-gate checkpoint is
-            ever written and an interrupted match restarts from zero.
+        gate_checkpoint_every: Games between mid-gate checkpoints, and the
+            chunk the parallel gate plays in. Must be at most ``gate_games``; a
+            larger value means no mid-gate checkpoint is ever written and an
+            interrupted match restarts from zero. It also bounds the work a kill
+            can lose: at most one chunk.
         workers: Self-play processes.
+        gate_workers: Processes for the gate, defaulting to ``workers``. They are
+            separate because the measured optima differ: EXP-014 found self-play
+            saturating at six workers (331 games/h, with eight within 1%) while
+            the gate peaks at **four** (260 games/h) and loses 33% at eight. The
+            likely reason is that a gate worker holds *two* networks, challenger
+            and champion, against self-play's one — twice the resident model
+            memory and BLAS working set per worker on six physical cores. That
+            is an explanation from structure, not a measurement.
         root: Checkpoint directory.
         history_path: JSONL appended once per generation. Kept outside the
             checkpoint so a run that dies mid-write still has its history.
@@ -142,11 +152,16 @@ class LoopConfig:
     gate_simulations: int = 400
     gate_checkpoint_every: int = GATE_CHECKPOINT_EVERY
     workers: int = 1
+    gate_workers: int | None = None
     root: Path = field(default_factory=lambda: Path("data/az-runs/default"))
     history_path: Path | None = None
 
     def __post_init__(self) -> None:
         self.root = Path(self.root)
+        if self.gate_workers is None:
+            self.gate_workers = self.workers
+        if self.gate_workers < 1:
+            raise ValueError(f"gate_workers must be positive, got {self.gate_workers}")
         if self.history_path is None:
             self.history_path = self.root / "history.jsonl"
         self.history_path = Path(self.history_path)
@@ -406,8 +421,9 @@ def run(
                 _last_gated: int = last_gated,
                 _row: dict = row,
             ) -> None:
-                if done % config.gate_checkpoint_every:
-                    return
+                # run_gate now fires this once per chunk, and the chunk is
+                # gate_checkpoint_every -- one concept instead of a cadence here
+                # and a cadence there that had to agree.
                 checkpoint.save(
                     _snapshot(
                         config,
@@ -436,6 +452,8 @@ def run(
                 wins_so_far=gate_wins,
                 first_wins_so_far=gate_first_wins,
                 on_progress=_progress,
+                workers=config.gate_workers,
+                chunk=config.gate_checkpoint_every,
             )
             gate_wins = gate_games_done = gate_first_wins = 0
             last_gated = generation

@@ -1,0 +1,20 @@
+phase A: straight run into data/az-runs/shakedown
+phase B: killed run into data/az-runs/shakedown-killed
+  killed with SIGKILL at gate game 5 of generation 1
+  resuming
+
+  C1  PASS  the loop closes
+        3 history rows, checkpoint at generation 3
+  C2  PASS  8 spawned workers run the adopted head
+        samples per generation: [500, 500, 500]
+  C3  PASS  the gate decides, with an interval and a seat split
+        gen 1: 70.0% [48.1%, 85.5%] seats 9/5 promoted=True
+  C4  PASS  a SIGKILL mid-gate resumes to byte-equal weights
+        straight challenger 1929309feee0, killed 1929309feee0
+
+throughput  145 games/hour composed (0.21x the engine-only 705), peak child RSS 385 MB
+the registered run (30 gen x 200 games x 5 seeds = 30,000 games) projects to 206.5 h of self-play at this rate, gates excluded
+written  results/exp014-shakedown-5x5.json  (2861.4s)
+
+all four checks pass: the objection to starting the run is removed
+(passing licenses nothing else -- this is not evidence about the game)

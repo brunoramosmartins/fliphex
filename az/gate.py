@@ -68,12 +68,15 @@ it should happen when a *live* third caller appears, not by editing a closed one
 
 from __future__ import annotations
 
+import multiprocessing as mp
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
 from math import comb, sqrt
 
-from az.network import FlipHexNet
+import torch
+
+from az.network import FlipHexNet, build_net, net_spec
 from az.player import EVALUATION_TEMPERATURE_PLIES, SearchPlayer
 from fliphex.moves import apply_move
 from fliphex.rules import is_terminal
@@ -199,6 +202,94 @@ def play_match_game(
     return winner == challenger_colour
 
 
+def game_players(
+    challenger_net: FlipHexNet,
+    champion_net: FlipHexNet,
+    *,
+    index: int,
+    simulations: int,
+    seed: int,
+    temperature_plies: int,
+) -> tuple[SearchPlayer, SearchPlayer]:
+    """The two players for game ``index``.
+
+    Both seeds are functions of the match seed and the game index alone, which is
+    what makes a game the same game whenever and wherever it is played. That
+    property is what the parallel path below relies on: games may complete in any
+    order and the result is unchanged.
+    """
+    return (
+        SearchPlayer(
+            challenger_net,
+            simulations=simulations,
+            seed=seed * 2_000_003 + index,
+            temperature_plies=temperature_plies,
+        ),
+        SearchPlayer(
+            champion_net,
+            simulations=simulations,
+            seed=seed * 3_000_017 + index,
+            temperature_plies=temperature_plies,
+        ),
+    )
+
+
+_MATCH: dict = {}
+
+
+def _init_match_worker(
+    variant: Variant,
+    challenger_spec: dict,
+    challenger_weights: dict,
+    champion_spec: dict,
+    champion_weights: dict,
+    simulations: int,
+    seed: int,
+    temperature_plies: int,
+) -> None:
+    """Build both networks once per worker, not once per game.
+
+    Each net travels as a spec plus weights, because a ``state_dict`` alone does
+    not say what shape of network it belongs to -- the defect that made
+    self-play rebuild every network as a factored head.
+
+    One torch thread per worker: eight workers each spawning six BLAS threads
+    oversubscribe six physical cores and the measured speedup does not survive it.
+    """
+    torch.set_num_threads(1)
+    challenger = build_net(challenger_spec)
+    challenger.load_state_dict(challenger_weights)
+    challenger.eval()
+    champion = build_net(champion_spec)
+    champion.load_state_dict(champion_weights)
+    champion.eval()
+    _MATCH.update(
+        variant=variant,
+        challenger=challenger,
+        champion=champion,
+        simulations=simulations,
+        seed=seed,
+        temperature_plies=temperature_plies,
+    )
+
+
+def _play_indexed(index: int) -> tuple[int, bool]:
+    challenger, champion = game_players(
+        _MATCH["challenger"],
+        _MATCH["champion"],
+        index=index,
+        simulations=_MATCH["simulations"],
+        seed=_MATCH["seed"],
+        temperature_plies=_MATCH["temperature_plies"],
+    )
+    return index, play_match_game(
+        _MATCH["variant"],
+        challenger,
+        champion,
+        challenger_first=index % 2 == 0,
+    )
+
+
 def run_gate(
     variant: Variant,
     challenger_net: FlipHexNet,
@@ -213,6 +304,8 @@ def run_gate(
     wins_so_far: int = 0,
     first_wins_so_far: int = 0,
     on_progress: Callable[[int, int, int], None] | None = None,
+    workers: int = 1,
+    chunk: int = 1,
 ) -> GateResult:
     """Play the match and decide.
 
@@ -230,8 +323,20 @@ def run_gate(
         start_at: Resume from this game index.
         wins_so_far: Challenger wins already recorded before ``start_at``.
         first_wins_so_far: Of those, how many came in the first seat.
+        workers: Processes to play games in. Games are independent given the
+            match seed and the index, so parallelising changes nothing about the
+            result — only how long it takes. EXP-014 measured a serial gate at
+            61% of the whole training budget, four times the per-game cost of
+            parallel self-play, for no reason but that it ran in one process.
+        chunk: Games completed between ``on_progress`` calls. Progress is
+            reported only on a **contiguous prefix**, so a resume replays exactly
+            the games that did not finish and the seat balance holds: game
+            ``i`` takes the first seat when ``i`` is even, and a prefix of even
+            length carries equal seats. Parallel games complete out of order, so
+            reporting anything but a prefix would checkpoint a state no resume
+            could reconstruct.
         on_progress: Called with ``(games_done, wins, first_seat_wins)`` after
-            every game, so a caller can checkpoint a part-finished gate — 400
+            each chunk, so a caller can checkpoint a part-finished gate — 400
             games is about 34 minutes, the longest uninterruptible unit in the
             run. All three are needed: resuming without the seat split would
             restore the right total and the wrong per-seat breakdown, and the
@@ -260,30 +365,62 @@ def run_gate(
             stacklevel=2,
         )
 
+    if chunk < 1:
+        raise ValueError(f"chunk must be positive, got {chunk}")
+
     wins = wins_so_far
     first_wins = first_wins_so_far
 
-    for index in range(start_at, games):
-        challenger_first = index % 2 == 0
-        challenger = SearchPlayer(
-            challenger_net,
-            simulations=simulations,
-            seed=seed * 2_000_003 + index,
-            temperature_plies=temperature_plies,
-        )
-        champion = SearchPlayer(
-            champion_net,
-            simulations=simulations,
-            seed=seed * 3_000_017 + index,
-            temperature_plies=temperature_plies,
-        )
-        won = play_match_game(
-            variant, challenger, champion, challenger_first=challenger_first
-        )
+    def record(index: int, won: bool) -> None:
+        nonlocal wins, first_wins
         wins += won
-        first_wins += won and challenger_first
-        if on_progress is not None:
-            on_progress(index + 1, wins, first_wins)
+        first_wins += won and index % 2 == 0
+
+    remaining = range(start_at, games)
+    if workers <= 1:
+        for index in remaining:
+            challenger, champion = game_players(
+                challenger_net,
+                champion_net,
+                index=index,
+                simulations=simulations,
+                seed=seed,
+                temperature_plies=temperature_plies,
+            )
+            record(
+                index,
+                play_match_game(
+                    variant, challenger, champion, challenger_first=index % 2 == 0
+                ),
+            )
+            if on_progress is not None and (index + 1 - start_at) % chunk == 0:
+                on_progress(index + 1, wins, first_wins)
+    else:
+        # "spawn", not "fork": torch runs threads, and forking a multi-threaded
+        # process can leave a lock held in a child with no thread to release it.
+        # The failure is a hang, and a hang inside a 400-game gate costs the run.
+        initargs = (
+            variant,
+            net_spec(challenger_net),
+            challenger_net.state_dict(),
+            net_spec(champion_net),
+            champion_net.state_dict(),
+            simulations,
+            seed,
+            temperature_plies,
+        )
+        with mp.get_context("spawn").Pool(
+            workers, initializer=_init_match_worker, initargs=initargs
+        ) as pool:
+            for start in range(start_at, games, chunk):
+                batch = list(range(start, min(start + chunk, games)))
+                # `map`, not `imap_unordered`: results are folded back in index
+                # order so the seat attribution cannot depend on which worker
+                # finished first.
+                for index, won in pool.map(_play_indexed, batch):
+                    record(index, won)
+                if on_progress is not None:
+                    on_progress(batch[-1] + 1, wins, first_wins)
 
     low, high = wilson(wins, games)
     rate = wins / games if games else 0.0

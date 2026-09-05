@@ -1,0 +1,157 @@
+{
+  "experiment": "EXP-014",
+  "registered": "experiments/registry.md",
+  "kind": "instrument shakedown -- not evidence about the game",
+  "variant": "5x5-h1",
+  "architecture": "ConvRotationNet",
+  "torch": "2.13.0+cpu",
+  "config": {
+    "board": "5x5",
+    "seed": 1,
+    "generations": 3,
+    "games": 20,
+    "simulations": 400,
+    "steps": 400,
+    "batch_size": 64,
+    "buffer_capacity": 20000,
+    "gate_every": 2,
+    "gate_games": 20,
+    "gate_threshold": 0.55,
+    "gate_checkpoint_every": 5,
+    "workers": 8
+  },
+  "is_registered_scale": true,
+  "checks": [
+    {
+      "id": "C1",
+      "what": "the loop closes",
+      "passed": true,
+      "detail": "3 history rows, checkpoint at generation 3"
+    },
+    {
+      "id": "C2",
+      "what": "8 spawned workers run the adopted head",
+      "passed": true,
+      "detail": "samples per generation: [500, 500, 500]"
+    },
+    {
+      "id": "C3",
+      "what": "the gate decides, with an interval and a seat split",
+      "passed": true,
+      "detail": "gen 1: 70.0% [48.1%, 85.5%] seats 9/5 promoted=True"
+    },
+    {
+      "id": "C4",
+      "what": "a SIGKILL mid-gate resumes to byte-equal weights",
+      "passed": true,
+      "detail": "straight challenger 1929309feee0, killed 1929309feee0"
+    }
+  ],
+  "all_passed": true,
+  "throughput": {
+    "composed_games_per_hour": 145.25887959927763,
+    "seconds_total": 1487.0003169229603,
+    "seconds_per_generation": [
+      231.58843776601134,
+      1033.3257679550443,
+      217.36804686998948
+    ],
+    "peak_child_rss_kb": 394112,
+    "engine_only_reference": 705,
+    "note": "Composed, with the network in the loop. R8's 705 games/hour was measured engine-only with torch not competing for the cores. This is a cost measurement: workers, games and generations may change by amendment, the five seeds may not."
+  },
+  "history": [
+    {
+      "generation": 0,
+      "samples": 500,
+      "buffer": 500,
+      "refresh_fraction": 0.025,
+      "policy_loss": 4.835050487518311,
+      "value_loss": 0.06069164391468803,
+      "gated": false,
+      "seconds": 231.58843776601134
+    },
+    {
+      "generation": 1,
+      "samples": 500,
+      "buffer": 1000,
+      "refresh_fraction": 0.025,
+      "policy_loss": 4.757345069646835,
+      "value_loss": 0.08125384463943192,
+      "gated": true,
+      "gate_win_rate": 0.7,
+      "gate_ci": [
+        0.4810232237710206,
+        0.854524726031006
+      ],
+      "gate_as_first": 9,
+      "gate_as_second": 5,
+      "promoted": true,
+      "seconds": 1033.3257679550443
+    },
+    {
+      "generation": 2,
+      "samples": 500,
+      "buffer": 1500,
+      "refresh_fraction": 0.025,
+      "policy_loss": 4.325298978686333,
+      "value_loss": 0.10644976503652287,
+      "gated": false,
+      "seconds": 217.36804686998948
+    }
+  ],
+  "kill": {
+    "format_version": 2,
+    "generation": 1,
+    "last_gated": -1,
+    "buffer_size": 1000,
+    "gate_wins": 2,
+    "gate_games": 5,
+    "gate_first_wins": 2,
+    "meta": {
+      "seed": 1,
+      "variant": "5x5-h1",
+      "net_spec": {
+        "class": "ConvRotationNet",
+        "n_cols": 5,
+        "n_rows": 5,
+        "filters": 64,
+        "blocks": 4
+      },
+      "schedule": {
+        "games": 20,
+        "simulations": 400,
+        "steps": 400,
+        "batch_size": 64,
+        "buffer_capacity": 20000,
+        "gate_every": 2,
+        "gate_games": 20,
+        "gate_threshold": 0.55
+      },
+      "pending_row": {
+        "generation": 1,
+        "samples": 500,
+        "buffer": 1000,
+        "refresh_fraction": 0.025,
+        "policy_loss": 4.757345069646835,
+        "value_loss": 0.08125384463943192,
+        "gated": false
+      }
+    }
+  },
+  "digests": {
+    "straight": {
+      "generation": 3,
+      "challenger": "1929309feee0dda476863b28f4ffe05fd9b64fd592608c240f1f7f7d41a7472b",
+      "champion": "64591afcbc4ed34285584f1c8f4d11040762d68942176fabe57e8b30bcfe4a3a",
+      "buffer": 1500
+    },
+    "killed": {
+      "generation": 3,
+      "challenger": "1929309feee0dda476863b28f4ffe05fd9b64fd592608c240f1f7f7d41a7472b",
+      "champion": "64591afcbc4ed34285584f1c8f4d11040762d68942176fabe57e8b30bcfe4a3a",
+      "buffer": 1500
+    }
+  },
+  "elapsed_seconds": 2861.4204421570175
+}
