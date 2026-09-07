@@ -1,0 +1,95 @@
+{
+  "experiment": "EXP-015",
+  "registered": "experiments/registry.md",
+  "variant": "5x5-h1",
+  "architecture": "ConvRotationNet",
+  "criterion": "Every seed's Wilson 95% interval against prior-free UCT at equal simulations must lie entirely above 50%. A seed that fails is recorded as instability, never averaged away.",
+  "not_established": "Beating prior-free UCT licenses 'the learner learned something' and nothing more. How good it is comes from H3's solver-agreement clause, which is a measurement and gates nothing here.",
+  "schedule": {
+    "seeds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "generations": 30,
+    "games": 200,
+    "simulations": 400,
+    "steps": 400,
+    "batch_size": 64,
+    "buffer_capacity": 20000,
+    "gate_every": 5,
+    "gate_games": 400,
+    "gate_threshold": 0.55,
+    "workers": 6,
+    "gate_workers": 4,
+    "floor_games": 200
+  },
+  "seeds": {
+    "1": {
+      "seed": 1,
+      "floors": {
+        "equal_simulations": {
+          "label": "equal simulations",
+          "games": 200,
+          "wins": 128,
+          "win_rate": 0.64,
+          "ci": [
+            0.5714139956562682,
+            0.7033091226866021
+          ],
+          "as_first": 91,
+          "as_second": 37,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": true,
+          "seconds": 2397.608047900001
+        },
+        "generation_0": {
+          "label": "generation 0",
+          "games": 200,
+          "wins": 25,
+          "win_rate": 0.125,
+          "ci": [
+            0.0861191515921568,
+            0.1780153528465839
+          ],
+          "as_first": 25,
+          "as_second": 0,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": false,
+          "seconds": 2511.515604152002
+        },
+        "equal_time": {
+          "label": "equal time",
+          "games": 200,
+          "wins": 121,
+          "win_rate": 0.605,
+          "ci": [
+            0.5358822087449843,
+            0.6701601300121683
+          ],
+          "as_first": 86,
+          "as_second": 35,
+          "net_simulations": 400,
+          "uct_simulations": 462,
+          "clears_floor": true,
+          "seconds": 2736.7116252979977
+        }
+      },
+      "training_seconds": 24808.824274802,
+      "generations_run_this_invocation": 8,
+      "history_path": "data/az-runs/h3-seed1/history.jsonl",
+      "equal_time_budget": {
+        "moves_sampled": 25,
+        "net_seconds_per_move": 1.5288685920000717,
+        "uct_seconds_per_move_at_400": 1.324763651999965,
+        "ratio": 1.1540689463301428,
+        "uct_simulations": 462
+      },
+      "seconds_total": 32526.106246651998
+    }
+  }
+}
