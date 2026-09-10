@@ -4254,6 +4254,93 @@ with each seed's own per-generation history at
 matches are written by the same script. Verdict applied from the artefact by
 `scripts/exp015_analysis.py`. All named before the instrument exists.
 
+#### Amendment (2026-09-10) — a third artefact, and two corrections to this entry's own text
+
+Written while seed 3 is running, with seeds 1 and 2 complete. **Nothing below
+reads a floor result across seeds** — that is refused until all five exist. What
+follows concerns where the run's records live and two statements this entry makes
+about its own instrument.
+
+**1. The per-generation record was not in the repository.**
+
+The Artefact section above names the per-seed history at
+`data/az-runs/h3-seed<N>/history.jsonl`, and `.gitignore:32` ignores
+`data/az-runs/`. So everything this entry promises to report *per generation*
+lived only in untracked scratch: the training curve, the six gate outcomes per
+seed, and `refresh_fraction` — which the threats section commits to reporting
+"every generation so it stays legible", a commitment that cannot be met by a file
+no reader of the repository can open.
+
+The console logs do not cover the gap. Both were reopened with `>` rather than
+`>>` on a resume, so `results/exp015-seed1.log` holds **10** of its 30 generation
+lines and `results/exp015-seed2.log` holds **13**.
+
+**What this does not claim.** No measurement is affected and nothing was lost:
+every floor match is in the JSON artefact, the weights are in the checkpoints,
+and the histories are intact on disk. What was missing is that the repository
+could not show them — which for a portfolio-grade public repo is the whole point
+of writing them down.
+
+**The addition: `results/exp015-histories.json`**, consolidated from the per-seed
+JSONL by `scripts/exp015_analysis.py`. Three properties, because a copy that
+behaves carelessly is worse than no copy:
+
+- **A completed seed's rows are immutable.** If the snapshot and a live file with
+  all 30 generations disagree, the script stops rather than re-syncing. A record
+  that silently adopts whatever is on disk records nothing.
+- **The scan is wider than the artefact.** A seed's artefact entry is written only
+  once its 30 generations finish, so a seed that is running — or one killed
+  halfway — has a history and no entry. Those are precisely the rows worth
+  keeping.
+- **It tolerates a half-written final line**, because the file may be read while a
+  seed is appending to it. Any earlier line failing to parse is a hard error.
+
+**2. The effective bar is 57.0%, not "around 58%".**
+
+The success-criterion section computes the bar as a quotation. `smallest_clearing`
+computes it: at 200 games the smallest clearing count is **114 = 57.0%**, whose
+interval is [50.1%, 63.7%]. One win fewer, 113 = 56.5%, gives [49.6%, 63.2%] and
+fails. The entry's substantive point stands unchanged and is if anything
+understated — "entirely above 50%" is a 57-point bar, not a 50-point one — but the
+number is now computed by `scripts/exp015_analysis.py` rather than asserted, and
+it is pinned by a test so a change to the interval cannot move it silently.
+
+**3. "UCT gets several times the simulations" was wrong: it gets 1.03–1.15×.**
+
+The secondary's justification predicts that at equal time "UCT gets several times
+the simulations", and expected result 2 leans on it to argue the equal-time floor
+is the harder bar and "may not clear". Measured, the ratio is **1.15×** (462
+simulations) on seed 1 and **1.03×** (411) on seed 2.
+
+**Mechanism, and it was foreseeable from this entry's own text.** The entry
+reasons from the network agent costing ~10.9 s/game while prior-free UCT "does no
+forward passes at all", and infers a large ratio. That compares the network's cost
+against zero rather than against what UCT actually does: a random playout runs to
+the end of the game — up to 25 plies of move generation and application — where a
+network evaluation is one forward pass on a static position. The two per-move
+costs land within 15% of each other, so equal-time and equal-simulations are
+nearly the same experiment on this board at this budget.
+
+**Consequences, and they cut against the run, not for it.** The secondary charges
+the network far less for its cost than registered, so a seed clearing the
+equal-time floor establishes correspondingly less. It stays secondary and stays
+reported; the write-up must quote the measured ratio beside it and may not repeat
+the "several times" framing. A design that genuinely charges for compute would
+have to equalise something other than wall-clock per move, and that would be a new
+entry, not a reinterpretation of this one.
+
+**A second-order effect, recorded now so it is not discovered in the Result.** The
+ratio is measured per seed against whatever the machine is doing at the time, so
+UCT's budget differs seed to seed (411 and 462 so far). The equal-time arm is
+therefore not a constant-difficulty bar and its rates are not strictly comparable
+between seeds. The primary is unaffected: both agents there are pinned to 400
+simulations.
+
+**What this amendment does not change.** No criterion, no schedule, no decision
+rule, no stopping rule, and no seed count. It adds one tracked artefact and
+corrects two descriptive statements. The floor is still read per seed on the
+Wilson interval at equal simulations, and solver agreement still gates nothing.
+
 
 ## Planned
 
