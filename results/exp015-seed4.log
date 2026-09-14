@@ -1,0 +1,51 @@
+nohup: ignoring input
+seed 4: starting fresh
+  gen  0    1965s  buffer  5000  policy 5.0519
+  gen  1    1950s  buffer 10000  policy 4.9767
+  gen  2    1949s  buffer 15000  policy 4.9767
+  gen  3    1964s  buffer 20000  policy 4.9499
+  gen  4    7596s  buffer 20000  policy 4.9675  GATE 90.0% promoted=True
+  gen  5    2274s  buffer 20000  policy 4.9879
+  gen  6    2054s  buffer 20000  policy 4.9581
+  gen  7    1903s  buffer 20000  policy 4.8846
+  gen  8    1896s  buffer 20000  policy 4.7837
+  gen  9    6766s  buffer 20000  policy 4.7850  GATE 72.8% promoted=True
+  gen 10    1945s  buffer 20000  policy 4.6942
+  gen 11    2159s  buffer 20000  policy 4.5699
+  gen 12    2065s  buffer 20000  policy 4.4270
+  gen 13    2297s  buffer 20000  policy 4.2488
+  gen 14    7822s  buffer 20000  policy 4.2174  GATE 60.0% promoted=True
+  gen 15    1961s  buffer 20000  policy 4.1414
+  gen 16    1938s  buffer 20000  policy 4.0611
+  gen 17    2015s  buffer 20000  policy 3.9366
+  gen 18    1948s  buffer 20000  policy 3.8082
+  gen 19    7458s  buffer 20000  policy 3.8113  GATE 48.5% promoted=False
+  gen 20    2190s  buffer 20000  policy 3.7942
+  gen 21    2017s  buffer 20000  policy 3.7737
+  gen 22    2052s  buffer 20000  policy 3.7802
+  gen 23    1994s  buffer 20000  policy 3.7674
+  gen 24    7116s  buffer 20000  policy 3.7510  GATE 63.2% promoted=True
+  gen 25    2095s  buffer 20000  policy 3.8522
+  gen 26    2177s  buffer 20000  policy 3.8639
+  gen 27    2157s  buffer 20000  policy 3.8851
+  gen 28    2102s  buffer 20000  policy 3.9016
+  gen 29    7757s  buffer 20000  policy 3.8685  GATE 49.5% promoted=False
+seed 4: floor, equal simulations
+  equal simulations    112/200 = 56.0% [49.1%, 62.7%]  seats 75/37  UCT sims 400  FAILS the floor
+seed 4: reference, generation 0
+  generation 0         22/200 = 11.0% [7.4%, 16.1%]  seats 21/1  UCT sims 400  FAILS the floor
+seed 4: measuring the equal-time ratio
+  net 1.304 s/move, UCT 1.227 s/move at 400 -> ratio 1.06, UCT gets 425 simulations
+  equal time           106/200 = 53.0% [46.1%, 59.8%]  seats 74/32  UCT sims 425  FAILS the floor
+
+  equal simulations    112/200 = 56.0% [49.1%, 62.7%]  seats 75/37  UCT sims 400  FAILS the floor
+  generation 0         22/200 = 11.0% [7.4%, 16.1%]  seats 21/1  UCT sims 400  FAILS the floor
+  equal time           106/200 = 53.0% [46.1%, 59.8%]  seats 74/32  UCT sims 425  FAILS the floor
+
+THIS SEED FAILS THE FLOOR. Per the registration, if this is seed 1 the run stops here and the entry reports a failure. A restart with different hyperparameters needs a new registered entry -- retraining until it works selects on the outcome.
+
+seeds complete: ['1', '2', '3', '4'] of (1, 2, 3, 4, 5)
+equal-simulations floor: 64.0%  76.0%  63.0%  56.0%   spread 8.3%
+H3's stability clause needs all five. Nothing is read across seeds until they are done.
+
+written  results/exp015-h3-training-5x5.json
