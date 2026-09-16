@@ -282,6 +282,70 @@
         "uct_simulations": 425
       },
       "seconds_total": 101420.75481216298
+    },
+    "5": {
+      "seed": 5,
+      "floors": {
+        "equal_simulations": {
+          "label": "equal simulations",
+          "games": 200,
+          "wins": 124,
+          "win_rate": 0.62,
+          "ci": [
+            0.5510658951919951,
+            0.6844110633876079
+          ],
+          "as_first": 90,
+          "as_second": 34,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": true,
+          "seconds": 2375.873759820999
+        },
+        "generation_0": {
+          "label": "generation 0",
+          "games": 200,
+          "wins": 6,
+          "win_rate": 0.03,
+          "ci": [
+            0.013820125830748327,
+            0.06389511973247333
+          ],
+          "as_first": 6,
+          "as_second": 0,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": false,
+          "seconds": 2285.512036205
+        },
+        "equal_time": {
+          "label": "equal time",
+          "games": 200,
+          "wins": 124,
+          "win_rate": 0.62,
+          "ci": [
+            0.5510658951919951,
+            0.6844110633876079
+          ],
+          "as_first": 90,
+          "as_second": 34,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": true,
+          "seconds": 2354.867292396004
+        }
+      },
+      "training_seconds": 28217.584914901,
+      "generations_run_this_invocation": 10,
+      "history_path": "data/az-runs/h3-seed5/history.jsonl",
+      "equal_time_budget": {
+        "moves_sampled": 25,
+        "net_seconds_per_move": 1.1686667720001425,
+        "uct_seconds_per_move_at_400": 1.1912061081599676,
+        "ratio": 0.9810785589450668,
+        "uct_simulations": 400
+      },
+      "seconds_total": 35292.965432391
     }
   }
 }
