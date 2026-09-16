@@ -142,6 +142,12 @@ LAYER_UNIFORM = Stratum(
 
 STRATA = {s.name: s for s in (REGISTERED, LAYER_UNIFORM)}
 
+#: Default run order: **the registered stratum first**, because it is the one
+#: the decision rule runs on. Insertion order, never ``sorted()`` — alphabetical
+#: puts ``layer_uniform`` first, which would leave a run interrupted for days
+#: holding the descriptive half and not the primary one.
+DEFAULT_ORDER = tuple(STRATA)
+
 #: The calibration sweep, pre-declared: the first N per `k` of the registered
 #: stratum in generation order. Deterministic, and it needs no further seed.
 CALIBRATION = {6: 34, 7: 33, 8: 33}
@@ -550,7 +556,7 @@ def main() -> int:
     board = VARIANT.board()
     work = Path(args.work)
     rows = read_work(work)
-    chosen = [STRATA[name] for name in (args.stratum or sorted(STRATA))]
+    chosen = [STRATA[name] for name in (args.stratum or DEFAULT_ORDER)]
 
     started = time.monotonic()
     if not args.assemble_only:

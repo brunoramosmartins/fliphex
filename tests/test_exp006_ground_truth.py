@@ -344,3 +344,14 @@ def test_the_denominator_counts_won_positions_only(tmp_path, monkeypatch):
     wins = sum(1 for r in rows if r["proved"] and r["value"] == "WIN")
     assert summary["decision_denominator"] == wins
     assert summary["mover_wins"] + summary["mover_loses"] == summary["proved"]
+
+
+def test_the_registered_stratum_runs_first():
+    """Alphabetical order would put the descriptive stratum ahead of the primary.
+
+    An interruption is the normal case here, not the exception — the run spans
+    hours and the machine hibernates — so a run stopped partway must hold the
+    stratum the decision rule reads, not the one that only describes.
+    """
+    assert exp006.DEFAULT_ORDER[0] == "registered"
+    assert set(exp006.DEFAULT_ORDER) == set(exp006.STRATA)
