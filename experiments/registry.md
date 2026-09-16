@@ -1493,6 +1493,111 @@ direction.
 was not free to *decide*: the decision had to be made before the run, which is
 why it is here and dated.
 
+#### Amendment (2026-09-16) — the measure is vacuous on lost positions, and the agent was never named
+
+Amended **before the run**, which is the only time this is allowed. The sampling
+design is untouched: same seeds, same 500 + 250 positions, same stratification,
+same separation of the two strata, same `0.90` threshold. What changes is the
+denominator that threshold is applied to, and three things the 2026-08-05 entry
+could not fix because Axis 2 did not exist when it was written.
+
+**1. "Whether the chosen move preserves the value" is vacuous on half the sample.**
+
+Draws are impossible on 25 cells, so a position is a WIN or a LOSS for the side
+to move. From a **LOSS**, every legal move leads to a position the opponent wins:
+the value is preserved by *every* move, and the learner scores a hit whatever it
+plays. Those positions are not measuring the learner. They are measuring the
+fraction of the sample that happens to be lost.
+
+Measured on the shipped 5×5 with **seed 99** — deliberately not seed 2 or seed 4,
+so the registered samples stay unseen:
+
+| `k` | side to move | positions | mover LOSES |
+|--:|---|--:|--:|
+| 6 | second | 40 | **13 (32.5%)** |
+| 6 | second | 30 | **9 (30.0%)** |
+| 7 | first | 40 | **3 (7.5%)** |
+
+Median node counts came in at 6,626 and 16,019, against EXP-003's 6,660 and
+20,024 — the cost model this entry was built on reproduces.
+
+**What that does to the registered rule.** The reported rate decomposes as
+`loss_fraction + (1 − loss_fraction) × accuracy`. Demanding 0.90 of it therefore
+demands **85.2–85.7%** accuracy at `k = 6`'s two measured mixes and **89.2%** at
+`k = 7`'s: one
+threshold meaning two different things, with the pooled meaning fixed by a mix
+the entry never measured. And the measure's floor is not zero — a mover playing
+at random scores the whole loss fraction for free.
+
+**The mix is structural, not noise.** `t = 25 − k`, and the side to move
+alternates with `t`, so `k ∈ {6, 8}` puts the **second** player on move and
+`k = 7` the **first**. The second player is lost about four times as often. That
+is consistent with H1 and is **not evidence for it** — these are sampled
+positions under a random-playout bias, not game values — but it does mean the
+loss fraction swings with `k` parity by construction, which is the worst possible
+property for a rate pooled across `k`.
+
+**The fix: the denominator becomes positions the mover wins.** The decision rule
+runs on the subset where the root value is **WIN**, where a wrong move actually
+throws the game away. Lost positions are **counted and excluded**, never scored
+as hits. Per-`k` and pooled rates are reported on this denominator.
+
+**The threshold stays at 0.90** and is therefore *stricter* than registered, not
+looser. That direction is deliberate: discovering that a measure was inflated is
+not a licence to re-tune the bar to the inflation. The arithmetic above says what
+0.90 used to buy.
+
+**One residual, closed by measurement rather than assumption.** A WIN position
+where *every* move also wins would be non-discriminating in the same way. In the
+30-position probe at `k = 6` there were **zero** such positions, and among the 21
+discriminating ones the share of legal moves that throw the win away had a median
+of **89.7%** (min 2.8%, max 98.8%) — so a random mover would agree on roughly a
+tenth of them. Because zero is a measurement on one `k` at one sample size and
+not a proof, the instrument runs the full child sweep on a **pre-declared
+calibration subsample of 100 positions** drawn from the registered stratum, and
+reports the non-discriminating count and the random-move baseline beside the
+headline rate. The remaining positions need only their root value, which keeps
+the sweep's cost bounded.
+
+**2. The entry never says which agent "the learned policy" is.**
+
+It could not: it was registered on 2026-08-05, before Axis 2 existed, and that
+ordering is the entry's whole point. EXP-015 has since produced **five**
+champions and established that they are not interchangeable — one of the five
+fails the prior-free floor, and the between-seed spread rejects a single
+underlying strength (`χ² = 18.52`, 4 df).
+
+**All five champions are evaluated, and the rule is per seed.** Reporting one
+agreement rate would hide exactly the variance EXP-015 measured, and picking the
+best seed would select on the outcome. So:
+
+- Each of the five EXP-015 champions plays the whole sample.
+- **H3's clause on this member is satisfied only if every seed's Wilson lower
+  bound exceeds 0.90.** A seed that fails is recorded, not averaged away — the
+  same falsifiability structure EXP-015's clause 1 uses, for the same reason.
+- The five rates and their spread are reported whatever happens.
+
+**3. The evaluation budget is pinned at 400 simulations.**
+
+Also unspecified, and it is not a detail: agreement from the raw policy head and
+agreement after search are different claims. 400 is what EXP-015's floor matches
+and self-play both used, so this measures the agent **as deployed** rather than a
+configuration that exists only for this table. `dirichlet_weight = 0` and the
+position's ply (17 to 19) is far past `EVALUATION_TEMPERATURE_PLIES = 4`, so
+selection is deterministic `argmax` over visit counts; the search seed is
+recorded regardless.
+
+**The raw prior is reported beside it, descriptively.** One forward pass, no
+search, `argmax` over the masked policy — it costs almost nothing and it is the
+quantity EXP-011, EXP-012 and EXP-013 all measured on the 5×3, so it is the only
+figure in this entry that can be read against the architecture decisions. It
+**gates nothing**: the decision rule is the 400-simulation arm.
+
+**What this amendment does not change.** No sample, no seed, no stratification,
+no threshold, and no part of the anti-circularity argument: ground truth is still
+produced by `solver/minimax.py`, which proves or raises, and this measurement
+still gates nothing in Axis 2 — EXP-015 is finished and its champions are frozen.
+
 ### EXP-008 — how strong is an exact agent with no endgame database?
 
 - **Registered.** 2026-08-30, before the instrument existed, at the Phase 3
