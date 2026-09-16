@@ -4341,6 +4341,223 @@ rule, no stopping rule, and no seed count. It adds one tracked artefact and
 corrects two descriptive statements. The floor is still read per seed on the
 Wilson interval at equal simulations, and solver agreement still gates nothing.
 
+#### Result (2026-09-16) — four of five clear, and the spread is not sampling noise
+
+Five runs of `scripts/exp015_h3_run.py`, one seed per invocation, 2026-09-05 to
+2026-09-16. **135.0 h of machine time**, artefact
+[`exp015-h3-training-5x5.json`](../results/exp015-h3-training-5x5.json),
+per-generation histories
+[`exp015-histories.json`](../results/exp015-histories.json), logs
+`exp015-seed<N>.log`. Every interval below is recomputed from the win counts by
+`scripts/exp015_analysis.py`, which also refuses to combine seeds until all five
+exist and cross-checks each recomputation against what the run stored.
+
+#### The primary: the equal-simulations floor
+
+Champion against prior-free UCT, both at 400 simulations, 200 games, seats
+alternating.
+
+| seed | wins | rate | Wilson 95% | seats (first/second) | verdict |
+|--:|--:|--:|:--|--:|:--|
+| 1 | 128/200 | 64.0% | [57.1%, 70.3%] | 91/37 | CLEARS |
+| 2 | 152/200 | 76.0% | [69.6%, 81.4%] | 97/55 | CLEARS |
+| 3 | 126/200 | 63.0% | [56.1%, 69.4%] | 89/37 | CLEARS |
+| **4** | **112/200** | **56.0%** | **[49.1%, 62.7%]** | 75/37 | **fails** |
+| 5 | 124/200 | 62.0% | [55.1%, 68.4%] | 90/34 | CLEARS |
+
+> **INSTABILITY RECORDED. H3's clause 1 is not satisfied.** The criterion is
+> per-seed — every Wilson interval entirely above 50% — and seed 4's includes it.
+> The registration's falsifiability clause says a failing seed is recorded as
+> instability and never averaged away, so that is what this entry reports.
+
+**The mean is 64.2% and it is not the result.** It is in the artefact because the
+entry promised the five rates and their spread whatever happened, and it is the
+number most likely to be quoted in place of the verdict. Nothing in this run
+licenses "the learner beats prior-free UCT at 64%".
+
+**Seed 4 missed by two games.** The bar at 200 games is 114 wins — computed, not
+quoted; the registration's "around 58%" is 57.0% — and seed 4 returned 112. That
+is recorded and it changes nothing: a pre-registered rule that bends for a
+two-game miss is not a rule, and the same two games of noise would equally have
+carried a genuinely unstable seed over the line. The fragility is the argument
+for reporting all five rates, not for reinterpreting one.
+
+#### The spread is a measurement, not one unlucky seed
+
+This is the part that gives H3's clause 1 more than a shrug. The clause's
+measurement column said "variance reported", and reported alone cannot be wrong.
+
+| | |
+|---|--:|
+| rates | 64.0%, 76.0%, 63.0%, 56.0%, 62.0% |
+| mean, sd | 64.2%, **7.3%** |
+| range | 56.0% – 76.0% |
+| sd expected from sampling alone at the pooled rate | **3.4%** |
+| homogeneity χ² (4 df, 0.05 critical 9.488) | **18.52** |
+
+**The seeds differ by more than the 200-game samples can explain.** Observed
+spread is 2.2× the binomial expectation and the homogeneity test rejects a single
+underlying rate. So the failure is not "one seed drew badly": training runs that
+differ only in seed end up at genuinely different strengths, and 56% and 76% are
+both things this pipeline produces.
+
+**What the χ² does not do.** It gates nothing — the registered criterion is
+per-seed precisely because a homogeneity test can pass while a seed sits below
+50%. It also names no cause: nothing here separates seed-dependent training
+dynamics from seed-dependent self-play data, and with five seeds nothing could.
+
+#### The secondary, and a defect that costs it one of its five points
+
+UCT receives the simulation count it can complete in the network agent's measured
+per-move wall clock. Reported, gating nothing.
+
+| seed | UCT sims | wins | rate | Wilson 95% | verdict |
+|--:|--:|--:|--:|:--|:--|
+| 1 | 462 | 121/200 | 60.5% | [53.6%, 67.0%] | CLEARS |
+| 2 | 411 | 147/200 | 73.5% | [67.0%, 79.1%] | CLEARS |
+| 3 | 470 | 111/200 | 55.5% | [48.6%, 62.2%] | fails |
+| 4 | 425 | 106/200 | 53.0% | [46.1%, 59.8%] | fails |
+| 5 | **400** | 124/200 | 62.0% | [55.1%, 68.4%] | **not a measurement — see below** |
+
+**Seed 5's secondary is a byte-for-byte duplicate of its own primary.** The
+measured ratio was **0.98** — the network came out *cheaper* per move than plain
+UCT — and `equal_time_simulations` clamps with `max(SIMULATIONS, ...)`, so UCT
+was given 400. With the same match seed and the same simulation count, the match
+replayed identically: 124/200, seats 90/34, every field equal.
+
+The clamp itself is defensible (never hand UCT *fewer* simulations than the
+primary). What is not defensible is that the arm then reports as an independent
+result that "clears". **The honest count is 2 of 4**, not 3 of 5. The instrument
+should have detected `ratio <= 1` and recorded the arm as inapplicable, with the
+reason — that at this budget the network is not the expensive agent — which is
+itself the finding.
+
+This is the second consequence of the same mistaken forecast the 2026-09-10
+amendment corrects. The entry predicted UCT would get "several times" the
+simulations at equal time; measured across five seeds it got **0.98× to 1.17×**,
+and on one seed it got nothing at all. The secondary was registered as the harder
+bar and it is barely a different bar.
+
+#### The reference: generation 0
+
+| seed | 1 | 2 | 3 | 4 | 5 |
+|---|--:|--:|--:|--:|--:|
+| rate | 12.5% | 13.5% | 6.0% | 11.0% | **3.0%** |
+
+All five fail, none close. **The untrained prior is much worse than no prior** —
+a randomly initialised network does not merely fail to help, it lands **36.5 to
+47 points below the 50% an even match would give**. The obvious mechanism is
+that an unformed prior steers PUCT away from what plain UCT would have explored,
+but that is an inference from one number and is **not measured here**.
+
+Two things this is good for and one it is not: it shows the floor is not
+trivially passable, and it bounds what training moved — **45 to 62.5 points** per
+seed, from the generation-0 rate to the trained one. It says nothing about how
+good the trained agent is, since a terrible starting point is not evidence about
+the destination.
+
+#### Training, and what it does not explain
+
+| seed | policy loss | best | value loss | promotions | champion |
+|--:|:--|:--|:--|--:|:--|
+| 1 | 5.204 → 3.879 | 3.734 @ 24 | 0.485 → 0.444 | 5/6 | gen 24 |
+| 2 | 5.128 → 3.777 | 3.768 @ 27 | 0.613 → 0.440 | 5/6 | gen 29 |
+| 3 | 5.162 → 3.735 | 3.719 @ 28 | 0.547 → 0.435 | 5/6 | gen 24 |
+| 4 | 5.052 → 3.868 | 3.751 @ 24 | 0.585 → 0.420 | **4/6** | gen 24 |
+| 5 | 5.148 → 3.838 | 3.823 @ 28 | 0.495 → 0.427 | 5/6 | gen 29 |
+
+Gate trajectories, `+` promoted:
+
+```
+seed 1  g4:87.8%+  g9:59.8%+  g14:61.5%+  g19:60.2%+  g24:55.8%+  g29:54.8%-
+seed 2  g4:91.8%+  g9:70.2%+  g14:61.3%+  g19:57.0%+  g24:53.8%-  g29:63.2%+
+seed 3  g4:91.8%+  g9:84.5%+  g14:61.8%+  g19:60.5%+  g24:58.0%+  g29:49.8%-
+seed 4  g4:90.0%+  g9:72.8%+  g14:60.0%+  g19:48.5%-  g24:63.2%+  g29:49.5%-
+seed 5  g4:91.8%+  g9:74.0%+  g14:68.2%+  g19:57.2%+  g24:49.8%-  g29:64.2%+
+```
+
+**Improvement decays into the threshold.** The three early gates average **75.1%**
+and the three late ones **56.4%**, with 6 of 15 late gates below the 55% line
+against 0 of 15 early. By generation 19 the challenger is winning close matches,
+which is what a run approaching the capacity of its budget looks like — and it is
+also what a run whose gate has stopped discriminating looks like. This entry
+cannot tell those apart.
+
+**A correlation that is reported and not explained.** Seed 4 has the fewest
+promotions (4 of 6) and the lowest floor rate, which is the story one wants. It
+does not survive the other rows: seeds 1 and 3 also froze their champion at
+generation 24 and landed at 64.0% and 63.0%, while seeds 2 and 5 both carried
+generation 29 champions and landed 14 points apart. At five seeds, with one
+failure, no such relationship is identifiable, and fitting one to this table
+would be reading the outcome backwards.
+
+**The gate's own discipline, as registered.** 30 gates at 400 games promoting on
+a 55% point estimate promote an exactly-equal challenger 2.55% of the time, so
+there is a **54.0% chance of at least one false promotion across the run**. That
+is a coin flip on whether some champion in this table was promoted on noise. It
+never touches the floor, which is read on an interval and against an opponent the
+gate never sees — but it does mean "champion" in the table above is a weaker label
+than it looks.
+
+#### Cost
+
+**135.0 h of machine time, 27.0 h per seed** (124.5 h training, 10.5 h floor
+matches), against the **≈146 h** this entry projected from EXP-014. The
+projection was 8% high — the first cost estimate in this project to land, and it
+landed because it was built from a measured decomposition rather than from a
+composed rate. Eleven calendar days, with the machine hibernating overnight; no
+resume cost a generation.
+
+#### Predictions, scored
+
+1. **"All five seeds clear the equal-simulations floor" — FAILED.** Four did.
+   The registration added "if the prior is worth nothing after 30 generations,
+   something upstream is wrong", which is *not* what happened: seed 4's prior is
+   worth something, just not reliably enough to clear a 57% bar.
+2. **"The equal-time floor is closer, and may not clear" — held, for the wrong
+   reason.** It did fail twice. But the prediction's mechanism — UCT getting
+   several times the simulations — is wrong: measured, UCT got **0.98× to
+   1.17×**. The arm is close to the primary because the two agents cost nearly
+   the same per move, not because the network is being charged heavily for its
+   compute.
+3. **"Between-seed spread is the number to watch, not the mean" — held, and it
+   is the entry's most useful line.** The spread is what carries the verdict.
+
+#### What this establishes
+
+**That the learner learned something on four of five seeds, and that it does not
+do so reliably.** Nothing more. Three boundaries, stated here because they are
+what a reader will be tempted to cross:
+
+- **Not "the learner is good".** Prior-free UCT with random playouts is a low
+  bar by construction. How good the learner is comes from H3's clause 2.
+- **H3 cannot be closed.** Clause 2 — agreement with the solver's exact verdict
+  on the pre-declared comparison set — needs EXP-006's shipped-5×5 endgame sample
+  at `k ≤ 8`, which has not been run. This entry produces the trained agents that
+  read will consume; it computes no agreement rate and consults no solver output,
+  which is what keeps adr-004 R1 intact.
+- **One machine, one run.** Nothing separates a property of the learner from a
+  property of this laptop's numerics.
+
+And one boundary in the other direction: **the seat splits are not evidence for
+H1.** They are large and consistent (75–97 wins as first against 34–55 as second)
+and they are confounded, because the two seats are held by different agents. H1
+is measured in Phase 5 under a matched protocol.
+
+#### What follows
+
+- **R6 has materialised** — "AZ training unstable or non-convergent", scored 2×2
+  at registration. One seed in five failing a floor, with the between-seed spread
+  rejecting homogeneity, is that risk biting. The row needs the measured numbers
+  and a revised likelihood.
+- **The instrument defect is recorded, not repaired.** Fixing
+  `equal_time_simulations` to record `ratio <= 1` as inapplicable is a change to a
+  finished instrument; it belongs to whatever entry next runs an equal-time arm,
+  and this entry's secondary must be quoted as 2 of 4 until then.
+- **No restart.** Retraining with different hyperparameters to convert seed 4
+  requires a new registered entry, as this one states. The instability is the
+  result.
+
 
 ## Planned
 
