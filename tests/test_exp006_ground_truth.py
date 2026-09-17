@@ -355,3 +355,24 @@ def test_the_registered_stratum_runs_first():
     """
     assert exp006.DEFAULT_ORDER[0] == "registered"
     assert set(exp006.DEFAULT_ORDER) == set(exp006.STRATA)
+
+
+def test_the_header_cannot_claim_exhausted_while_hiding_an_unproved_row(
+    tmp_path, monkeypatch
+):
+    """R3's filter is mechanical, so the header must be true of what it selects.
+
+    The real run excluded one position at the budget. An artefact that says
+    "exhausted" and says nothing else would pass a filter that then reads a row
+    with no value in it.
+    """
+    stratum = _toy(monkeypatch, {6: 2}, {})
+    monkeypatch.setattr(exp006, "MAX_NODES", 1)
+    board = exp006.VARIANT.board()
+    work = tmp_path / "work.jsonl"
+    exp006.generate(stratum, work, board, [])
+
+    artefact = exp006.assemble(exp006.read_work(work), tmp_path / "out.json")
+
+    assert artefact["excluded_at_budget"] == 2
+    assert "excluded_at_budget" in artefact["termination_scope"]

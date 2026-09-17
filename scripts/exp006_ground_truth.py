@@ -449,9 +449,21 @@ def assemble(rows: list[dict], out: Path) -> dict:
         "cells": VARIANT.n_cells,
         "hands": [bin(purple).count("1"), bin(green).count("1")],
         # adr-004 R3, required on every Axis-1 artefact. H3's comparison set is
-        # defined by filtering on these two fields.
+        # defined by *filtering* on these two fields, so they have to be true of
+        # what a filter would then use. Every position carrying a value was
+        # proved; a position that hit the budget carries no value, is excluded
+        # from every denominator, and is counted here rather than left for a
+        # reader to discover inside the summary. A whole artefact claiming
+        # "exhausted" while holding an unproved row is exactly the prose claim
+        # R3 exists to replace.
         "ordering": "internal",
         "termination": "exhausted",
+        "termination_scope": (
+            "Every position with a value was proved by an unbounded search. "
+            "Positions that reached the node budget carry no value and are "
+            "excluded from every denominator; see excluded_at_budget."
+        ),
+        "excluded_at_budget": sum(1 for r in rows if not r["proved"]),
         "max_nodes": MAX_NODES,
         "generated": date.today().isoformat(),
         "strata": {
