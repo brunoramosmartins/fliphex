@@ -1164,4 +1164,79 @@ reach for afterwards.
 
 ## Lessons Learned
 
+**Measure the composed system, not its components.** I initially treated the measured engine-only throughput as if it were the throughput of the training system. That turned 705 games/hour into a 59.6 h estimate for five seeds, even though the evaluator had a different workload and no equivalent parallelism. EXP-014 forced the decomposition back to the actual operations. The resulting estimate was ~146 h; the run took 135.0 h. The lesson is not simply to benchmark. It is to benchmark the thing that will actually run.
+
+**Pre-registration protects the boundary around a result, not the quality of the question.** Several entries were correctly registered and still turned out to contain questions that could not be answered by their instruments. EXP-012's equivalence gate had a forecast half-width of 2.43 against δ = 2.00, making the registered gate incapable of resolving the question. The 0.90 threshold used later was pre-declared but never derived. Pre-registration prevented the numbers from being moved after the result; it could not make an under-justified threshold or an unresolvable design scientifically stronger.
+
+**A falsifier should be designed to discriminate between mechanisms.** The factored-head experiment produced a clear operational difference: the flat head was 7.0 points ahead after 400 PUCT simulations, versus an 8.0-point supervised gap. But the experiment could not distinguish conditional-independence failure from output-capacity limitation. I had designed a test that could establish that the head was too weak without being able to establish why. The later frozen-tower experiment reinforced the distinction: the remedy could be evaluated, while the proposed mechanism remained unresolved. I would now treat "what competing explanations remain if this result appears?" as part of experiment design, not as post-hoc interpretation.
+
+**A falsification condition deserves its own risk, not only risks for its causes.** The risk register had thirteen entries, mostly naming possible causes of learner weakness: architecture, aliasing, augmentation, compute and instability. H3's actual failure condition had no row. That omission mattered because, once the result arrived, several causal stories were available to explain it. R14 was added only afterwards. The result itself was not harmed by the late risk entry; the loss was that the response to the result had not been pre-committed.
+
+**I learned to separate a safe invariant from a necessary invariant.** The checkpoint snapshot includes RNG state, and it is useful for reproducibility. But H3's seed-level result does not make restoring that state a load-bearing invariant of the loop. Removing `restore_rng` as a probe left the resume test green. The important discovery was therefore not "RNG state is load-bearing", but that the implementation was able to tell us whether it was. A checkpoint field should not become an invariant merely because it sounds important.
+
+**A test that cannot fail is not a regression test.** The first resume test could pass on broken code because it simulated interruption by calling the training loop twice rather than actually killing a process at a checkpoint boundary. The later `SIGKILL` shakedown exposed a real replay defect, but the stronger lesson came from testing the test itself: removing pieces of the implementation still left the test green. A regression test has to be sensitive to the failure mode it claims to protect against.
+
+**Statistical validity and experimental validity are different properties.** The deterministic evaluator could report 400 games and calculate a binomial interval while effectively replaying one game. The original move-preservation metric could also produce valid arithmetic while granting every legal move a free hit on losing positions. In both cases, the statistics were computed correctly over a quantity that did not represent the intended evidence. The experiment therefore has to validate its unit of observation before validating its estimator.
+
+**A reduced-board result can constrain a design without validating the full-board claim.** The head ladder was selected using 5×3 solver ground truth, while the shipped learner operates on 5×5. The 5×3 experiments were therefore legitimate inputs to the architecture decision, but their numerical differences cannot be presented as 5×5 evidence. The 3.3-point deficit against the flat head remains a 5×3 result.
+
+**Engineering optimisations need a reference implementation.** The move-alias partition and the closed-form policy normaliser both replace expensive general procedures with mathematical shortcuts. In both cases, the shortcut was tested against the original implementation across variants and depths. This is the pattern I want to retain: optimise only after identifying the invariant, and keep the expensive path as a reference for tests.
+
+**Parallelism is a workload property, not a hardware property.** Self-play peaked at six workers; the evaluator peaked at four because each gate worker holds two networks. Twelve logical CPUs did not translate into twelve times the throughput. The relevant quantity was the measured scaling of the operation, including its memory and model footprint, not the number printed by the operating system.
+
+**Process hygiene is part of experimental hygiene.** A monitoring loop based on `pgrep -f "measure_gate.py"` matched its own command line and waited for itself indefinitely. I caught it by stopping and asking whether the observed behaviour made sense. That incident is small compared with the training result, but it belongs here because the failure mode is broader: automation can execute a syntactically correct command indefinitely while doing exactly the wrong thing. Generated shell commands need the same sanity checks as generated Python.
+
+**Negative results become useful when the scope of the claim is kept narrow.** The factored head did not survive its registered comparison. The rotation-share claim did not survive its decomposition. The equal-time UCT arm did not provide the compute separation originally intended. H3 did not establish the causal reason for the learner's final weakness. None of those outcomes needs to be upgraded into a stronger story. The durable result is the part the experiment actually identified.
+
+**The phase changed how I think about an experiment.** I started by thinking mostly about whether the AlphaZero loop would work. By the end, the harder problem was deciding whether a result could be trusted, what exactly it established, and what it left unidentified. The most valuable artifacts of the phase are therefore not only the network and the training loop, but the tests, registered criteria, corrections and explicit boundaries around what the evidence does and does not say.
+
 ## Failed Attempts
+
+**The first compute model.** The initial estimate priced 42,000 games — 30,000 self-play plus 12,000 evaluation — at the parallel self-play rate of 705 games/hour. The evaluator had not been parallelised and ran at 89 games/hour. The resulting 59.6 h estimate for five seeds was therefore invalid. EXP-014 rebuilt the estimate from the measured workload decomposition.
+
+**The tenfold parallelism claim.** The first description of self-play parallelism treated six physical cores plus hyper-threading as roughly an order-of-magnitude free speedup. Twelve workers measured 4.31×. The original statement was withdrawn before being used as a result.
+
+**The 29-plane encoding.** The original 13-own / 12-opponent hand allocation could not represent the joker when the thirteen-tile player was the opponent. The encoding was changed to 13+13, and the missing-joker case was pinned by a test.
+
+**The apply-every-move alias check.** The straightforward implementation applied every legal move to identify resulting-state aliases. At the 5×5 root this meant 1,450 applications. A local bitwise partition replaced the expensive path after being checked against it in both directions across variants and depths.
+
+**The assumption that sibling merging creates a DAG.** The Phase 3 amendment treated position-based sibling merging as a transposition structure and left a backup rule unresolved. Inspection showed that merged siblings still have one parent. The resulting structure is a tree; a DAG would require cross-parent transpositions. The unnecessary backup issue was removed rather than implemented.
+
+**The worker rebuilt the wrong network.** The first spawned self-play worker reconstructed `FlipHexNet` instead of the adopted conditioned head. The bug was invisible with one worker. `net_spec()` and `build_net()` were introduced so the worker receives the architecture specification separately from the weights.
+
+**The compact replay-buffer estimate.** The initial estimate treated the policy target as approximately 44 values and the sample as roughly 200 bytes. The actual target is defined over legal moves, up to 1,450 of them, while the encoded position is 750 bytes. Object representation reached approximately 2.4 GB for 100,000 samples. The packed representation reduced the worst-case estimate to approximately 198 MB.
+
+**The deque replay buffer.** A deque was initially chosen for FIFO semantics. Random sampling from the middle is O(n), which is the dominant operation during training. It was replaced by a ring buffer with O(1) eviction and random access.
+
+**The first gate progress interface.** `on_progress` originally returned only games completed and wins. That was enough to recover the overall rate but not the first-seat split. A resumed gate could therefore report a correct aggregate with an invalid breakdown. The callback was expanded before the full run.
+
+**The deterministic evaluator.** The original temperature-zero evaluation could replay the same game between deterministic searchers while reporting 400 games. The gate now samples the opening for four plies before returning to greedy play, so repeated matches are genuinely distinct. The default search configuration remains deterministic outside evaluation.
+
+**The first resume test.** `tests/test_az_loop.py` simulated interruption by calling `run` twice. It passed even when the implementation could replay completed work. A real `SIGKILL` at a checkpoint boundary exposed the defect: the resumed process repeated self-play and training already represented in the checkpoint. The shakedown was changed to exercise an actual interrupted process.
+
+**The checkpoint cadence that never reached the checkpoint.** The mid-gate checkpoint interval was initially 25 games while the toy gate contained only 20. No mid-gate checkpoint could therefore exist, so the interruption test could have been exercising a path that was never reached. The cadence was corrected before the shakedown was accepted.
+
+**The spawned-process harness with module constants.** The debugging scale lived in module constants, but `spawn` starts a fresh interpreter and re-imports the module. A reduced parent configuration could therefore become the full child configuration. The scale was moved into explicit runtime configuration, and spawned execution was exercised through a real guarded file rather than a heredoc.
+
+**The assumption that RNG restoration was load-bearing.** RNG state was initially treated as essential to resume correctness because H3 is evaluated across seeds. A probe removed `restore_rng`; the resume test remained green. RNG state is retained in the checkpoint as a safe reproducibility measure, but the experiment does not claim it is a load-bearing invariant of this loop.
+
+**The equal-time UCT forecast.** The secondary comparison was designed on the assumption that UCT would receive several times more simulations because it performs no neural-network forward passes. Measurement gave UCT only 0.98×–1.17× the network agent's budget. On seed 5 the ratio was below one, so `max(SIMULATIONS, ...)` clamped UCT to 400 and the match duplicated the primary comparison. The artefact still records seed 5 as `CLEARS`; the instrument was not repaired. The correct reading of the secondary is therefore 2 of 4 applicable seeds, not a five-seed result. It is a recorded limitation, not a repaired experiment.
+
+**The first factored-head explanation.** EXP-011 established an 8.0-point supervised gap and a 7.0-point gap after 400 PUCT simulations. It did not establish that conditional independence was the mechanism because the flat head also had substantially greater output capacity. The mechanistic claim was withdrawn.
+
+**The rotation-share claim.** The amendment predicted that a sizeable part of the rotation factor represented no real choice. The measurement was 21.6% over all tiles but only 11.4% over multi-orbit tiles; the larger figure was inflated by the tile whose rotation orbit has size one. The stronger interpretation was withdrawn.
+
+**EXP-012's equivalence design.** The registered δ was 2.00 points while the forecast half-width was 2.43. The gate was therefore incapable of resolving the registered equivalence question. The result was treated as unresolved rather than converted into evidence for either mechanism. The subsequent rule requires δ to exceed the forecast half-width, with the available margin shown before execution.
+
+**EXP-013's broken secondary.** The registered secondary used solver labels where non-solver labels were required, and its direction rule contradicted the entry's own prediction 4. Both defects belonged to EXP-013 and were caught before execution. The secondary was replaced with head-to-head play by dated amendment.
+
+**The generation-over-generation floor.** Comparing a challenger only with the previous generation was considered as a possible minimum criterion. It was rejected because it is derivative of the training process and overlaps with the evaluator gate. Prior-free UCT was retained as the independent floor.
+
+**The underived 0.90 threshold.** The 0.90 solver-agreement threshold was pre-declared but never derived. It did not affect the current negative verdict because the observed gap was much larger than the threshold, but the threshold remains methodologically weak for future experiments near the boundary.
+
+**The risk register without a failure-outcome row.** The register contained risks for possible causes of weakness but no explicit risk for H3's falsification condition. R14 was added only after the result. This was not repaired retroactively; the lateness is part of the record.
+
+**The process-wait loop.** A monitoring loop using `pgrep -f "measure_gate.py"` matched its own command line and therefore waited indefinitely. The loop was stopped after inspecting the unexpected behaviour. The attempted automation was discarded rather than treated as evidence that the gate was still running.
+
+**The original submission-log schema.** The submission log inherited Axis 1 columns for random, heuristic and solver opponents, although Axis 2's registered evaluation used prior-free UCT and exact 5×5 positions. The columns were not filled with unrelated measurements. Empty cells were retained where the corresponding comparison had never been run.
+
