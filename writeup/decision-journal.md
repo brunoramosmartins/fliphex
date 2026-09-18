@@ -9,6 +9,56 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-09-18 — Phase 5 opened, with the gates in force and the notebooks dropped
+
+**Gate.** Phase 4's deliverables are present except the notebook, and the
+divergences are documented where they happened: `data/models/az-v*.pt` became
+five gitignored run directories reproduced from commit, config and seed
+(`docs/submission-log.md` says so), and `ex04` plus TILs #2, #3 and #5 are
+problem sets and skeletons held in standby by an explicit author decision —
+develop the project end to end first, study the material afterwards.
+
+**Scope call: the notebooks are dropped, all three.** Phases 3, 4 and 5 each
+planned one; one exists. That is a pattern, not a delay, and carrying the
+backlog forward a third time would be planning against two phases of evidence.
+Replaced by scripts in `figures/` producing one canonical plot per hypothesis
+from the tracked artefacts — which is how every other number in this project is
+already reproduced. Nothing is lost that was being used: the training curves the
+Phase 4 notebook would have carried are in `results/exp015-histories.json`,
+tracked precisely so they are not trapped in a gitignored run directory, and the
+design log quotes them.
+
+**Scope call: H3's training is not repeated.** The roadmap's Phase 5 task says
+"repeat AZ training with 5 seeds". EXP-015 did that, and EXP-006 read the
+shipped-5×5 member of the comparison set. What remains is the 3×3 and 5×3
+members, whose exact solutions already exist at `termination: exhausted`. Phase 5
+measures those and writes the verdict. **Re-running the training now would select
+on the outcome** — both of H3's clauses came back negative, and a retrain after
+seeing that is exactly what the pre-registration exists to prevent. A different
+configuration needs a new registered entry and a reason that is not the result.
+
+**The measurement gates are in force from today.** `docs/measurement-gates.md`,
+adopted at the Phase 4 close: no Phase 5 or 6 experiment is registered until its
+eight answers are written into its registry entry. Two planned comparisons
+already fail a gate as sketched, and both are re-scoped before they run rather
+than after — H1's twenty seeds cannot resolve a two-point effect at the measured
+between-seed variance, and H2's joker-less test is an equivalence claim with no
+margin declared.
+
+**Carried from the close, unrepaired by choice:** `v0.7` is double-booked between
+Phase 4's `v0.7-az-tuned` and Phase 5's `v0.7-hypotheses-verdicts`, and
+`v0.7-az-tuned` names a tuning cycle that never happened. Phase 4 shipped as
+`v0.6-az`. Both are `/project-roadmap revise` items and neither blocks this
+phase.
+
+**One gap in the roadmap itself, found at the open.** Phase 5's deliverables name
+`exercises/ex05_complexity_analysis.md`, and the phase has **no exercises block**
+— Phases 2, 3 and 4 each carry one with the actual mathematical prompts. So the
+deliverable exists without its content brief. Recorded rather than invented: the
+prompts are written when the phase's measurements are known, not now.
+
+---
+
 ## 2026-09-18 — Phase 4 closing: three exit criteria unmet, and nineteen days this journal did not record
 
 > **Retrospective entry.** Written at the phase close, not on the days the
