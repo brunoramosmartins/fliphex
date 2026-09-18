@@ -186,7 +186,13 @@ def test_wilson_agrees_with_the_gate_that_produced_the_stored_intervals():
     If this ever fails, one of the two is wrong and every stored interval in the
     artefact is suspect -- which is exactly what the analysis guard would report
     at runtime, one artefact at a time.
+
+    The analysis module itself imports nothing from ``az`` on purpose, so that a
+    verdict is reproducible from the artefact on a machine that never trained
+    anything. This *test* reaches across that line deliberately, and is the only
+    thing in this file that needs torch.
     """
+    pytest.importorskip("torch", reason="az.gate imports torch")
     from az.gate import wilson as gate_wilson
 
     for n in (200, 400):

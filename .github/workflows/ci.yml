@@ -6,7 +6,14 @@ on:
   pull_request:
 
 jobs:
+  # Axis 1's exact solver runs under an interpreter with no torch build, and
+  # agents/__init__.py is written so that importing a non-AZ agent never pulls
+  # torch in. That is a supported configuration, so it is a CI job: this one
+  # proves the engine, the solver and the non-AZ agents still stand up without
+  # the optional extra. The az test modules are skipped whole by conftest.py,
+  # which prints a header saying so.
   check:
+    name: engine + solver (no torch)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,12 +21,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
-      # The Phase 1 engine imports only the standard library, and conftest.py
-      # puts the repo root and scripts/ on sys.path, so ruff + pytest are all
-      # CI needs. Add project deps here as later phases require them.
-      - name: Install tools
-        run: python -m pip install --upgrade "ruff>=0.4" "pytest>=8.0"
+      - name: Install
+        run: python -m pip install --upgrade -e ".[dev]"
 
       - name: Lint
         run: ruff check .
@@ -35,3 +40,33 @@ jobs:
           python scripts/build_docs.py
           git diff --exit-code docs/ \
             || (echo "::error::docs/ is stale — rerun scripts/build_docs.py" && exit 1)
+
+  # Everything the first job skips. Torch is installed from the CPU-only index:
+  # the default wheel carries a CUDA runtime worth hundreds of megabytes, and no
+  # GPU is reachable here or on the author's machine (R8 — the 462-series
+  # Windows driver predates WSL2 CUDA), so the CPU build is what actually runs.
+  az:
+    name: az package (torch)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install, with CPU-only torch
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ".[dev,az]"
+
+      - name: Confirm this job is actually testing what the other one skipped
+        run: |
+          python -c "import torch; print('torch', torch.__version__)"
+          pytest --collect-only -q tests/test_az_network.py > /dev/null \
+            || (echo "::error::the az modules did not collect — this job proves nothing" && exit 1)
+
+      - name: Tests
+        run: pytest
