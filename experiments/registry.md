@@ -32,7 +32,8 @@ Freely editable (append-only in practice).
 | EXP-013 | 2026-09-03 | — | 2 | The efficient parameterisation of (b): does sharing rotation weights across cells cost anything? | 5×3-**h2**, 12 seeds × 2 arms; `L_linear` 43,290 rotation parameters against `V_conv` **198** (a 1×1 convolution) | 29 | **complete** | **Adopt the convolutional form.** `V_conv − L_linear = +0.95` pts, lower limit **−0.06%** against a registered margin of −1.70%: non-inferior at 218× fewer parameters in the component the decision is about. On the shipped 5×5 the head drops to **347,887** parameters — below the factored head's own 352,495. Its registered secondary was found broken in two independent ways *before the run* and replaced by a dated amendment. [`exp013-conv-rotation-5x3-h2.json`](../results/exp013-conv-rotation-5x3-h2.json) |
 | EXP-014 | 2026-09-04 | — | 2 | Pipeline shakedown before committing ~146 h: does the loop close, and does a `SIGKILL` mid-gate resume byte-equal? | Shipped 5×5, toy scale; four checks C1–C4 | — | **complete** | **All four pass, on the second attempt, and the measurement is the finding.** C4 failed first: a checkpoint written *inside* a gate replayed a finished generation, duplicating self-play and taking 400 more gradient steps, and **nothing raised**. Throughput is **145 games/h composed** against an engine-only 705 — R8's binding number was wrong by **4.9×**, and the gate, never parallelised, was **61%** of a projected 220.9 h. Worker optima differ by activity: self-play **6**, gate **4**. [`exp014-shakedown-5x5.json`](../results/exp014-shakedown-5x5.json) |
 | EXP-015 | 2026-09-04 | H3 | 2 | The H3 training run: five seeds against the prior-free UCT floor | Shipped 5×5-`h1`, `ConvRotationNet`, 5 seeds × 30 generations × 200 games, gate every 5 at 400 games | 1–5 | **complete** | **Instability recorded; H3's clause 1 is not satisfied.** Four seeds clear the floor and one does not — seed 4 at **56.0% [49.1%, 62.7%]**, two games short. The five rates are 64.0 / 76.0 / 63.0 / 56.0 / 62.0%, a between-seed `sd` of **7.3%** against the **3.4%** sampling alone predicts, and homogeneity `χ² = 18.52` on 4 df **rejects a common rate**. 135.0 h, against ≈146 h projected. [`exp015-h3-training-5x5.json`](../results/exp015-h3-training-5x5.json) |
-| EXP-016 | 2026-09-18 | H1 | 1 + 2 | H1's shipped-board arm: the first-player rate under named, imperfect play | Shipped 5×5-`h1`. Primary: prior-free UCT self-play, 400 simulations, **20 seeds × 250 = 5,000 games** (20.5 h at a measured 14.77 s/game). Secondary: the five EXP-015 champions, 250 games each | 1–20 | **registered** | — |
+| EXP-016 | 2026-09-18 | H1 | 1 + 2 | H1's shipped-board arm: the first-player rate under named, imperfect play | Shipped 5×5-`h1`. Primary: prior-free UCT self-play, 400 simulations, **20 seeds × 250 = 5,000 games** (20.5 h at a measured 14.77 s/game). Secondary: the five EXP-015 champions, 250 games each | 1–20 | **withdrawn before running** | **Withdrawn 2026-09-18, same day, by red-team.** Prior-free UCT at 400 simulations visits **10–18 of 325** root children (4%) and the coverage is seat-dependent, so the design measured cell-enumeration order. Six further blocking findings, including a seed schedule sharing **975 of 5,000** player seeds. No data collected. Superseded by **EXP-017**. |
+| EXP-017 | 2026-09-18 | H1 | 1 + 2 | H1's shipped-board arm: the first-player rate under exact endgame play | Shipped 5×5-`h1`. `SolverAgent` both seats (`max_nodes` 2M, `search_below_k` 8, heuristic fallback), **5,000 games, one match seed**, 11.0 h single-worker at a measured 7.95 s/game. Diversity from the heuristic's random tie-break; `proved_rate` ~31% | 1 | **registered** | — |
 
 **Registration basis.** EXP-001 through EXP-005 are registered against the H1/H2
 text at tag `v0.3-hypotheses`. Any post-lock amendment to that text is recorded
@@ -5034,6 +5035,272 @@ is there to say whether a stronger agent moves the number, and the two arms are
 `results/exp016-first-player-5x5.json`, written by
 `scripts/eval_first_player_advantage.py`. Verdict applied from the artefact by
 the same script, and the per-seed rates go in whatever the pooled interval says.
+
+#### Amendment (2026-09-18, same day) — **withdrawn before running**, and the gates are what withdrew it
+
+Red-teamed the day it was registered, before the instrument existed. **Seven
+blocking findings.** No data was ever collected; the total cost of the error is
+this section. Superseded by **EXP-017**, which takes a new ID rather than
+amending this one, because the *agent* changes and therefore the measured
+quantity does — the same reason EXP-007 was not folded into EXP-005.
+
+**The finding that withdrew it, and it was measured rather than argued.** The
+primary arm gave prior-free UCT **400 simulations** against a root that
+`ExpansionMode.POSITION` collapses to **325 distinct children** — 1.23
+simulations per child. Measured on the shipped 5×5, three seeds per ply:
+
+| ply | mover | distinct children | children visited at all | busiest child |
+|--:|---|--:|--:|--:|
+| 0 | P1 | 325 | **10–18 (4%)** | 288–373 of 400 |
+| 1 | P2 | 343 | 32–91 (20%) | 39–247 |
+| 2 | P1 | 346 | 9–56 (8%) | 231–366 |
+| 6 | P1 | 397 | **3–19 (3%)** | 268–376 |
+
+At that ratio PUCT is not searching, it is walking `board.cells` in order — an
+unvisited child scores `1.5·√N/325`, which is 0.005 at the first simulation, so
+one early rollout win holds the budget until its mean decays. `_select_child`
+breaks ties with a strict `>` on generation order, `legal_moves` is cell-major,
+and `group_by_position`'s own docstring warns that *"a fixed seed pins the child
+ordering, which PUCT's tie-breaking reads at low visit counts."*
+
+**The coverage is seat-dependent** — 20% at ply 1 against 3–8% at even plies —
+and the two seats never face the same move list: P1 opens into 25 empty cells
+and holds the joker throughout. So the registered design would have produced a
+**tight, perfectly reproducible ±1.39% interval around a property of the cell
+enumeration order**, and its second decision branch would have published that as
+*"a finding about the game's design"*.
+
+**Six further blocking findings, all sound, three verified here directly.**
+
+- **The seed schedule collides.** `game_players` derives seats from
+  `seed·2_000_003 + index` and `seed·3_000_017 + index`. Under the registered
+  20 seeds × 250 games those families share **975 of 5,000** values — the
+  challenger's RNG in match seed 3 game 25 is byte-identical to the champion's in
+  match seed 2 game 0. One match seed × 5,000 games collides **zero** times.
+- **No branch of the decision rule changed anything.** H1's verdict is fixed by
+  the exact solves, the secondary gates nothing, and branch 3 gates nothing — so
+  all three outcomes ship the same artefact. That is gate 1's own failure mode:
+  a threshold with no decision behind it.
+- **The entry violated its own boundary.** Section 2 forbade converting an
+  imperfect-play measurement into a claim about perfect play; branch 2 called
+  prior-free UCT "strong play" and promised "a finding about the game's design",
+  and expected result 1 predicted the imperfect-play quantity *because* the exact
+  solves agree.
+- **"Honours the roadmap's 20 seeds literally" was false.** Match seeds over an
+  agent with no training seed partition one i.i.d. stream and buy no
+  independence; 20 × 250 and 1 × 5,000 are the same experiment.
+- **`GateResult` mislabels its fields for this use** — `summary()` prints the
+  challenger's two seat totals as "P1" and "P2", and `win_rate`/`ci_*`/`promoted`
+  sit at ~50% by construction in a self-play match.
+- **The 2-point MDE confused half-width with power.** At a true 52% the interval
+  excludes 50% about **80%** of the time, not always. The registered `n` survives
+  by coincidence — 5,000 games gives 80.4% power against 52.0% — but the
+  justification was a narrative, which is EXP-006's underived-threshold defect in
+  better clothes.
+
+**What survived, recorded because a review that only reports failures is not a
+review.** The seat arithmetic `as_first + (games/2 − as_second)` is correct
+against `az/gate.py` line by line. The i.i.d. claim is correct. Gate 5
+(superiority declared, equivalence refused for want of a margin) and gate 8 (a
+real abort branch with the unaffordable arm priced at 540 h) both hold. Gate 6
+applied EXP-014's precedent properly.
+
+**What this cost, and what it bought.** One red-team pass and four short
+measurements, against a 20.5-hour run that would have produced a publishable-
+looking wrong number. This is the first entry written under
+`docs/measurement-gates.md`, and the gates found the defect the author did not.
+
+### EXP-017 — H1's shipped-board arm: the first-player rate under exact endgame play
+
+**Registered 2026-09-18, before the instrument exists.** Replaces EXP-016,
+withdrawn the same day. Everything EXP-016's red-team found is either fixed here
+or recorded as a threat; the findings are not restated, only their consequences.
+
+#### The subject, named honestly
+
+The agent is `agents/solver_agent.py` in **both seats**: `max_nodes = 2,000,000`,
+`search_below_k = 8`, falling back to `HeuristicAgent`. That is **not** a strong
+player and the entry does not call it one. It is:
+
+> **the heuristic for roughly seventeen plies, then perfect play for the last
+> eight.**
+
+Measured on this configuration, twelve self-play games: `proved_rate` **31%**,
+reproducing EXP-008's independently measured 32%. So about a third of the plies
+are proved and the rest are the fallback's, and **no rate below may be quoted
+without that number** — the agent's own module docstring makes this a standing
+requirement, and EXP-008 established the precedent.
+
+**Why this agent rather than the learner or prior-free UCT.** Three properties,
+and the third is the one EXP-016 lacked:
+
+1. **No training seed.** Its output is a function of the game and the tie-break
+   seed alone, so the learner's measured between-seed `sd` of 7.3% cannot leak
+   in. A learner-based arm needs 20 training seeds — **540 h** — to resolve
+   anything, which gate 8 already priced as unaffordable.
+2. **Defined strength, already characterised.** EXP-008 measured it at 98.0%
+   [96.4, 98.9] against random and 61.0% [56.7, 65.2] against the heuristic it
+   falls back on.
+3. **Its move choice is not an artefact of enumeration order.** `HeuristicAgent`
+   takes the maximum net flip and breaks ties with `rng.choice`, not with the
+   first element of a cell-major list. This is what EXP-016 failed, and it is why
+   the substitution is a repair rather than a second guess.
+
+**And it plays the last eight plies exactly** — which is where a first-player
+advantage on a filling board actually resolves, since the winner is a cell count.
+
+#### The gates
+
+**1 — the decision, and the consequence attached to it.** EXP-016 answered this
+in form and failed it in substance: all three branches shipped the same artefact.
+Here the branches differ.
+
+H1's verdict is **not** at stake — four exhaustive solves (3×3 and 5×3, both deck
+arms, all `termination: exhausted`) already return P1, and that is H1's evidence.
+What this entry decides is **whether Phase 5 must run a strength-dependence
+sweep**: if the shipped board's first-player rate under exact endgame play does
+*not* clear 50%, the direction is not robust to the level of play, and the
+registered consequence is that the planned sensitivity sweep over simulations and
+`c_puct` becomes **mandatory rather than optional**, with a risk-register row
+opened for it. That is a real consequence, declared before the run.
+
+**MDE: 2 points.** Derived as power, not as half-width: at `se = 0.5/√5000 =
+0.707 pp`, 80% power at two-sided α = 0.05 needs `δ = 2.80·se = 1.98 pp`. So
+**5,000 games gives 80.4% power against a true 52.0%, and 29% against 51.0%.**
+Below 52% this design is not expected to resolve direction, and that is the
+registered limit rather than a hope.
+
+**2 — endpoints and labelling cost.** One deterministic endpoint: who won, from
+the final cell count. No annotation. The cost is compute, priced next.
+
+**3 — sizing under the clustering unit actually in force.** There is no training
+seed, so the only unit is the game. Measured 2026-09-18, twelve games, CPython,
+one worker: **7.95 s/game**, and `pypy3` is available at `/usr/bin/pypy3` — the
+interpreter EXP-008 used, where the same work ran roughly 2.4× faster.
+
+| games | half-width | power at 52% | cost, 1 worker CPython |
+|--:|--:|--:|--:|
+| 1,250 | 2.77% | 29% | 2.8 h |
+| **5,000** | **1.39%** | **80%** | **11.0 h** |
+| 20,000 | 0.69% | >99% | 44.2 h |
+
+**Registered: 5,000 games, one match seed.** One seed and not twenty, because
+twenty buy no independence over a fixed agent and **do** collide: EXP-016's
+schedule shared 975 of 5,000 player seeds across match seeds, while `index <
+5000 < 1_000_014` cannot collide. The harness asserts all 10,000 derived player
+seeds are distinct at startup and aborts otherwise, rather than trusting the
+arithmetic.
+
+**4 — the grader's ceiling.** Not applicable: the outcome is the engine's own
+cell count. The endgame half of the agent is exact by construction under
+adr-004, and `proved_rate` says how much of the game that covers.
+
+**5 — superiority or equivalence.** Superiority, reported as a two-sided Wilson
+interval against 50%. An interval containing 50% is reported as **no detected
+direction at a 2-point MDE** and is explicitly **not** evidence that the seats
+are equivalent — that claim needs a margin declared in advance and this entry
+does not have one.
+
+**6 — the pilot estimates noise, never effect.** The twelve-game probe
+established **cost, game diversity and `proved_rate` only**. Its win count is not
+recorded anywhere in this entry and informs nothing: at twelve games the
+half-width is ±28 points.
+
+**7 — the instrument runs against a known answer first.** Two probes before any
+number is reported, and both check the **artefact fields**, not only a return
+value — EXP-016's registered probes would have passed through its labelling
+defect:
+
+- A **5×1 board**, where the game value is exactly solvable, so the harness's
+  notion of "the first player won" is checked against a proof.
+- A **rigged agent that always loses as first**, which must produce
+  `first_player_rate == 0.0` in the written artefact.
+
+`GateResult` is **not** persisted. Its `win_rate`, `ci_low`, `ci_high` and
+`promoted` are challenger quantities that sit near 50% by construction in
+self-play, and its `summary()` prints the challenger's seat totals labelled "P1"
+and "P2". The artefact's own fields are named in the Artefact section below.
+
+**8 — the abort criterion.** 11.0 h single-worker, less parallelised, against a
+phase with no deadline. It fits. Had it not, the registered response is the one
+EXP-016 wrote and kept: report that the comparison is not affordable rather than
+run a study that cannot see its own effect.
+
+#### Configuration
+
+| | |
+|---|---|
+| variant | shipped **5×5**, `h1` |
+| agent, both seats | `SolverAgent(max_nodes=2_000_000, search_below_k=8)`, fallback `HeuristicAgent` |
+| games | **5,000**, one match seed, per-seat tie-break seeds derived from the game index |
+| diversity | from the heuristic's random tie-break — **no artificial random opening** |
+| measure | fraction of games won by the player who moved first |
+| interval | Wilson 95%, quoted only beside `proved_rate` and the distinct-game count |
+
+**Diversity is measured, not assumed.** EXP-016's red-team raised the nominal-`n`
+trap: a deterministic agent replays one game while the artefact reports `n =
+5,000`. Measured here, twelve games produced **twelve distinct games**. The
+harness counts distinct complete games anyway and **the interval is quoted
+against the distinct count** if it falls below the nominal one.
+
+No random opening is imposed. EXP-016's replacement design considered forcing
+`R` random plies, which would have had to be even to stay seat-symmetric and
+would have changed the estimand to "from a random opening". The heuristic's
+tie-break supplies diversity without that cost.
+
+#### Decision rule, fixed before the run
+
+On the 5,000 games, pooled Wilson 95%:
+
+- **Entirely above 50%** → the first-player advantage survives this level of
+  play. Descriptive; changes nothing; H1's verdict still rests on the exact arms.
+- **Entirely below 50%** → the advantage does not survive play that is heuristic
+  for seventeen plies and exact for eight. **The sensitivity sweep becomes
+  mandatory** and a risk row is opened. Whether this is about the game or about
+  the level of play is *not answered here*.
+- **Containing 50%** → no detected direction at a 2-point MDE. Not equivalence.
+
+#### Threats to validity
+
+- **This says nothing about perfect play, and no artefact may claim it does.**
+  The agent proves 31% of its plies. H1 is a claim about perfect play, and its
+  evidence is the four exact solves.
+- **The rate is substantially a property of `HeuristicAgent`**, which chooses by
+  maximum net flip this ply — a one-ply greedy rule. EXP-008 recorded the same
+  caveat for the same reason.
+- **The 8-ply exact window is seat-neutral, but the heuristic phase is not.**
+  Branching differs by ply and P1 carries the joker throughout, so the two seats
+  face different move sets at every ply. Unmeasured, and plausibly of order the
+  MDE.
+- **`search_below_k = 8` is inherited from EXP-003's measurement, not tuned
+  here.** A larger exact window would be a different agent and a different entry.
+- **One machine, one engine, one interpreter.**
+
+#### Expected result, recorded before the run
+
+1. **The interval clears 50%.** Stated as a **prior, not as evidence**: the four
+   exact solves are about a different quantity on different boards, and using
+   them to predict this one is the inference this entry forbids in the other
+   direction.
+2. **The magnitude is small, 51–55%**, and may fall below the 2-point MDE, in
+   which case branch 3 fires and the honest report is that the design could not
+   resolve it.
+3. **`proved_rate` lands near 31%**, reproducing the probe and EXP-008.
+
+#### Artefact
+
+`results/exp017-first-player-5x5.json`, written by
+`scripts/eval_first_player_advantage.py`. Fields, named before the run:
+`games`, `first_player_wins`, `first_player_rate`, `wilson_low`, `wilson_high`,
+`distinct_games`, `proved_plies`, `unattempted_plies`, `proved_rate`,
+`match_seed`, `simulations_not_applicable`, `search_below_k`, `max_nodes`,
+`variant`, `deck_arm`, `workers`, `interpreter`, `seconds`.
+
+**The verdict is applied by a separate script**, `scripts/exp017_analysis.py`,
+reading only the artefact — the EXP-015 split, which is what let that entry's
+analysis refuse to combine seeds and cross-check its own recomputation. Per-seat
+and per-group rates are reported **unconditionally**, whatever the pooled
+interval says.
 
 
 ## Planned
