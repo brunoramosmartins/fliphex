@@ -70,8 +70,14 @@ class Arm(StrEnum):
     #: This arm **does not exist on the shipped 5×5**, where the capacity is the
     #: whole 12-archetype deck and there is no next archetype to promote. That
     #: is not a limitation of the code: on the full board the joker is the only
-    #: tile that can give Player 1 the extra ply, which is why H2 is answered
-    #: exactly on the reduced boards and statistically on the shipped one.
+    #: tile that can give Player 1 the extra ply.
+    #:
+    #: So H2 is answered **exactly on the reduced boards and not at all on the
+    #: shipped one** — there is no joker-less 5×5 to play, statistically or
+    #: otherwise. This sentence previously said "statistically on the shipped
+    #: one", which named an experiment that cannot exist; corrected 2026-09-18
+    #: at the Phase 5 open, with the reasoning in the EXP-002 amendment of the
+    #: same date.
     H2 = "h2"
 
 
@@ -141,7 +147,7 @@ class Variant:
                 f"only {len(DECK)}. On the shipped {self.n_cols}x{self.n_rows} "
                 f"the joker is not a design choice — it is the only tile that "
                 f"can give Player 1 the extra ply, so H2 is exact on the reduced "
-                f"boards and statistical on this one (docs/research.md H2)."
+                f"boards and out of reach on this one (docs/research.md H2)."
             )
 
     @property

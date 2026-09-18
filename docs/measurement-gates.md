@@ -1,8 +1,14 @@
 # Measurement Gates
 
-**Adopted 2026-09-18, at the close of Phase 4.** Eight questions that must be
+**Adopted 2026-09-18, at the close of Phase 4.** Nine questions that must be
 answered **in writing and dated** before any Phase 5 or Phase 6 experiment is
 registered in `experiments/registry.md`.
+
+**Gate 9 was added later the same day**, after the first eight let the same
+defect through three times: a quantity that was never free to vary. The gates are
+a living list, and the honest way to run one is to add to it when it misses
+something — recorded here rather than folded in silently, because a list that
+grows without saying why looks designed.
 
 The gates exist because a project that plans `n` from what is affordable, rather
 than from what must be detected, discovers its own resolution at the end. Phase 4
@@ -27,7 +33,7 @@ is still unrun.
 
 ## The rule
 
-> **No Phase 5 or Phase 6 experiment is registered until its eight gate answers
+> **No Phase 5 or Phase 6 experiment is registered until its nine gate answers
 > are written into its registry entry.** A gate answered "not applicable" says
 > why in one line. A gate that cannot be answered is itself the finding, and the
 > experiment is not run until it is.
@@ -37,7 +43,7 @@ the scope has to be readable by someone who was not in the conversation.
 
 ---
 
-## The eight gates
+## The nine gates
 
 ### 1. The decision before the architecture
 
@@ -155,6 +161,60 @@ floor-only go/no-go after seed 1, explicitly scoped so it could not become
 optional stopping: the run stops if seed 1 fails the floor, and stopping for any
 *other* unfavourable reason is not licensed. It also forbade restarting with
 different hyperparameters without a new registered entry.
+
+### 9. What is this quantity free to be?
+
+**Added 2026-09-18, after the first eight missed the same defect three times.**
+
+*Before registering a measure, compute what it equals when nothing you are
+studying varies — under the rules alone, and under the fixed configuration
+alone. State its floor, its ceiling, and how much of its nominal range is
+actually reachable. **Fails if the reachable range is a point, or if the floor
+already covers most of the distance to the threshold.***
+
+Gates 1 and 3 ask whether the *design* can resolve an effect. Gate 7 asks whether
+the *instrument* computes what it claims. **None of them asks whether the
+quantity was ever free to move**, and that is the gap this project fell into
+three times out of three.
+
+| where | what pinned the quantity | cost of finding out |
+|---|---|---|
+| **EXP-006** | Draws are impossible, so from a lost position *every* legal move preserves the value. The agreement rate was floored by the sample's loss fraction — measured at **39.2 / 3.6 / 46.1%** at `k = 6/7/8`, handing out **148 of 500** positions before the learner moved. | Caught by reasoning, two days before the run |
+| **EXP-016** | 400 simulations over a root that deduplicates to 325 children is **1.23 per child**, so PUCT walked the cell-major move list and visited **10–18** of them. The "measurement" was the enumeration order. | Caught by red-team, same day, before the run |
+| **H5** | 25 cells, no passing, hands exhausting exactly ⟹ every game places each archetype twice and the joker once. Placement frequency is a **constant**, checked at `[2]×12 + [1]` in all 500 games inspected. | Caught at the verdict, after the hypothesis had been locked for two phases |
+
+Three different mechanisms — a rule, a budget, a counting identity — and one
+shape: **a number that looked like evidence and could not have come out any
+other way.**
+
+#### How to answer it
+
+Compute the measure under two or three nulls in which the thing being studied is
+switched off, and put the values in the entry:
+
+1. **Under the rules alone.** What is it if the agent plays uniformly at random?
+   What if it plays perfectly? If those two agree, the rules fix it and the
+   measure is a restatement of the rulebook.
+2. **Under the configuration's own arithmetic.** Budget ÷ branching, `n` ÷
+   strata, samples ÷ capacity. EXP-016's `400 / 325` was available on paper
+   before a line of code ran.
+3. **Against the MDE.** If the spread between the nulls is smaller than the
+   effect gate 1 says must be detected, the measure cannot carry the claim
+   whatever `n` is.
+
+This is cheap — all three cases above are one paragraph of arithmetic or one
+500-game count — and it is the only gate here that a *locked* hypothesis can
+fail. H5's statement cannot be rewritten; what the verdict could do was say
+plainly that the named measure is forced, and that the balance conclusion does
+not follow from it.
+
+#### What it does not do
+
+**It does not licence redefining a measure to one that varies.** H5's frequency
+is withdrawn, not replaced with a quantity chosen after seeing that the first
+was vacuous. A substitute measure is a new registered entry with its own
+threshold declared in advance — the EXP-016 → EXP-017 route, which took a new ID
+precisely so the swap was visible.
 
 ---
 

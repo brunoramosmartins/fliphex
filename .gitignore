@@ -34,6 +34,15 @@ results/*.jsonl
 # embeds all 750 position records in its JSON artefact, so tracking the JSONL
 # would store the same rows twice.
 data/ground-truth/*.jsonl
+#
+# The rule the two EXP-006 decisions imply, written down so the next one is not
+# a coin flip: **track the per-item record when regenerating it needs something
+# the repository does not have.** EXP-006's agreement rows need the five
+# EXP-015 champions, which are gitignored run directories costing 27 h each, so
+# they are tracked. EXP-017's 5,000 game records are 5.1 MB of move strings that
+# a tracked, deterministic, single-process instrument regenerates from one seed
+# in three hours, and its JSON artefact already carries every aggregate the
+# analysis reads — so they are not. Reproducibility is the test, not size.
 figures/*.png
 !figures/.gitkeep
 notes/sources/
