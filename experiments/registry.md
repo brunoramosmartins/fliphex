@@ -1474,6 +1474,67 @@ boards where it is affordable rather than by a 5×3 run.
 - **Artefacts.** `results/exp007-5x3-h1.json`, `results/exp007-5x3-h2.json`,
   written per layer so an interrupted run still reports what it finished.
 
+#### Amendment (2026-09-18) — the nine gates, answered before the run and without touching the design
+
+This entry was registered on 2026-08-07, six weeks before the measurement gates
+existed. Phase 6's opening rule is that no experiment runs until its nine gate
+answers are written down. **Nothing in the design above changes**: not the
+configuration, not the 20% threshold, not the expected branch, not the
+falsifier. Changing any of them now, after the 3×3 pilot has been seen, would be
+selecting on the outcome. This amendment only answers the questions.
+
+**1 — the decision, and the consequence attached to it.** adr-012 decision 7:
+under 20% unreachable, don't-cares leave the design entirely; at or above,
+adr-012 keeps the don't-care path and EXP-004 measures what it is worth after
+compression. Registered 2026-08-07, implemented as `THRESHOLD = 0.20` in
+`scripts/exp007_closure.py`, applied mechanically by `verdict()` and refused on
+any configuration that is not the 5×3 or any run that is not complete.
+
+**2 — the endpoint is fixed, not a choice.** The transitive reachable closure
+over all 17,506,580,337 configurations of the 5×3. There is no sample size to
+pick: the measurement is exhaustive and deterministic, and there is no seed.
+
+**3 — the clustering unit does not apply.** One deterministic pass, no sampling,
+no interval. Answered "not applicable" for the reason gate 3 asks about: there
+is no random draw whose independence could be overstated.
+
+**4 — the estimator is the count itself.** No estimator, no interval. The only
+arithmetic is a sum over layers.
+
+**5 — power does not apply**, for the same reason as 3 and 4. What replaces it
+is verification: adr-010 V1 runs free on every layer, comparing each layer total
+against the closed form, and a mismatch fails the run.
+
+**6 — what a null result looks like.** A closure at or above 20% is not a
+failure; it is the branch the registry calls *"the informative outcome"* and
+says is reported rather than re-run. Both branches were written before the
+instrument existed and both are implemented.
+
+**7 — the instrument reproduces a known answer.** The 3×3 pilot returns
+**3.9131%** on `h1` against the figure recorded on 2026-08-07, and the two 3×3
+arms disagree (3.9131% against 3.8866%) where EXP-005's one-step quantity
+returned identical counts from different decks. Re-run today under PyPy 3.11.15:
+3.4 s, both checks clean.
+
+**8 — affordability, and it is the one number this amendment adds.** The 3×3
+processes 711,963 configurations in 3.4 s. The 5×3 holds 17,506,580,337, a
+factor of **24,589**, which extrapolates to **~23 h per arm and ~47 h for both**
+— and that is the optimistic reading, since the 3×3 fits in cache while the 5×3
+works two 1.08 GB bitsets. This is affordable and is recorded here so the actual
+cost can be read against it. The per-layer timings are printed and the artefact
+is rewritten after every layer, so the projection is replaced by a measurement
+within the first hour rather than at the end.
+
+**9 — what is this quantity free to be?** Answered before gate 9 existed, under
+the heading *"Predicted, so it can fail"*: the one-step quantity obeys
+`orphans(t) = layer(t) / 2^t` exactly, and **if the closure reproduces that
+identity the instrument is measuring one-step-back under a different name**.
+That is precisely gate 9's question — a measure that cannot come out any other
+way — and `check_falsifier()` fails the run when it happens. Recorded here
+because it is the earliest instance in the project of the question the gate was
+later written to ask, and it was asked six weeks before the three failures that
+prompted the gate.
+
 ### EXP-006 — exact ground truth on the shipped 5×5, for H3
 
 - **Objective.** Give H3 a comparison-set member on the **shipped game** rather
