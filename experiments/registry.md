@@ -4854,6 +4854,19 @@ is measured in Phase 5 under a matched protocol.
 Sketched in Phase 0 so the phases have targets. IDs are allocated on
 registration, not here.
 
+> **Gate before you register.** From 2026-09-18, no Phase 5 or Phase 6
+> experiment below is registered until its eight measurement-gate answers are
+> written into its entry — see [`docs/measurement-gates.md`](../docs/measurement-gates.md).
+> A gate answered "not applicable" says why in one line; a gate that cannot be
+> answered is itself the finding, and the experiment is not run until it is.
+>
+> Two of the planned rows already fail a gate as sketched, and the file says so
+> with the arithmetic: **H1's "20 seeds × 1000 games"** resolves ±3.42% at
+> EXP-015's measured between-seed `sd`, so it cannot see a 2-point first-player
+> advantage, and "20 seeds" is ambiguous between 540 h and 57 h of compute. **The
+> joker-less variant** is an equivalence claim and needs a margin declared in
+> advance, which a superiority test cannot supply afterwards.
+
 | Phase | Experiment | Hypothesis |
 |---|---|---|
 | 3 | Exhaustive solve of the 3×3 variant; record game value and a principal variation | H1, H2 |
