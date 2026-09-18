@@ -1598,6 +1598,191 @@ no threshold, and no part of the anti-circularity argument: ground truth is stil
 produced by `solver/minimax.py`, which proves or raises, and this measurement
 still gates nothing in Axis 2 — EXP-015 is finished and its champions are frozen.
 
+#### Result (2026-09-17) — H3 fails on the shipped game, by fourteen points
+
+Two runs. `scripts/exp006_ground_truth.py`, **4.39 h**, artefact
+[`5x5-endgame-seed2.json`](../data/ground-truth/5x5-endgame-seed2.json);
+`scripts/exp006_agreement.py`, ~40 min, artefact
+[`exp006-agreement-5x5.json`](../results/exp006-agreement-5x5.json) with the
+per-position rows beside it in `exp006-agreement-5x5.jsonl`.
+
+#### The ground truth
+
+**749 of 750 positions proved**, one excluded at the 20,000,000-node budget and
+recorded rather than replaced. The registered stratum is **complete: 500 of 500,
+zero exclusions**, so the decision rule's sample is entirely exhaustive under
+adr-004 R1.
+
+| stratum | drawn | excluded | won by the mover | denominator |
+|---|--:|--:|--:|--:|
+| registered | 500 | **0** | 352 | **70.4%** of drawn |
+| layer_uniform | 250 | 1 | 158 | 63.2% of drawn |
+
+**The 2026-09-16 amendment was necessary by a wider margin than it argued.** It
+was written from probes putting the lost fraction at 30–32.5% (`k = 6`) and 7.5%
+(`k = 7`); measured on the real sample it is **39.2%**, **3.6%** and **46.1%** at
+`k = 6/7/8`. Under the original rule, **148 of the registered stratum's 500
+positions** would have scored a hit before the learner moved.
+
+**The calibration sweep caught what the probe missed.** 100 positions, every
+distinct child solved. Its pre-registered check **holds**: on all 26 lost
+positions in the subsample, every child is a win for the opponent — the
+amendment's central claim is now verified rather than argued. But **3 of the 74
+won positions have no losing move at all**, and are vacuous for the same reason.
+The probe behind the amendment found zero in 30 and the amendment said so
+explicitly — "zero is a measurement on one `k` at one sample size and not a
+proof" — which is the only reason the sweep was registered at all.
+
+**The floor the rate sits on.** Median share of legal moves that throw the win
+away: **78.1%** (min 2.8%, max 98.8%). **A random mover agrees on 21.9% of won
+positions.** No rate below may be quoted without it.
+
+#### The rule: every seed fails
+
+Champion at 400 simulations, registered stratum, 352 positions, agreement scored
+by **value preservation** — the chosen move is applied and the child is solved
+exactly — never by identity with the solver's move.
+
+| seed | agrees | rate | Wilson 95% | verdict |
+|--:|--:|--:|:--|:--|
+| 1 | 266/352 | 75.6% | [70.8%, 79.8%] | **FAILS** |
+| 2 | 271/352 | 77.0% | [72.3%, 81.1%] | **FAILS** |
+| 3 | 267/352 | 75.9% | [71.1%, 80.0%] | **FAILS** |
+| 4 | 262/352 | 74.4% | [69.6%, 78.7%] | **FAILS** |
+| 5 | 266/352 | 75.6% | [70.8%, 79.8%] | **FAILS** |
+
+> **H3 fails on the shipped game.** All five, against a 0.90 bar. It is not
+> marginal: the **upper** limit of the best seed is 81.1%, nine points below the
+> threshold. Per the registration the reduced boards cannot rescue this —
+> carrying the shipped game is the entire reason this member exists.
+
+**The ladder, which is the useful way to read 75.7%:**
+
+| | rate |
+|---|--:|
+| random mover | 21.9% |
+| raw prior, no search | 53.5% |
+| **champion, 400 simulations** | **75.7%** |
+| required | 90.0% |
+
+Search is worth **+22 points** over the raw prior and the prior is worth +32 over
+random, so the learner is emphatically doing something. It is simply not doing
+enough, and the gap is 14 points rather than one or two.
+
+#### Why the measurement is believed
+
+Recorded because a unanimous failure is exactly the shape an instrument defect
+takes.
+
+**The depth gradient.** Across all five seeds and **both** arms the rate is
+monotone in difficulty:
+
+| arm | `k = 7` (mover has the extra tile) | `k = 6` | `k = 8` |
+|---|--:|--:|--:|
+| search | 85.7–89.4% | 69.3–78.2% | 51.1–62.2% |
+| prior | 68.3–77.0% | 32.7–47.5% | 27.8–44.4% |
+
+A broken scorer does not produce that ordering ten times out of ten.
+
+**Independent re-derivation.** Ten rows drawn at random from seed 1's search arm,
+each recomputed with a fresh solver and a fresh transposition table: **10/10**
+roots re-solve to WIN, **10/10** moves reproduce from the recorded search seed,
+**10/10** verdicts confirm. **Zero** child solves hit the node budget, so no
+position went unscored.
+
+**A re-run changed nothing.** The whole measurement was launched a second time
+and produced a byte-identical artefact.
+
+#### The two strata: the Takizawa gap is real, and larger than it looks
+
+Gaps are `layer_uniform − registered`, in points; standardised re-weights
+`layer_uniform`'s per-`k` rates to the registered stratum's `k` mix.
+
+| seed | registered | layer_uniform | raw gap | standardised | std. gap |
+|--:|--:|--:|--:|--:|--:|
+| 1 | 75.6% | 69.0% | −6.6 | 66.5% | **−9.1** |
+| 2 | 77.0% | 70.9% | −6.1 | 69.6% | **−7.4** |
+| 3 | 75.9% | 69.6% | −6.2 | 67.6% | **−8.3** |
+| 4 | 74.4% | 70.9% | −3.5 | 69.0% | **−5.5** |
+| 5 | 75.6% | 77.2% | **+1.6** | 76.1% | **+0.6** |
+| **mean** | **75.7%** | **71.5%** | **−4.2** | **69.8%** | **−5.9** |
+
+Four of five seeds are worse off the play distribution. **And the raw comparison
+understates it**, because the two strata do not hold the same mix of `k`:
+`layer_uniform` is **easier** by composition — 51.3% of its denominator is
+`k = 7` against the registered stratum's 45.7%, and only 19.6% is `k = 8` against
+25.6%. Standardising `layer_uniform`'s per-`k` rates to the registered mix moves
+the gap from **−4.2 to −5.9 points**.
+
+This is the FLIPHEX measurement of Takizawa 2023 §5 — that an evaluator's
+systematic errors concentrate where play does not go — and it is what the
+2026-08-07 amendment registered the second stratum to find. **The strata are not
+pooled**, and seed 5 reversing the sign is reported, not smoothed.
+
+Two limits on it. `layer_uniform` is uniform over the *layer*, not over the
+reachable set, which is not implementable at 5.017e16 configurations; the orphan
+filter rejected **zero** positions across all 250 draws, which is what a `2**-17`
+rate predicts and confirms it is a correctness guard rather than a filter. And
+250 positions across five seeds is a small basis for a 5.9-point claim.
+
+#### The seed spread collapsed, and that is a finding
+
+The same five champions, two measurements:
+
+| | mean | sd | range |
+|---|--:|--:|--:|
+| solver agreement (here) | 75.7% | **0.9%** | 74.4–77.0% |
+| prior-free UCT floor (EXP-015) | 64.2% | **7.3%** | 56.0–76.0% |
+
+**The instability EXP-015 measured does not appear here.** Seed 4 — the one that
+failed EXP-015's floor and whose `χ² = 18.52` rejected a common rate — is
+ordinary in this table, 1.2 points below the best.
+
+**This does not resolve EXP-015's instability; it says the two measures are
+measuring different things.** A plausible mechanism is that the floor is a whole
+game, where a strength difference compounds over 24 plies, while this is a single
+decision in a deep endgame — but that is an inference from two numbers and is
+**not measured**. What is established is narrower and still useful: *endgame
+value agreement is far more stable across training seeds than head-to-head
+strength is*, so a run's seed variance is a property of the measurement as much
+as of the learner.
+
+#### A caveat on the threshold, stated rather than left implicit
+
+**The 0.90 was pre-declared on 2026-08-05 and never derived.** The entry fixes it
+without an argument from anything measurable, which for a negative verdict would
+normally be a serious weakness — a bar set by taste can fail a learner that a
+justified bar would pass.
+
+It does not matter here, and the reason is arithmetic rather than rhetorical: the
+observed rates are **75.7%**, their best upper limit is **81.1%**, and no
+plausible re-derivation moves a threshold far enough to reach that. The caveat is
+recorded because the *next* entry to use this bar may land near it, and then the
+missing derivation will decide the outcome.
+
+#### What this establishes, and what it does not
+
+**H3's clause 2 fails on the shipped-5×5 member.** The clause names three
+members — 3×3, 5×3, and this one. The other two are read separately and are not
+touched here; this member alone is decided, and it is decided against.
+
+**Together with EXP-015, both of H3's clauses now have negative verdicts.**
+Clause 1 (stability across seeds) was recorded as instability on 2026-09-16;
+clause 2 fails on the shipped game here. H3 is not closed by this entry — the
+3×3 and 5×3 members remain — but no combination of the remaining reads can
+convert either verdict.
+
+**Not established.** That the architecture is wrong, that the budget is wrong, or
+that more training would close a 14-point gap: nothing here varies any of those,
+and attributing the failure to one of them would be a story, not a measurement.
+That the learner is weak in general — it beats prior-free UCT on four seeds of
+five and beats a random mover by 54 points here. And nothing about play away from
+`k ≤ 8`: these are endgames, sampled at three depths, on one machine.
+
+**No re-run.** Retraining, re-tuning or re-sampling to move 75.7% toward 90%
+requires a new registered entry. Selecting on this outcome is precisely what the
+pre-registration exists to prevent.
+
 ### EXP-008 — how strong is an exact agent with no endgame database?
 
 - **Registered.** 2026-08-30, before the instrument existed, at the Phase 3

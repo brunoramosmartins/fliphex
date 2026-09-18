@@ -1,0 +1,172 @@
+nohup: ignoring input
+ground truth: 750 positions, 510 won by the mover and therefore scorable (68.0%)
+  layer_uniform  158
+  registered     352
+seed 1 / search: 510 of 510 positions left
+  50/510  0.8 min  (0.91 s/position)
+  100/510  2.4 min  (1.42 s/position)
+  150/510  7.6 min  (3.05 s/position)
+  200/510  9.1 min  (2.73 s/position)
+  250/510  9.7 min  (2.33 s/position)
+  300/510  10.7 min  (2.13 s/position)
+  350/510  11.7 min  (2.00 s/position)
+  400/510  12.6 min  (1.90 s/position)
+  450/510  15.5 min  (2.06 s/position)
+  500/510  19.1 min  (2.29 s/position)
+  510/510  19.6 min  (2.31 s/position)
+seed 1 / prior: 510 of 510 positions left
+  50/510  0.1 min  (0.13 s/position)
+  100/510  0.8 min  (0.50 s/position)
+  150/510  3.5 min  (1.42 s/position)
+  200/510  3.9 min  (1.16 s/position)
+  250/510  3.9 min  (0.94 s/position)
+  300/510  4.1 min  (0.81 s/position)
+  350/510  4.3 min  (0.74 s/position)
+  400/510  4.6 min  (0.68 s/position)
+  450/510  6.0 min  (0.80 s/position)
+  500/510  8.5 min  (1.02 s/position)
+  510/510  8.7 min  (1.03 s/position)
+seed 2 / search: 510 of 510 positions left
+  50/510  0.7 min  (0.84 s/position)
+  100/510  2.1 min  (1.25 s/position)
+  150/510  5.5 min  (2.21 s/position)
+  200/510  7.5 min  (2.25 s/position)
+  250/510  8.1 min  (1.94 s/position)
+  300/510  8.9 min  (1.79 s/position)
+  350/510  9.8 min  (1.69 s/position)
+  400/510  10.7 min  (1.61 s/position)
+  450/510  12.8 min  (1.71 s/position)
+  500/510  15.5 min  (1.86 s/position)
+  510/510  15.9 min  (1.87 s/position)
+seed 2 / prior: 510 of 510 positions left
+  50/510  0.1 min  (0.09 s/position)
+  100/510  0.7 min  (0.41 s/position)
+  150/510  2.3 min  (0.91 s/position)
+  200/510  2.8 min  (0.83 s/position)
+  250/510  2.8 min  (0.67 s/position)
+  300/510  3.0 min  (0.60 s/position)
+  350/510  3.3 min  (0.56 s/position)
+  400/510  3.5 min  (0.53 s/position)
+  450/510  5.0 min  (0.67 s/position)
+  500/510  7.2 min  (0.87 s/position)
+  510/510  7.7 min  (0.90 s/position)
+seed 3 / search: 510 of 510 positions left
+  50/510  0.7 min  (0.83 s/position)
+  100/510  2.1 min  (1.28 s/position)
+  150/510  5.4 min  (2.14 s/position)
+  200/510  7.6 min  (2.27 s/position)
+  250/510  8.3 min  (2.00 s/position)
+  300/510  9.3 min  (1.86 s/position)
+  350/510  10.2 min  (1.75 s/position)
+  400/510  11.0 min  (1.65 s/position)
+  450/510  13.0 min  (1.73 s/position)
+  500/510  15.2 min  (1.83 s/position)
+  510/510  15.6 min  (1.84 s/position)
+seed 3 / prior: 510 of 510 positions left
+  50/510  0.1 min  (0.11 s/position)
+  100/510  0.5 min  (0.31 s/position)
+  150/510  3.0 min  (1.21 s/position)
+  200/510  4.0 min  (1.19 s/position)
+  250/510  4.0 min  (0.96 s/position)
+  300/510  4.1 min  (0.81 s/position)
+  350/510  4.2 min  (0.72 s/position)
+  400/510  4.5 min  (0.67 s/position)
+  450/510  5.6 min  (0.74 s/position)
+  500/510  7.1 min  (0.85 s/position)
+  510/510  7.3 min  (0.86 s/position)
+seed 4 / search: 510 of 510 positions left
+  50/510  0.7 min  (0.82 s/position)
+  100/510  2.0 min  (1.19 s/position)
+  150/510  4.8 min  (1.92 s/position)
+  200/510  5.9 min  (1.78 s/position)
+  250/510  6.5 min  (1.56 s/position)
+  300/510  7.3 min  (1.46 s/position)
+  350/510  8.1 min  (1.39 s/position)
+  400/510  8.9 min  (1.33 s/position)
+  450/510  10.4 min  (1.39 s/position)
+  500/510  12.3 min  (1.48 s/position)
+  510/510  12.7 min  (1.49 s/position)
+seed 4 / prior: 510 of 510 positions left
+  50/510  0.1 min  (0.17 s/position)
+  100/510  0.7 min  (0.40 s/position)
+  150/510  1.9 min  (0.76 s/position)
+  200/510  2.3 min  (0.68 s/position)
+  250/510  2.3 min  (0.55 s/position)
+  300/510  2.4 min  (0.48 s/position)
+  350/510  2.5 min  (0.44 s/position)
+  400/510  2.7 min  (0.40 s/position)
+  450/510  4.0 min  (0.53 s/position)
+  500/510  5.0 min  (0.60 s/position)
+  510/510  5.2 min  (0.61 s/position)
+seed 5 / search: 510 of 510 positions left
+  50/510  0.7 min  (0.80 s/position)
+  100/510  1.6 min  (0.97 s/position)
+  150/510  4.0 min  (1.59 s/position)
+  200/510  5.4 min  (1.62 s/position)
+  250/510  5.9 min  (1.43 s/position)
+  300/510  6.7 min  (1.34 s/position)
+  350/510  7.6 min  (1.30 s/position)
+  400/510  8.3 min  (1.25 s/position)
+  450/510  9.5 min  (1.27 s/position)
+  500/510  11.4 min  (1.37 s/position)
+  510/510  11.9 min  (1.40 s/position)
+seed 5 / prior: 510 of 510 positions left
+  50/510  0.1 min  (0.06 s/position)
+  100/510  0.5 min  (0.30 s/position)
+  150/510  1.5 min  (0.61 s/position)
+  200/510  1.7 min  (0.52 s/position)
+  250/510  1.8 min  (0.42 s/position)
+  300/510  1.9 min  (0.37 s/position)
+  350/510  1.9 min  (0.33 s/position)
+  400/510  2.1 min  (0.31 s/position)
+  450/510  2.5 min  (0.34 s/position)
+  500/510  3.8 min  (0.46 s/position)
+  510/510  4.2 min  (0.49 s/position)
+
+random-move baseline on won positions: 21.9%. No rate below may be quoted without it.
+
+== arm: search (DECISION RULE) ==
+  seed  stratum             hits    rate        Wilson 95%  verdict
+  1     layer_uniform   109/158   69.0% [ 61.4%, 75.7%]  (not the rule)
+  1     registered      266/352   75.6% [ 70.8%, 79.8%]  FAILS
+
+  2     layer_uniform   112/158   70.9% [ 63.4%, 77.4%]  (not the rule)
+  2     registered      271/352   77.0% [ 72.3%, 81.1%]  FAILS
+
+  3     layer_uniform   110/158   69.6% [ 62.1%, 76.3%]  (not the rule)
+  3     registered      267/352   75.9% [ 71.1%, 80.0%]  FAILS
+
+  4     layer_uniform   112/158   70.9% [ 63.4%, 77.4%]  (not the rule)
+  4     registered      262/352   74.4% [ 69.6%, 78.7%]  FAILS
+
+  5     layer_uniform   122/158   77.2% [ 70.1%, 83.1%]  (not the rule)
+  5     registered      266/352   75.6% [ 70.8%, 79.8%]  FAILS
+
+
+== arm: prior (descriptive, gates nothing) ==
+  seed  stratum             hits    rate        Wilson 95%  verdict
+  1     layer_uniform    75/158   47.5% [ 39.8%, 55.2%]  (not the rule)
+  1     registered      188/352   53.4% [ 48.2%, 58.6%]  (not the rule)
+
+  2     layer_uniform    81/158   51.3% [ 43.5%, 58.9%]  (not the rule)
+  2     registered      179/352   50.9% [ 45.6%, 56.0%]  (not the rule)
+
+  3     layer_uniform    73/158   46.2% [ 38.6%, 54.0%]  (not the rule)
+  3     registered      182/352   51.7% [ 46.5%, 56.9%]  (not the rule)
+
+  4     layer_uniform    75/158   47.5% [ 39.8%, 55.2%]  (not the rule)
+  4     registered      196/352   55.7% [ 50.5%, 60.8%]  (not the rule)
+
+  5     layer_uniform    77/158   48.7% [ 41.1%, 56.5%]  (not the rule)
+  5     registered      197/352   56.0% [ 50.7%, 61.1%]  (not the rule)
+
+== the rule ==
+  rates    75.6%  77.0%  75.9%  74.4%  75.6%
+  mean 75.7%   sd 0.9%   range 74.4%-77.0%
+
+  H3 FAILS ON THE SHIPPED GAME: seeds [1, 2, 3, 4, 5] do not clear 90%.
+  Per the registration the reduced boards cannot rescue this — carrying the
+  shipped game is the entire reason this member exists — and a failing seed
+  is recorded, not averaged away.
+
+written  results/exp006-agreement-5x5.json
