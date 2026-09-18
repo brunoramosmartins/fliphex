@@ -271,7 +271,7 @@ enumerated fact and a 20-seed win rate:
 | ID | Verdict | Evidence class | Evidence | Experiment | Phase |
 |---|---|---|---|---|---|
 | H1 | — | | | | |
-| H2 | — | | | | |
+| H2 | **supported** on the boards where it is computable; **out of reach by construction** on the shipped 5×5 | `exact` — four exhaustive solves, single implementation, V0–V6 passed per [adr-010](adr/adr-010-solver-correctness.md), `termination: exhausted` on all four | Both arms return **P1** on both boards: 3×3-`h1`/`h2` and 5×3-`h1`/`h2`. Swapping P1's extra tile from the joker to `P3-tri` does not change which player holds the advantage. The arms are **verified distinct** rather than assumed so — extra-tile criticality **17.07%** (1,237,229,498 of 7,248,350,863 positions with the tile still in hand), and 10,258,229,474 cross-arm positions compared with **0 mismatches** where it is already spent. **The 17.07% is a magnitude, not a verdict**: it measures positional sensitivity, H2 asserts a root property, and no threshold for it was ever registered — see the EXP-002 amendment of 2026-09-18. Its interpretation waits on Phase 6's per-archetype tile criticality, which supplies the reference distribution. **No shipped-5×5 arm exists**: at capacity 12 there is no next archetype to promote, so the joker is the only tile that can give P1 the extra ply and `Variant(5, 5, Arm.H2)` raises. | [EXP-001](../experiments/registry.md), [EXP-002](../experiments/registry.md) + its 2026-09-18 amendment | 3 (evidence), 5 (verdict) |
 | H3 | — | | | | |
 | H4 | — | | | | |
 | H5 | — | | | | |

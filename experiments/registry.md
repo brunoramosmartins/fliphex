@@ -1025,6 +1025,85 @@ run 3.22 / 22.86 / 35.37 / 28.55 / 23.94; even layers 6, 8, 10, 12 run
 mechanism is not claimed: this is the third instrument to show the parity split,
 and it is worth one experiment of its own rather than a paragraph of speculation.
 
+#### Amendment (2026-09-18) — H2's registered measure has no decision rule, and measures something adjacent to H2
+
+Written at the Phase 5 open, while reading H2 for its verdict. **No new
+computation.** Three corrections to this entry's own H2 apparatus, two of them to
+sentences written here.
+
+**1. The registered measure was never given a threshold, and the number is
+already known.**
+
+This entry is emphatic that H2 must not be read from the roots:
+
+> *"H2 is NOT reported from this. Both arms agreeing on a root value is one bit.
+> The registered measure is the **criticality**."*
+
+The reasoning is right — the power caveat about one bit against a 50% prior
+stands. But the entry names the measure and **never says what value of it
+supports or rejects H2**. The number has been on disk since Phase 3:
+**17.069%**, from 1,237,229,498 of 7,248,350,863 positions where P1's extra tile
+is still in hand.
+
+So a threshold declared now would be chosen knowing the answer. **It is not
+being declared.** This is the same defect EXP-006 recorded for its underived
+`0.90`, and unlike that one it cannot be waved past with "the gap was large
+anyway", because there is no gap without a bar.
+
+**2. Criticality does not measure what H2 asserts, and the re-scope is a
+reduction.**
+
+H2 is *"removing the joker does not change **which player holds the theoretical
+advantage**"* — a claim about the root. Criticality measures **positional
+sensitivity**: how many individual positions change value when P1's extra tile
+is swapped. No threshold on the second decides the first, at any value.
+
+**What criticality actually does is better, and needs no threshold.** It is a
+**validity check on the root comparison**. Had it come out near zero, the two
+arms would be effectively the same game and their agreeing roots would carry
+nothing. At **17.07%** over 7.2 × 10⁹ positions the arms are demonstrably
+different games, so the agreement is one bit *about two genuinely distinct
+objects* — which is what makes one bit worth having. The cross-arm verification
+supports the same reading from the other side: **10,258,229,474 positions
+compared, 0 mismatches**, so where the extra tile is already spent the two arms
+are identical, exactly as they should be.
+
+The question this re-scope has to answer is only *"is criticality bounded away
+from zero?"*, and 17.07% answers it without a bar.
+
+**3. What 17.07% means is deferred to Phase 6, which already plans the
+comparison that would settle it.**
+
+The interpretable question is not "is 17% big" but "is the joker more critical
+than an ordinary archetype". Phase 6's planned **tile criticality** — the
+fraction of solved 5×3 positions whose value changes when *each* archetype is
+removed — supplies the reference distribution, and a rank within a measured
+distribution needs no post-hoc threshold. Until then **17.07% is reported as a
+magnitude and not interpreted**, and no artefact may call the joker "critical"
+or "not critical" on the strength of it.
+
+**What H2 can be concluded from, and it is enough for its own statement.**
+
+| board | arm `h1` (extra tile = joker) | arm `h2` (extra tile = `P3-tri`) |
+|---|---|---|
+| 3×3 | **P1**, `termination: exhausted` | **P1**, `termination: exhausted` |
+| 5×3 | **P1**, `termination: exhausted` | **P1**, `termination: exhausted` |
+
+Four exhaustive solves, two boards, both arms, one answer. **Which player holds
+the advantage does not change when P1's extra tile stops being the joker** — and
+the criticality says the two arms are different enough for that to mean
+something.
+
+**4. The shipped 5×5 has no H2 arm, and two places in the code say otherwise.**
+
+`Variant(5, 5, Arm.H2)` raises, correctly: at capacity 12 there is no next
+archetype to promote, so on the shipped board the joker is the only tile that can
+give P1 the extra ply. But the `ValueError`'s own message, and `Arm.H2`'s
+docstring, both end by saying H2 is *"statistical on this one"*. **There is no
+joker-less 5×5 to play, so that names no experiment**, and the locked H2 text
+does not ask for one — it reads *"exact on 3×3/5×3"*. Both sentences are
+corrected to say the shipped board is out of reach by construction.
+
 ### EXP-003 — endgame subtree cost: does searching beat storing?
 
 - **Objective.** Find the crossover `k*` at which materialising an endgame
