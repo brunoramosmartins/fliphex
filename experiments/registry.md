@@ -26,6 +26,9 @@ Freely editable (append-only in practice).
 | EXP-008 | 2026-08-30 | — | 1 | Exact agent strength on the shipped 5×5 with no endgame database | 25 cells, hands 13 + 12; 2M-node budget, `search_below_k = 8`; 250 games per opponent × seat | 5 | **complete** | **Exit criterion NOT met.** vs random **98.0%** [96.4, 98.9] ✅; vs heuristic **61.0%** [56.7, 65.2] ❌. `proved_rate` **32%** — no rate may be quoted without it. Post-hoc control: between two heuristics the **first** seat wins only 40.0%, a property of the greedy agent and **not** an H1 input; it does not baseline the P2 arm (seeds unmatched by seat). [`exp008-agent-strength.json`](../results/exp008-agent-strength.json) |
 | EXP-009 | 2026-08-30 | — | 1 | WIN/LOSS mix per layer: the parity split, measured instead of inferred | 5×3-h1, all 16 layers, exhaustive | — | **complete** | **Uniformity breaks at `t = 5`.** Layers 0–4 are uniform — every one of the 12,841,920 configurations at `t = 4` is a P1 win, every one of the 713,440 at `t = 3` a P2 loss — then the parities converge monotonically to 50/50. Confirms EXP-002's criticality boundary and EXP-004's compression ratios from a third direction, and retires the parity question. 70.8 s. [`exp009-parity-5x3-h1.json`](../results/exp009-parity-5x3-h1.json) |
 | EXP-007 | 2026-08-07 | — | 1 | True reachable closure per layer, and what one-step-back predecessor counting misses | 5×3, 15 cells, hands 8 + 7, both arms | — | registered; 3×3 pilot run | **The registered rule runs on the complete 5×3 only** and has not. The 3×3 pilot is instrument shakedown, not the result: [`exp007-3x3-h1.json`](../results/exp007-3x3-h1.json), [`exp007-3x3-h2.json`](../results/exp007-3x3-h2.json). Row added retrospectively on 2026-08-30 — the experiment was registered in full below but never listed here. |
+| EXP-010 | 2026-08-30 | — | 2 | Deduplicated (by-position) MCTS expansion against the naive by-action tree, with a multiplicity-corrected control | 5×3-**h2** (V5 `51192b4d…`), 3,000 WIN positions stratified over `t = 5..14`, uniform prior + rollout leaves, 3 arms, primary at budget 400 | 17 | **complete** | **`B − A = +4.77` pts** [+3.47, +6.06] at the primary budget; falsifier did not fire; every registered prediction held. **The benefit is prior mass, not visit-splitting** — arm C keeps all 540 children, corrects only the priors, and recovers the whole effect (`B − C = −0.77`, not distinguishable from zero). Concentrated where a decision exists: **+8.9** pts on odd layers (floor 16.2%) against **+0.6** on even (floor 66.8%), with layers 12–14 saturated. Aliased mass **27.5%**, tree overhead **+19.6%** (inference cost absent — no network). 22.7 min. [`exp010-mcts-dedup-5x3-h2.json`](../results/exp010-mcts-dedup-5x3-h2.json) |
+| EXP-011 | 2026-08-30 | — | 2 | Is the factored policy head too costly *in the pipeline*? (risk R5) | 5×3-**h2** (V5 `51192b4d…`), 2,500 WIN positions, 2,000 train / 500 held out, 5 seeds per arm, primary = top-1 optimality after 400 PUCT sims; arms **34** vs **1,170** logits (amended 2026-08-31) | 23 | **complete** | **The rule fires: fallback (b) is to be registered and run.** Flat beats factored **+7.0** pts on the primary metric (73.7% vs 66.8%, floor 39.6%), paired *t* **+6.96** [+4.81, +9.11], between-seed spread **1.5%** — the five seeds of each arm do not overlap. **Search did not close the gap**: the post-search deficit is +7.0 against a +8.0 supervised one, so mitigation (a) did not rescue the factored head (the 1-point ratio is a point estimate with no registered contrast behind it — see the correction). Factored is worse on *training* loss too (2.616 vs 2.375), so this is expressiveness, not generalisation. **Cannot separate independence from capacity** — 34 logits against 1,170, 0.33 M params against 0.88 M — and EXP-012 establishes that **no head-factorisation experiment can**, since relaxing the factorisation *is* adding output width; the claim that (b) would settle it is withdrawn (see the correction). Rotation is inert on only **11.4%** of multi-orbit (cell, tile) pairs, so the ADR's "sizeable share" claim is *not* the reason. Interval reaches +4.81, just under the 5-pt margin — recorded, not repaired. H3's 5×3 member now carries an architecture-selection caveat. [`exp011-factored-head-5x3-h2.json`](../results/exp011-factored-head-5x3-h2.json) |
+| EXP-012 | 2026-09-01 | — | 2 | Fallback (b) — rotation conditioned on cell — and whether the **cell** is what it depends on | 5×3-**h2** (V5 `51192b4d…`), 2,500 WIN positions, 2,000 train / 500 held out, 5 seeds × 5 arms. **B (rot given cell), C (pooled control) and E (rot given tile) are identical in parameters and shape — 373,369 — and differ only in the readout index.** | 29 | **registered; rewritten in full after red-team; not yet run** | |
 
 **Registration basis.** EXP-001 through EXP-005 are registered against the H1/H2
 text at tag `v0.3-hypotheses`. Any post-lock amendment to that text is recorded
@@ -1490,6 +1493,296 @@ direction.
 was not free to *decide*: the decision had to be made before the run, which is
 why it is here and dated.
 
+#### Amendment (2026-09-16) — the measure is vacuous on lost positions, and the agent was never named
+
+Amended **before the run**, which is the only time this is allowed. The sampling
+design is untouched: same seeds, same 500 + 250 positions, same stratification,
+same separation of the two strata, same `0.90` threshold. What changes is the
+denominator that threshold is applied to, and three things the 2026-08-05 entry
+could not fix because Axis 2 did not exist when it was written.
+
+**1. "Whether the chosen move preserves the value" is vacuous on half the sample.**
+
+Draws are impossible on 25 cells, so a position is a WIN or a LOSS for the side
+to move. From a **LOSS**, every legal move leads to a position the opponent wins:
+the value is preserved by *every* move, and the learner scores a hit whatever it
+plays. Those positions are not measuring the learner. They are measuring the
+fraction of the sample that happens to be lost.
+
+Measured on the shipped 5×5 with **seed 99** — deliberately not seed 2 or seed 4,
+so the registered samples stay unseen:
+
+| `k` | side to move | positions | mover LOSES |
+|--:|---|--:|--:|
+| 6 | second | 40 | **13 (32.5%)** |
+| 6 | second | 30 | **9 (30.0%)** |
+| 7 | first | 40 | **3 (7.5%)** |
+
+Median node counts came in at 6,626 and 16,019, against EXP-003's 6,660 and
+20,024 — the cost model this entry was built on reproduces.
+
+**What that does to the registered rule.** The reported rate decomposes as
+`loss_fraction + (1 − loss_fraction) × accuracy`. Demanding 0.90 of it therefore
+demands **85.2–85.7%** accuracy at `k = 6`'s two measured mixes and **89.2%** at
+`k = 7`'s: one
+threshold meaning two different things, with the pooled meaning fixed by a mix
+the entry never measured. And the measure's floor is not zero — a mover playing
+at random scores the whole loss fraction for free.
+
+**The mix is structural, not noise.** `t = 25 − k`, and the side to move
+alternates with `t`, so `k ∈ {6, 8}` puts the **second** player on move and
+`k = 7` the **first**. The second player is lost about four times as often. That
+is consistent with H1 and is **not evidence for it** — these are sampled
+positions under a random-playout bias, not game values — but it does mean the
+loss fraction swings with `k` parity by construction, which is the worst possible
+property for a rate pooled across `k`.
+
+**The fix: the denominator becomes positions the mover wins.** The decision rule
+runs on the subset where the root value is **WIN**, where a wrong move actually
+throws the game away. Lost positions are **counted and excluded**, never scored
+as hits. Per-`k` and pooled rates are reported on this denominator.
+
+**The threshold stays at 0.90** and is therefore *stricter* than registered, not
+looser. That direction is deliberate: discovering that a measure was inflated is
+not a licence to re-tune the bar to the inflation. The arithmetic above says what
+0.90 used to buy.
+
+**One residual, closed by measurement rather than assumption.** A WIN position
+where *every* move also wins would be non-discriminating in the same way. In the
+30-position probe at `k = 6` there were **zero** such positions, and among the 21
+discriminating ones the share of legal moves that throw the win away had a median
+of **89.7%** (min 2.8%, max 98.8%) — so a random mover would agree on roughly a
+tenth of them. Because zero is a measurement on one `k` at one sample size and
+not a proof, the instrument runs the full child sweep on a **pre-declared
+calibration subsample of 100 positions** drawn from the registered stratum, and
+reports the non-discriminating count and the random-move baseline beside the
+headline rate. The remaining positions need only their root value, which keeps
+the sweep's cost bounded.
+
+**2. The entry never says which agent "the learned policy" is.**
+
+It could not: it was registered on 2026-08-05, before Axis 2 existed, and that
+ordering is the entry's whole point. EXP-015 has since produced **five**
+champions and established that they are not interchangeable — one of the five
+fails the prior-free floor, and the between-seed spread rejects a single
+underlying strength (`χ² = 18.52`, 4 df).
+
+**All five champions are evaluated, and the rule is per seed.** Reporting one
+agreement rate would hide exactly the variance EXP-015 measured, and picking the
+best seed would select on the outcome. So:
+
+- Each of the five EXP-015 champions plays the whole sample.
+- **H3's clause on this member is satisfied only if every seed's Wilson lower
+  bound exceeds 0.90.** A seed that fails is recorded, not averaged away — the
+  same falsifiability structure EXP-015's clause 1 uses, for the same reason.
+- The five rates and their spread are reported whatever happens.
+
+**3. The evaluation budget is pinned at 400 simulations.**
+
+Also unspecified, and it is not a detail: agreement from the raw policy head and
+agreement after search are different claims. 400 is what EXP-015's floor matches
+and self-play both used, so this measures the agent **as deployed** rather than a
+configuration that exists only for this table. `dirichlet_weight = 0` and the
+position's ply (17 to 19) is far past `EVALUATION_TEMPERATURE_PLIES = 4`, so
+selection is deterministic `argmax` over visit counts; the search seed is
+recorded regardless.
+
+**The raw prior is reported beside it, descriptively.** One forward pass, no
+search, `argmax` over the masked policy — it costs almost nothing and it is the
+quantity EXP-011, EXP-012 and EXP-013 all measured on the 5×3, so it is the only
+figure in this entry that can be read against the architecture decisions. It
+**gates nothing**: the decision rule is the 400-simulation arm.
+
+**What this amendment does not change.** No sample, no seed, no stratification,
+no threshold, and no part of the anti-circularity argument: ground truth is still
+produced by `solver/minimax.py`, which proves or raises, and this measurement
+still gates nothing in Axis 2 — EXP-015 is finished and its champions are frozen.
+
+#### Result (2026-09-17) — H3 fails on the shipped game, by fourteen points
+
+Two runs. `scripts/exp006_ground_truth.py`, **4.39 h**, artefact
+[`5x5-endgame-seed2.json`](../data/ground-truth/5x5-endgame-seed2.json);
+`scripts/exp006_agreement.py`, ~40 min, artefact
+[`exp006-agreement-5x5.json`](../results/exp006-agreement-5x5.json) with the
+per-position rows beside it in `exp006-agreement-5x5.jsonl`.
+
+#### The ground truth
+
+**749 of 750 positions proved**, one excluded at the 20,000,000-node budget and
+recorded rather than replaced. The registered stratum is **complete: 500 of 500,
+zero exclusions**, so the decision rule's sample is entirely exhaustive under
+adr-004 R1.
+
+| stratum | drawn | excluded | won by the mover | denominator |
+|---|--:|--:|--:|--:|
+| registered | 500 | **0** | 352 | **70.4%** of drawn |
+| layer_uniform | 250 | 1 | 158 | 63.2% of drawn |
+
+**The 2026-09-16 amendment was necessary by a wider margin than it argued.** It
+was written from probes putting the lost fraction at 30–32.5% (`k = 6`) and 7.5%
+(`k = 7`); measured on the real sample it is **39.2%**, **3.6%** and **46.1%** at
+`k = 6/7/8`. Under the original rule, **148 of the registered stratum's 500
+positions** would have scored a hit before the learner moved.
+
+**The calibration sweep caught what the probe missed.** 100 positions, every
+distinct child solved. Its pre-registered check **holds**: on all 26 lost
+positions in the subsample, every child is a win for the opponent — the
+amendment's central claim is now verified rather than argued. But **3 of the 74
+won positions have no losing move at all**, and are vacuous for the same reason.
+The probe behind the amendment found zero in 30 and the amendment said so
+explicitly — "zero is a measurement on one `k` at one sample size and not a
+proof" — which is the only reason the sweep was registered at all.
+
+**The floor the rate sits on.** Median share of legal moves that throw the win
+away: **78.1%** (min 2.8%, max 98.8%). **A random mover agrees on 21.9% of won
+positions.** No rate below may be quoted without it.
+
+#### The rule: every seed fails
+
+Champion at 400 simulations, registered stratum, 352 positions, agreement scored
+by **value preservation** — the chosen move is applied and the child is solved
+exactly — never by identity with the solver's move.
+
+| seed | agrees | rate | Wilson 95% | verdict |
+|--:|--:|--:|:--|:--|
+| 1 | 266/352 | 75.6% | [70.8%, 79.8%] | **FAILS** |
+| 2 | 271/352 | 77.0% | [72.3%, 81.1%] | **FAILS** |
+| 3 | 267/352 | 75.9% | [71.1%, 80.0%] | **FAILS** |
+| 4 | 262/352 | 74.4% | [69.6%, 78.7%] | **FAILS** |
+| 5 | 266/352 | 75.6% | [70.8%, 79.8%] | **FAILS** |
+
+> **H3 fails on the shipped game.** All five, against a 0.90 bar. It is not
+> marginal: the **upper** limit of the best seed is 81.1%, nine points below the
+> threshold. Per the registration the reduced boards cannot rescue this —
+> carrying the shipped game is the entire reason this member exists.
+
+**The ladder, which is the useful way to read 75.7%:**
+
+| | rate |
+|---|--:|
+| random mover | 21.9% |
+| raw prior, no search | 53.5% |
+| **champion, 400 simulations** | **75.7%** |
+| required | 90.0% |
+
+Search is worth **+22 points** over the raw prior and the prior is worth +32 over
+random, so the learner is emphatically doing something. It is simply not doing
+enough, and the gap is 14 points rather than one or two.
+
+#### Why the measurement is believed
+
+Recorded because a unanimous failure is exactly the shape an instrument defect
+takes.
+
+**The depth gradient.** Across all five seeds and **both** arms the rate is
+monotone in difficulty:
+
+| arm | `k = 7` (mover has the extra tile) | `k = 6` | `k = 8` |
+|---|--:|--:|--:|
+| search | 85.7–89.4% | 69.3–78.2% | 51.1–62.2% |
+| prior | 68.3–77.0% | 32.7–47.5% | 27.8–44.4% |
+
+A broken scorer does not produce that ordering ten times out of ten.
+
+**Independent re-derivation.** Ten rows drawn at random from seed 1's search arm,
+each recomputed with a fresh solver and a fresh transposition table: **10/10**
+roots re-solve to WIN, **10/10** moves reproduce from the recorded search seed,
+**10/10** verdicts confirm. **Zero** child solves hit the node budget, so no
+position went unscored.
+
+**A re-run changed nothing.** The whole measurement was launched a second time
+and produced a byte-identical artefact.
+
+#### The two strata: the Takizawa gap is real, and larger than it looks
+
+Gaps are `layer_uniform − registered`, in points; standardised re-weights
+`layer_uniform`'s per-`k` rates to the registered stratum's `k` mix.
+
+| seed | registered | layer_uniform | raw gap | standardised | std. gap |
+|--:|--:|--:|--:|--:|--:|
+| 1 | 75.6% | 69.0% | −6.6 | 66.5% | **−9.1** |
+| 2 | 77.0% | 70.9% | −6.1 | 69.6% | **−7.4** |
+| 3 | 75.9% | 69.6% | −6.2 | 67.6% | **−8.3** |
+| 4 | 74.4% | 70.9% | −3.5 | 69.0% | **−5.5** |
+| 5 | 75.6% | 77.2% | **+1.6** | 76.1% | **+0.6** |
+| **mean** | **75.7%** | **71.5%** | **−4.2** | **69.8%** | **−5.9** |
+
+Four of five seeds are worse off the play distribution. **And the raw comparison
+understates it**, because the two strata do not hold the same mix of `k`:
+`layer_uniform` is **easier** by composition — 51.3% of its denominator is
+`k = 7` against the registered stratum's 45.7%, and only 19.6% is `k = 8` against
+25.6%. Standardising `layer_uniform`'s per-`k` rates to the registered mix moves
+the gap from **−4.2 to −5.9 points**.
+
+This is the FLIPHEX measurement of Takizawa 2023 §5 — that an evaluator's
+systematic errors concentrate where play does not go — and it is what the
+2026-08-07 amendment registered the second stratum to find. **The strata are not
+pooled**, and seed 5 reversing the sign is reported, not smoothed.
+
+Two limits on it. `layer_uniform` is uniform over the *layer*, not over the
+reachable set, which is not implementable at 5.017e16 configurations; the orphan
+filter rejected **zero** positions across all 250 draws, which is what a `2**-17`
+rate predicts and confirms it is a correctness guard rather than a filter. And
+250 positions across five seeds is a small basis for a 5.9-point claim.
+
+#### The seed spread collapsed, and that is a finding
+
+The same five champions, two measurements:
+
+| | mean | sd | range |
+|---|--:|--:|--:|
+| solver agreement (here) | 75.7% | **0.9%** | 74.4–77.0% |
+| prior-free UCT floor (EXP-015) | 64.2% | **7.3%** | 56.0–76.0% |
+
+**The instability EXP-015 measured does not appear here.** Seed 4 — the one that
+failed EXP-015's floor and whose `χ² = 18.52` rejected a common rate — is
+ordinary in this table, 1.2 points below the best.
+
+**This does not resolve EXP-015's instability; it says the two measures are
+measuring different things.** A plausible mechanism is that the floor is a whole
+game, where a strength difference compounds over 24 plies, while this is a single
+decision in a deep endgame — but that is an inference from two numbers and is
+**not measured**. What is established is narrower and still useful: *endgame
+value agreement is far more stable across training seeds than head-to-head
+strength is*, so a run's seed variance is a property of the measurement as much
+as of the learner.
+
+#### A caveat on the threshold, stated rather than left implicit
+
+**The 0.90 was pre-declared on 2026-08-05 and never derived.** The entry fixes it
+without an argument from anything measurable, which for a negative verdict would
+normally be a serious weakness — a bar set by taste can fail a learner that a
+justified bar would pass.
+
+It does not matter here, and the reason is arithmetic rather than rhetorical: the
+observed rates are **75.7%**, their best upper limit is **81.1%**, and no
+plausible re-derivation moves a threshold far enough to reach that. The caveat is
+recorded because the *next* entry to use this bar may land near it, and then the
+missing derivation will decide the outcome.
+
+#### What this establishes, and what it does not
+
+**H3's clause 2 fails on the shipped-5×5 member.** The clause names three
+members — 3×3, 5×3, and this one. The other two are read separately and are not
+touched here; this member alone is decided, and it is decided against.
+
+**Together with EXP-015, both of H3's clauses now have negative verdicts.**
+Clause 1 (stability across seeds) was recorded as instability on 2026-09-16;
+clause 2 fails on the shipped game here. H3 is not closed by this entry — the
+3×3 and 5×3 members remain — but no combination of the remaining reads can
+convert either verdict.
+
+**Not established.** That the architecture is wrong, that the budget is wrong, or
+that more training would close a 14-point gap: nothing here varies any of those,
+and attributing the failure to one of them would be a story, not a measurement.
+That the learner is weak in general — it beats prior-free UCT on four seeds of
+five and beats a random mover by 54 points here. And nothing about play away from
+`k ≤ 8`: these are endgames, sampled at three depths, on one machine.
+
+**No re-run.** Retraining, re-tuning or re-sampling to move 75.7% toward 90%
+requires a new registered entry. Selecting on this outcome is precisely what the
+pre-registration exists to prevent.
+
 ### EXP-008 — how strong is an exact agent with no endgame database?
 
 - **Registered.** 2026-08-30, before the instrument existed, at the Phase 3
@@ -1637,10 +1930,2942 @@ sweep enumerates, most of which is unreachable in play. What it licenses is a
 statement about the artefact's structure, not about FLIPHEX strategy, and it
 links to no hypothesis.
 
+### EXP-010 — deduplicated MCTS expansion against the naive tree
+
+- **Registered.** 2026-08-30 at the Phase 4 opening; **revised the same day**
+  after `experiment-redteam`, before any instrument existed. The first draft is
+  superseded in full — it is not preserved, because nothing was run from it. The
+  defects it carried are recorded in the 2026-08-30 journal entry, since three of
+  them are recurrences of failures this project has already had once.
+- **This is not an open decision.** The
+  [adr-005](../docs/adr/adr-005-alphazero-scope-and-network.md) Phase 3
+  amendment already *requires* children to be indexed by position rather than by
+  action. This entry registers a measurement, not a choice.
+- **Objective.** Measure what deduplicated expansion buys, and what it costs,
+  against an otherwise identical naive tree, on positions whose exact value is
+  known — and separate the benefit that comes from the ADR's stated mechanism
+  from the benefit that comes merely from having fewer children.
+- **The mechanism being measured.** 1,450 root actions reach **325** distinct
+  positions on the 5×5 (4.46×; 2.28× over a whole game),
+  `scripts/measure_move_collapse.py`. Expanding by action splits one position's
+  visit counts across up to six labels **(i)** *and* gives each label its own
+  prior **(ii)**. `π` is then read off the split counts. Risk **R13**, score 9.
+- **Hypothesis.** — none. This is an instrument-quality measurement about the
+  search. It is **not** evidence about H1, H2 or H3, and the anti-circularity
+  clause below explains why it may read Axis 1 anyway.
+
+#### Ground truth, pinned
+
+`data/subgame-solutions/5x3-**h2**.json`, V5 digest
+`51192b4d403ac1cb45c22d92ce58bab215843f457f245e7aca6d18744f8a3f43`. The run must
+verify the digest before drawing and abort on mismatch.
+
+**Why h2 and not h1**, recorded because the first draft chose h1 and the reason
+it changed is not obvious. h2 is the arm the principal-variation audit actually
+ran on — 15 of 15, `results/exp002-pv-audit-5x3-h2.json` — and the arm the
+layer-to-layer recurrence check covered. h1 has neither, and its V4 produced no
+search evidence at `t = 0..5`, which includes the shallowest layer sampled here.
+h2 is also **less contaminated for EXP-011's purposes**: its P1 deck holds one
+single-rotation-orbit tile (`P6`) against h1's two (`P6` and the joker).
+
+#### The sample
+
+- **3,000 positions**, drawn once, seed **17**, and used by **both** arms — the
+  comparison is paired. **Independent of EXP-011's draw**: different seed,
+  separate draw, so the two entries' results do not share sampling error and may
+  be read jointly.
+- **Stratified uniformly across layers `t = 5..14`**, 300 per layer. Uniform
+  sampling over the union would concentrate the draw near `t = 8–9` where the
+  layers are widest and would set the parity mix by accident.
+- **`t ≥ 5` because EXP-009 measured layers 0–4 as uniform** — every
+  configuration there shares one value, so every legal move is optimal and the
+  comparison would discriminate nothing. `t = 15` is terminal and has no moves.
+- **Restricted to positions that are a WIN for the side to move.** This is the
+  repair for the defect that killed the first draft: in a position that is a
+  *loss*, no optimal move exists, every arm scores zero deterministically, and
+  the pooled metric becomes a parity-weighted mixture of degenerate cases. The
+  restriction is a declared domain, not a filter applied after seeing results,
+  and it is the only domain on which the primary metric is defined.
+
+#### The searcher, specified
+
+The first draft said "uniform prior, no trained network", which names the prior
+and leaves the **leaf evaluator** unstated — three different experiments hide in
+that gap, and under one of them the headline number is decided by child
+insertion order, which differs between arms by construction.
+
+- **Prior: uniform** over the expanded children. No trained network anywhere.
+  With a network in the loop any difference is confounded with that network's
+  quality, and at generation 0 the network is noise.
+- **Leaf evaluator: random rollout to a terminal**, one playout per simulation,
+  returning the exact ±1 outcome. FLIPHEX playouts are ≤ 15 plies here, always
+  terminate and always yield a decided winner, so this is well defined and cheap.
+  It makes the searcher plain UCT with a uniform prior, which is
+  [adr-005](../docs/adr/adr-005-alphazero-scope-and-network.md)'s own designated
+  baseline — appropriate, because the question is about the *tree*, not about a
+  policy.
+- **`c_puct` fixed at its default, not tuned here.** Recorded as a stated
+  constant rather than a control: the same `c_puct` does **not** mean the same
+  exploration behaviour across arms with different child counts, because PUCT's
+  exploration term normalises the prior over the children. Arm C below exists
+  because of this.
+- **Deduplication is sibling-alias merging at a single parent**, not a full
+  cross-parent transposition DAG. On a placement game with inert tiles the latter
+  is a large separate benefit unrelated to R13, and folding the two together
+  would credit deduplication with someone else's win.
+- **There is no DAG, and therefore no backup rule to choose.** Corrected
+  2026-08-30 while implementing `az/mcts.py`, against an earlier revision of this
+  entry that fixed the rule as "the mean over parents". Sibling-alias merging
+  gives a child several *action labels* and still exactly **one parent**, so the
+  structure stays a tree. adr-005's Phase 3 amendment predicted that
+  deduplication "turns the tree into a DAG" and called the backup rule an
+  unresolved subtlety — that is true of *cross-parent* transposition, which this
+  entry does not implement, and not of the merging that addresses R13. Pinned by
+  `tests/test_az_mcts.py::test_sibling_merging_does_not_create_a_dag`, which walks
+  the tree and asserts no node is reached twice.
+
+  This **removes a confounder** rather than adding one: the earlier revision had
+  to word its falsifier as "the mechanism is wrong *or* the backup rule is bad",
+  and that disjunction is now gone. The ADR's stated cost for deduplication does
+  not materialise; only its benefit is at stake.
+
+#### Three arms
+
+| | Children indexed by | Prior per child | Isolates |
+|---|---|---|---|
+| **A — naive** | action | uniform over actions | the deployed-naive baseline |
+| **B — deduplicated** | position | uniform over positions | the ADR's design |
+| **C — multiplicity-corrected** | action | uniform, divided by alias multiplicity | mechanism (ii) alone |
+
+**Arm C is the control the first draft lacked.** Without it, a gain for B at a
+small budget is fully explained by "B has ~4× fewer children and can complete a
+pass over them" — an effect obtainable by deleting three quarters of A's children
+at random, which is not the ADR's mechanism. B vs C isolates visit-splitting
+**(i)**; C vs A isolates prior mass **(ii)**.
+
+**Arm A's root readout is the argmax over action labels**, matching what the ADR
+says happens in deployment — "`π` is then read off those split counts" — not the
+argmax after aggregating aliased visits. Registered because the choice moves the
+primary number and a competent implementation would silently do the other thing.
+
+#### Metrics
+
+1. **Primary — top-1 optimality at budget 400**, paired: the fraction of the
+   3,000 positions where the most-visited root child is a move whose resulting
+   position is exactly a loss for the opponent. Comparisons B vs A, B vs C, C vs A
+   by McNemar on the discordant pairs, with 95% intervals on each difference.
+2. **Reported with it, and the primary number may not be quoted without them:**
+   - the **random-legal-move floor** on the same sample, measured rather than
+     assumed, per layer;
+   - the **exact-search ceiling** (100% by construction, stated so the scale is
+     explicit);
+   - the primary metric **stratified by `t`**, never only pooled.
+   The floor is not a constant: it is set by the value mix of the layer *below*
+   the sampled one, and EXP-009's table implies it swings from near 0% at `t = 5`
+   to roughly 75% at `t = 6`. A pooled number without the floor beside it has no
+   interpretable scale, which is the V3/V4 failure mode this project has now hit
+   three times.
+3. **Budgets 100 and 1,600** are run and reported as **secondary and
+   descriptive**, carrying no decision rule. Only budget 400 is tested. This is
+   the multiplicity control: three tested budgets on one sample would fire
+   somewhere under the null about 14% of the time.
+4. **Cost, split in two** because the two halves transfer differently:
+   - **tree cost** — position hashing and DAG backup, per simulation. This
+     transfers to deployment.
+   - **inference cost** — *not measured here*, because there is no network. In
+     deployment deduplication **reduces** the number of distinct children to
+     evaluate, so its sign is plausibly negative. Recorded so that a measured
+     tree overhead is never quoted as the pipeline's overhead.
+5. **Diagnostic — aliased policy mass at the root**, defined without ambiguity:
+   for a root position whose legal actions partition into `k` classes by
+   resulting position, with class `j` holding `m_j` actions, the aliased share is
+   `Σ_j (m_j − 1) / Σ_j m_j` — i.e. every action beyond the first in its class.
+   Measured on the sample rather than predicted from the 5×5 root. **Under-reports
+   by construction**: the mechanism compounds down the tree and this is measured
+   at the root only.
+
+#### Decision rule
+
+The adopted design does not depend on the outcome; what the outcome governs is
+whether adr-005 stands.
+
+- **B ≥ A on the primary** → proceed as the ADR directs.
+- **Falsifier, stated as a non-inferiority test**: B worse than A by more than a
+  **2-point margin**, i.e. the 95% interval on `(B − A)` lies entirely below
+  **−2** — not below zero, which is a different and much weaker claim. If it
+  fires, an ADR amendment is written **before** any self-play run. Since there is
+  no backup rule to confound it (see above), the falsifier reads cleanly: **the
+  amendment's stated mechanism is wrong.**
+- **If B beats A but C also beats A by a comparable margin**, the benefit is
+  mostly prior mass and not visit-splitting. That does not change the design —
+  the ADR mandates B — but it is reported as such rather than as a vindication of
+  both mechanisms.
+- **Cost is reported, not gated.** The first draft listed a "50% overhead
+  ceiling" under *Decision rule* with no consequence attached, which invites it
+  to be quoted as a threshold that was met. There is no cost threshold.
+
+#### Power
+
+McNemar, discordant proportion `π_d ≈ 0.15`, two-sided 5%, 80% power. At
+**N = 3,000** the detectable difference is **~2 points**, which is what makes the
+2-point falsifier resolvable — at the first draft's N = 1,000 the floor was ~3.4
+points and the falsifier could not fire, while the entry nonetheless presented it
+as a test. If the realised `π_d` differs materially from 0.15 the achieved
+detectable difference is recomputed from it and **reported**, rather than the
+threshold being quietly reinterpreted.
+
+#### Anti-circularity
+
+adr-005 point 4 forbids Axis 1 from driving Axis 2's selection. This experiment
+reads Axis 1 and is nevertheless compliant, on a narrower and stronger argument
+than the first draft's:
+
+The first draft argued "no trained parameters, so nothing is selectable". That
+reading is too narrow — a **search design** selected by agreement with the solver
+on the 5×3 is still a selection along the dimension H3 later reports, since the
+5×3 is a member of H3's comparison set and top-1 optimality against the solver is
+metric-for-metric H3's 5×3 evidence.
+
+What actually holds: **adr-005 already mandates arm B**, so no outcome selects
+anything. The one channel that could is the falsifier, and it triggers an *ADR
+amendment written by hand*, not an automatic design change. If this experiment
+ever gains a trained network or the power to choose between arms, the clearance
+lapses and the entry is re-registered.
+
+#### Expected result, recorded before the run
+
+- **B > A on the primary, by 2 to 8 points at budget 400.** Band re-derived for
+  the regime actually sampled. The first draft predicted 3–15 points from the
+  5×5 root's 4.46× collapse — a regime this design *excludes*, since `t ≥ 5` on
+  15 cells corresponds to the 5×5 around ply 8 (~1.8×) and decays from there.
+- **Aliased mass on the sample: 20 to 45%**, not the 60–80% the first draft
+  imported from `1 − 1/4.46 = 77.6%` at the 5×5 root.
+- **C between A and B**, nearer B — most of the effect predicted to be prior mass
+  rather than visit-splitting.
+- **Tree overhead under 20%.**
+- The margin between B and A is predicted to shrink as the budget rises, since a
+  naive tree with enough simulations eventually visits all six aliases anyway.
+
+#### Threats to validity
+
+- **Regime mismatch.** Measured where the aliasing is weakest, by construction.
+  Generalising to the 5×5 root requires the alias structure to be comparable, and
+  adr-005's own decay table says it is not. The result licenses "deduplication
+  helps at ~1.8× collapse"; the 5×5 root is 4.46× and is *more* favourable, so
+  the direction transfers and the magnitude does not.
+- **The searcher is not the deployed searcher.** Uniform prior, rollout
+  evaluation. A trained value head changes the tree's shape and could change the
+  sign, though no mechanism for that is known.
+- **Reachability.** The sample is drawn from the configuration space, not from
+  positions a strong agent reaches. EXP-005 and EXP-007 have **not run on the
+  5×3**, so the unreachable share is unknown; on the 3×3 it was 3.28%. The
+  reachable share is reported as unknown rather than assumed small.
+- **h2's `t = 5` layer** is the most discriminating and the least independently
+  verified: V4's coverage there is thin on both arms.
+- **Cross-parent transposition is deliberately absent.** Two different parents
+  reaching the same position get separate nodes here. That is a real search
+  improvement this entry declines to measure, so "deduplication helps by X" must
+  never be read as "transposition-aware MCTS helps by X" — the second is a larger
+  and untested claim.
+
+**Artefact.** `results/exp010-mcts-dedup-5x3-h2.json`, carrying every quantity
+above including the floors, the per-layer table, and the realised `π_d`.
+
+#### Result (2026-08-31) — 1,360 s, `B − A = +4.77` pts, and the benefit is prior mass
+
+Artefact [`results/exp010-mcts-dedup-5x3-h2.json`](../results/exp010-mcts-dedup-5x3-h2.json).
+3,000 positions, PyPy 3.11.15, 22.7 minutes. **Every pre-registered prediction
+held**; the falsifier did not fire.
+
+| budget | A naive | B dedup | C mult-corrected | `B − A` | `B − C` |
+|--:|--:|--:|--:|--:|--:|
+| 100 | 66.63 | 67.83 | **70.83** | +1.20 [+0.03, +2.37] | **−3.00** [−4.26, −1.74] |
+| **400** | 74.17 | **78.93** | 79.70 | **+4.77** [+3.47, +6.06] | −0.77 [−2.11, +0.58] |
+| 1600 | 83.30 | **86.33** | 84.43 | +3.03 [+1.88, +4.19] | **+1.90** [+0.74, +3.06] |
+
+Realised discordance put the detectable difference at **1.86 points** against the
+registered 2-point margin — the design had the power its falsifier needed, which
+the first registration did not.
+
+**The benefit is prior mass, not visit-splitting.** At the primary budget
+`C − A = +5.53` [+4.17, +6.90] while `B − C = −0.77` [−2.11, +0.58] is not
+distinguishable from zero. Arm C keeps all 540 children and only corrects their
+priors, and it recovers the whole effect. This is the case the entry
+pre-registered as *"reported as such rather than as a vindication of both
+mechanisms"* — mechanism **(ii)** carries the result and mechanism **(i)** is not
+shown to contribute at 400 simulations. **The design does not change: adr-005
+mandates B**, and B is also the arm that gets there with a quarter of the
+children.
+
+**The sign of `B − C` inverts with the budget** — C ahead by 3.00 points at 100,
+B ahead by 1.90 at 1600, both intervals excluding zero. A coherent story is
+available (few simulations reward keeping more distinct children to explore;
+many simulations make split counts start to hurt), and it is **not being told as
+a finding**: budgets 100 and 1600 are registered as secondary and descriptive
+with no decision rule, precisely so that three tested budgets could not fire
+somewhere under the null. Promoting this to a claim requires its own
+registration.
+
+**Nearly half the sample could not discriminate, and the per-layer table says
+so.** Split by the parity EXP-009 identified:
+
+| | n | random floor | A | B | `B − A` |
+|---|--:|--:|--:|--:|--:|
+| odd `t` (mover rarely wins) | 1,500 | 16.2% | 54.4 | 63.3 | **+8.9** |
+| even `t` | 1,500 | 66.8% | 93.9 | 94.5 | +0.6 |
+
+Layers 12, 13 and 14 are **saturated** — all three arms at ≥ 99%. The pooled
+`+4.77` is an average over two populations that have nothing to do with each
+other: where a decision exists the effect is roughly nine points, and where a
+random move already scores 67% there is nothing left to win. The strongest layer
+is `t = 5`: floor 3.0%, A 24.3%, **B 43.7%**, with 55.1% aliased mass. Quoting
+the pooled figure without this table would misdescribe the result in both
+directions.
+
+**Predictions, checked.** `B > A` by 2–8 points at budget 400 → **+4.77** ✓.
+Aliased mass 20–45% → **27.5%** ✓. C between A and B, nearer B → C in fact
+*level with or above* B at the primary budget, which is the stronger form of the
+same prediction. Tree overhead under 20% → **+19.6%**, held, but only just.
+Margin shrinking as budget rises → held for `B − A` from 400 to 1600 (+4.77 to
++3.03), **not** from 100 to 400 (+1.20 to +4.77), which the entry did not
+anticipate and which the low-budget inversion above explains.
+
+**Cost, and what it is not.** Tree overhead is **+19.6%** at the primary budget
+(25.4 ms → 30.4 ms per search). **Inference cost is absent by construction** —
+there is no network here — and in deployment deduplication *reduces* the number
+of distinct children to evaluate, so the pipeline's sign is plausibly the other
+way. The 19.6% may not be quoted as the pipeline's overhead.
+
+**One thing this does not license.** Cross-parent transposition is deliberately
+not implemented, so *"deduplication helps by 4.77 points"* must never become
+*"transposition-aware MCTS helps by 4.77 points"*. And the 5×3 at `t ≥ 5` sits
+near the 5×5's ply 8 (~1.8× collapse) rather than its root (4.46×): the direction
+transfers, the magnitude does not.
+
+### EXP-011 — is the factored policy head too costly in the pipeline? (risk R5)
+
+- **Registered.** 2026-08-30 at the Phase 4 opening; **revised the same day**
+  after `experiment-redteam`, before any instrument existed. The first draft is
+  superseded in full and nothing was run from it.
+- **Objective.** Test whether the factored policy head's conditional-independence
+  assumption is *too costly*, which is the question
+  [adr-005](../docs/adr/adr-005-alphazero-scope-and-network.md) actually asks and
+  requires to be "checked explicitly and logged, not assumed away". Risk **R5**.
+- **The assumption.** 25 cell + 13 tile + 6 rotation logits combined as
+  `log p(cell) + log p(tile) + log p(rotation)` — 44 instead of 1,950. It asserts
+  that cell, tile and rotation are conditionally independent given the state,
+  which is false on its face.
+- **Hypothesis.** — none. A negative result changes the architecture, not a claim
+  about FLIPHEX.
+
+#### What the first draft got wrong about its own question
+
+It measured supervised approximation error against the exact optimal policy and
+let that fire fallback **(b)**. But adr-005 lists the mitigations *in order*, and
+**(a) is "rely on MCTS to correct the prior, which is exactly what MCTS is
+for"**. A supervised test contains no MCTS, so it cannot speak to the ADR's first
+and primary defence — while being empowered to trigger the second. It is entirely
+possible for 400 simulations to wash out a 7-point gap in the prior, which is
+precisely what (a) claims.
+
+The repair is to make the **MCTS-corrected readout primary** and the supervised
+error secondary. This costs little: the searcher already exists as EXP-010's
+instrument.
+
+#### Ground truth and sample
+
+`data/subgame-solutions/5x3-h2.json`, V5 digest
+`51192b4d403ac1cb45c22d92ce58bab215843f457f245e7aca6d18744f8a3f43`, verified
+before drawing. Same arm as EXP-010, for the reasons recorded there.
+
+- **2,500 positions**, seed **23** — **a separate draw from EXP-010's**, so the
+  two entries are not nested and their results may be read together.
+- Stratified uniformly across `t = 5..14`; **restricted to positions that are a
+  WIN for the side to move**, for the reason given in EXP-010.
+- **Split 2,000 train / 500 held-out, declared here.** The first draft had no
+  split at all, which made it a memorisation contest between a 720-logit output
+  layer and a 29-logit one over 2,000 examples on a 0.33 M-parameter tower — a
+  contest whose result would have been an artefact either way. **Every reported
+  number is on the held-out 500.**
+
+#### Arms and what they hold fixed
+
+- **Factored** (29 logits on this deck: 15 cells + 8 tiles + 6 rotations) and
+  **flat** (15 × 8 × 6 = 720 logits). Identical tower, optimiser, epochs, batch
+  order, and training positions.
+- **Each arm is trained independently, tower and head together** — the deployment
+  configuration. This measures *network + head*, not the head in isolation, and
+  that is deliberate: the decision adr-005 asks about is the pipeline's, and a
+  frozen shared tower would answer a cleaner question that nobody has to act on.
+  If the result is ambiguous, a frozen-tower arm is the diagnostic, registered
+  then.
+- **5 seeds per arm.** The first draft ran one, which is the error adr-005's own
+  Phase 2 amendment already did the arithmetic for on the evaluator gate: the
+  dominant noise is **training-run variance**, and no number of positions touches
+  initialisation and SGD noise. Fixing the position sample and varying only the
+  seed, the between-arm gap is compared against the **between-seed spread** — a
+  gap smaller than the spread is not a result.
+- **The conditioned arm (fallback (b)) is not run speculatively.** If the rule
+  fires it is registered as an amendment with its own seeds, rather than being
+  judged by the same threshold on the same held-out set — which would be a
+  forking path with no multiplicity control.
+
+#### Amendment (2026-08-31) — the arms' logit counts, corrected against the built network
+
+**Nothing has been run. The arms above were written on 2026-08-30, before
+`az/network.py` existed; the network as built does not have the shapes they
+name.** The registration is amended rather than rewritten, so the drift is
+visible.
+
+**The factored head is 34 logits on this deck, not 29.** The tile factor emits
+one logit per tile in the *full* set of 13, not one per tile in this variant's
+deck, because the Phase 4 amendment to
+[adr-005](../docs/adr/adr-005-alphazero-scope-and-network.md) made the layout
+variant-independent: plane `k` and logit `k` mean the same thing on the 3×3, the
+5×3 and the 5×5, and the hand mask decides which are legal. So the factored arm
+is **15 cells + 13 tiles + 6 rotations = 34**.
+
+**The flat head is 1,170 logits, not 720 — and this one is not bookkeeping.**
+`15 × 8 × 6 = 720` sizes the flat head to the eight tiles this deck happens to
+contain. That would hand the flat arm a piece of information the factored arm is
+not given: which tiles exist in this variant. The flat head would enter the
+comparison with the action space pre-restricted, which biases the measurement
+**toward the flat head** — the arm whose win fires a fallback and amends the
+architecture. Being sloppy in that direction is the expensive one. Both arms
+therefore span the same action space, `15 × 13 × 6 = **1,170**`.
+
+**What this changes about the question.** The comparison is a ratio of output
+widths, and the amendment moves it:
+
+| | registered 2026-08-30 | as built |
+|---|--:|--:|
+| factored | 29 | **34** |
+| flat | 720 | **1,170** |
+| ratio | 24.8× | **34.4×** |
+
+The 5×5 figure adr-005 argues from is `44` against `1,950`, a ratio of **44.3×**.
+The corrected 5×3 ratio is closer to it than the registered one was, so the
+reduced board is now a slightly better proxy for the board the decision is
+actually about. That is a happy accident of the repair, not a reason for it.
+
+**Unchanged:** the ground truth and its digest, the seed (23), the sample size
+and split, the stratification, the five seeds per arm, every metric, the decision
+rule and its 5-point margin, and the anti-circularity repairs. The tower is
+measured at **332,965** parameters on the 5×3, which is the "0.33 M" the split
+argument above was written against.
+
+**Instrument note.** `az/train.py`'s loss is reusable here unchanged — its policy
+term takes any `π` — but this experiment trains **supervised against exact
+optimal play**, not on self-play targets, so the batches come from the solved
+database rather than from `az/selfplay.py`. The flat head does not exist yet and
+is part of the instrument to be built.
+
+#### The unit is the position, not the action label
+
+Both the target and the metrics are defined over **distinct resulting
+positions**, aggregating aliased actions. The first draft defined the target as
+uniform mass over optimal *moves*, which under R13 already assigns up to 6× mass
+to positions reachable by six rotations — so the flat head would have been scored
+partly on reproducing alias multiplicity, and the measured gap would have been
+contaminated by exactly the phenomenon EXP-010 exists to remove. That also
+contradicted the first draft's own claim that the two entries are independent.
+They are independent **only** under the position-level definition adopted here.
+
+#### Metrics
+
+1. **Primary — top-1 optimality after 400 PUCT simulations**, each head supplying
+   the prior, on the held-out 500, at 5 seeds per arm. This is the quantity the
+   decision is about, and the only one that can speak to mitigation (a).
+2. **Secondary — supervised policy agreement** on the held-out 500: top-1
+   agreement with the exact optimal policy, and cross-entropy against it, both at
+   the position level. Paired across arms on identical positions; compared with
+   McNemar (agreement) and a paired *t* on seed means (cross-entropy), 95%
+   intervals on both.
+3. **Reported beside both**: the random-legal-move floor per layer, as in
+   EXP-010.
+
+#### One number that needs no training at all
+
+Computed first and reported regardless of how everything else turns out: the
+fraction of (position, cell, tile) triples in the sample for which **rotation
+does not change the resulting board**. adr-005's Phase 3 amendment claims "a
+sizeable share of the rotation factor's output is not modelling a choice at all",
+and that has never been quantified.
+
+**Reported twice — with and without single-rotation-orbit tiles — and per layer.**
+h2's P1 deck holds `P6`, whose orbit is 1, so rotation trivially changes nothing
+for it **by orbit, not by the inertness mechanism the ADR describes**. Including
+it inflates the headline by a definitional artefact. The number that supports the
+ADR's claim is the one over multi-orbit tiles; the other is reported so nobody
+recomputes it later and gets a different answer. (This is also why h2 is the
+better arm here: 1 single-orbit tile in 8, against h1's 2.)
+
+#### Decision rule
+
+Read on the **primary** metric, on the held-out set, with the between-seed spread
+reported alongside:
+
+- Factored within **5 percentage points** of flat, *and* the gap no larger than
+  the between-seed spread → the assumption is accepted for v1, adr-005 stands.
+- Factored worse by **more than 5 points** *and* the gap exceeding the
+  between-seed spread → **mitigation (a) has failed on its own terms**, and
+  fallback **(b)** — rotation logits conditioned on the chosen cell — is
+  registered as an amendment and run.
+- Gap larger than 5 points but **within** the seed spread → not a result. Add
+  seeds, do not adopt a fallback.
+- If (b) is run and still loses by more than 5 points → fallback **(c)**, the
+  flat head. **Recorded now so it cannot be forgotten later: (c) does not fix
+  aliasing.** 1,950 logits over 1,450 actions is the same redundancy with more
+  parameters; only EXP-010's deduplication addresses it.
+
+#### Result (2026-09-01)
+
+Run `scripts/exp011_factored_head.py`, 2h16, artefact
+[`exp011-factored-head-5x3-h2.json`](../results/exp011-factored-head-5x3-h2.json),
+log [`exp011.log`](../results/exp011.log).
+
+**The registered rule fires. Fallback (b) is to be registered and run.**
+
+| | factored | flat | gap |
+|---|--:|--:|--:|
+| **Primary — top-1 optimality after 400 PUCT sims** | **66.8%** | **73.7%** | **+7.0** |
+| Secondary — supervised top-1 agreement | 58.6–60.8% | 65.6–68.6% | **+8.0** |
+| Between-seed spread (max of the two arms) | | | 1.5% |
+| Random-legal-move floor | | 39.6% | |
+
+Per seed, primary: factored `67.2, 66.6, 66.2, 65.8, 68.0`; flat
+`74.2, 74.2, 75.6, 71.8, 72.8`. **Every one of the five factored seeds is below
+every one of the five flat seeds** — the arms do not overlap at all, which is
+what the 1.5% spread against a 7.0-point gap says in a different way.
+
+Paired *t* on seed means: **+6.96** [+4.81, +9.11]. Supervised McNemar over all
+seeds: **+8.0 points**, 680 discordant.
+
+> **Correction (2026-09-01, red-team).** The interval first published here for the
+> supervised McNemar, `[+6.0, +10.0]`, is **wrong and is withdrawn**. It was
+> computed with `n = 2500`, but those 2,500 rows are 5 seeds × the *same* 500
+> held-out positions — five re-measurements of one sample, not 2,500 independent
+> pairs. Treating the position as the independent unit widens the half-width by
+> about `sqrt(5)`, from ±2.0 to roughly **±4.6** points. The point estimate of
+> **+8.0** stands; the interval does not. The instrument's `mcnemar()` inherits
+> the defect and must cluster on positions before it is reused.
+>
+> **This does not touch the verdict**, which reads on the primary metric's paired
+> *t* over seed means — a test whose unit is the seed and which was computed
+> correctly. One clause of that is under-stated, though: it is correct
+> **conditional on the fixed held-out set**. It contains no position-sampling
+> component at all, so `+7.0 [+4.81, +9.11]` is an interval for the difference
+> *on these 500 positions*, not for the difference on the 5×3. Generalising it
+> carries an unmeasured component; EXP-012 states this estimand distinction for
+> itself and this entry should not be read as claiming otherwise.
+>
+> **It does weaken one sentence below.** See the note under mitigation (a).
+
+#### The sharpest number is the one about mitigation (a)
+
+adr-005's first mitigation is *"rely on MCTS to correct the prior, which is
+exactly what MCTS is for"*, and the whole reason this entry was rewritten after
+red-team was so the primary metric could speak to it. It does:
+
+- supervised gap: **+8.0** points
+- gap after 400 PUCT simulations: **+7.0** points
+
+**Mitigation (a) did not rescue the factored head.** The supervised deficit was
++8.0 and the post-search deficit +7.0: the gap survives the search essentially
+intact, and the post-search gap of **+7.0** [+4.81, +9.11] excludes zero
+comfortably. That is the finding, and it is a stronger statement than "the flat
+head is better".
+
+> **Correction (2026-09-01, red-team).** The first wording said search closed
+> "roughly an eighth" of the deficit and called mitigation (a) "close to inert".
+> **The ratio is a point estimate with no interval on it.** The supervised gap
+> and the post-search gap were never contrasted as a tested difference, and once
+> the supervised interval is widened for clustering (above) a 1-point difference
+> between +8.0 and +7.0 is well inside the noise. What survives is the robust
+> claim — **search did not close the gap** — not the arithmetic of how little it
+> closed. A registered contrast of the two gaps would be needed to say more, and
+> none was registered.
+
+#### Not overfitting, and not early stopping
+
+Final *training* policy loss: factored **2.616**, flat **2.375**. The factored arm
+is worse on the data it was fitted to, not only on the held-out set, so this is
+an expressiveness limit rather than a generalisation one. More epochs would not
+close it.
+
+#### What this cannot separate, stated plainly
+
+The flat arm carries **879,381** parameters against the factored arm's
+**332,965** — the head is 1,170 logits against 34. The experiment therefore
+cannot distinguish *"cell, tile and rotation are not conditionally independent"*
+from *"44 logits is not enough capacity"*. Both are reasons the factored head
+loses, and adr-005's question — is it **too costly** — is answered either way,
+which is why the design was written at the pipeline level. But the *mechanism* is
+not established here, and no sentence in the write-up may claim it is. The
+registration's own contingency applies: a frozen-shared-tower arm is the
+diagnostic, registered if it is wanted.
+
+Fallback (b) — rotation logits conditioned on the chosen cell — is the natural
+next probe, and is registered as EXP-012.
+
+> **Correction (2026-09-01, red-team pass 2).** The sentence that stood here —
+> *"If (b) recovers most of the gap, the mechanism was independence; if it does
+> not, it was capacity"* — is **withdrawn as impossible, not merely unproven**.
+> In this parameterisation *any* relaxation of the factorisation adds output
+> dimensions, because relaxing the factorisation is what adding them means.
+> Independence and output-width capacity are **the same axis**, so no experiment
+> that varies the head's factorisation can separate them, and (b) cannot settle
+> the question this paragraph assigned to it. EXP-012 carries the argument in
+> full and replaces the question with one that is answerable: whether the
+> **cell** is what rotation depends on, which is what adr-005 actually asserts.
+
+#### Three further corrections (2026-09-01, red-team pass 2)
+
+**The threats section below misdescribes this experiment's own instrument.** It
+says the searcher uses rollout evaluation. `search_scores` in
+`scripts/exp011_factored_head.py` passes `evaluate=evaluator.evaluate` — the
+**network's value head**. The consequence matters: the primary metric is
+therefore network-level, not policy-head-level, so a difference between arms
+includes whatever their value heads learned.
+
+**The threats section also quotes the withdrawn logit counts** — "29 against 720,
+24.8×" — which the 2026-08-31 amendment replaced with 34 against 1,170, a ratio
+of 34.4×. The arithmetic in that threat is computed on the superseded figures.
+
+**"More epochs would not close it" is asserted from a single final-loss value**
+with no convergence check behind it, and 2.616 against 2.375 are two point
+estimates from five seeds each whose spread was not reported. EXP-012 pins a
+schedule and reports a convergence criterion precisely because this inference had
+nothing behind it.
+
+#### The rule fired on its own terms, and the margin deserves a note
+
+The registered rule reads on the **point estimate** and the between-seed spread:
+*"factored worse by more than 5 points and the gap exceeding the between-seed
+spread"*. 7.0 > 5 and 7.0 > 1.5, so it fires as written.
+
+**But the paired-*t* interval is [+4.81, +9.11], and 4.81 is below the 5-point
+margin.** Under the stricter reading EXP-010's red-team imposed on *its*
+falsifier — the interval must exclude the margin, not merely the point estimate
+clear it — this would be marginal rather than decisive. That stricter form was
+never written into EXP-011's rule.
+
+This is recorded, not repaired. Rewriting a decision rule after seeing the
+numbers is precisely what pre-registration exists to prevent, and the direction
+of the temptation here is towards the *weaker* conclusion, which makes it no more
+legitimate. The verdict stands as the locked rule gives it; a reader who prefers
+the stricter criterion has both numbers.
+
+#### The number that needed no training
+
+Over 2,500 positions and 51,250 `(cell, tile)` pairs:
+
+| | |
+|---|--:|
+| rotation changes nothing, all tiles | **21.6%** |
+| rotation changes nothing, multi-orbit tiles only | **11.4%** |
+
+adr-005's Phase 3 amendment claims *"a sizeable share of the rotation factor's
+output is not modelling a choice at all"*. **The honest reading is that 11.4% is
+not a sizeable share.** The larger figure includes `P6`, whose orbit is 1 and for
+which the property is vacuous — a definitional artefact, which is why both were
+required. The rotation factor has more to model than the amendment supposed, so
+this is *not* the reason the factored head lost.
+
+#### Anti-circularity — the caveat is now live
+
+The rule fired, so repair 2 of the clearance below applies: **H3's 5×3 member
+carries an architecture-selection caveat in its evidence class**, because the
+architecture was selected by fitting Axis 1 ground truth on 5×3 positions and H3
+later reports Axis 2's agreement against Axis 1 on a set including the 5×3.
+Repair 1 stands independently — H3's 5×3 comparison sample is drawn disjointly
+from seeds 17 and 23.
+
+#### Anti-circularity — the first draft's clearance did not hold
+
+It argued compliance because "every network trained in this experiment is
+discarded". That answers a question adr-005 does not ask. What survives is not
+weights but the **architecture decision**, selected by fitting Axis 1 ground
+truth on 5×3 positions and scored by agreement with the solver — and H3 later
+reports Axis 2's per-variant agreement against Axis 1 on a comparison set that
+**includes the 5×3**. The general form of the rule, from adr-004, covers this:
+*neither axis may be used to select or terminate the other along the dimension on
+which they are later compared.*
+
+The leak is small — one ternary choice among fallbacks adr-005 already
+enumerated — and is repaired here rather than argued away, by **both** available
+repairs:
+
+1. **H3's 5×3 comparison sample is drawn disjointly** from seeds 17 and 23. Both
+   draws are recorded in their artefacts so the disjointness is checkable rather
+   than asserted.
+2. **If the decision rule fires**, H3's 5×3 member carries an
+   architecture-selection caveat in the verdict table's evidence class. If it
+   does not fire, no architecture was selected by Axis 1 and no caveat is needed.
+
+The weights are still discarded — no network trained here seeds a self-play run,
+initialises a generation, or contributes to a checkpoint. That was never
+sufficient on its own.
+
+#### Expected result, recorded before the run
+
+- **Factored loses 0 to 4 points on the primary**, i.e. MCTS largely absorbs the
+  prior's weakness, which is mitigation (a)'s claim.
+- **Factored loses more on the secondary than on the primary** — 3 to 10 points
+  of supervised top-1 agreement — with most of the loss on positions where
+  several tiles are legal on the same strong cell. If the primary and secondary
+  gaps come out equal, mitigation (a) is doing nothing and that is the more
+  interesting finding.
+- **Between-seed spread of 2 to 6 points** on the primary, which is the reason
+  5 seeds are run.
+- **Rotation irrelevant in over 30% of multi-orbit triples**, rising with the
+  number of empty neighbours.
+
+#### Threats to validity
+
+- **The capacity ratio here is roughly half the deployed one, and the bias runs
+  toward accepting adr-005.** The 5×5 head is 44 logits against 1,950 — **44.3×**.
+  On the 5×3 h2 deck it is 29 against 720 — **24.8×**. Fewer cells and tiles means
+  less joint cell×tile×rotation structure to lose, so conditional independence is
+  a *less* costly assumption here by construction. **A pass at 5×3 does not
+  license the 5×5.** Both head geometries go in the artefact so that "the
+  factored head lost 2 points" is never quoted as a 5×5 number.
+- **Trained against ground truth**, so the supervised metric is an upper bound on
+  what self-play could extract; the primary metric is less exposed to this.
+- **Reachability**, as in EXP-010: sampled from the configuration space, and the
+  5×3's reachable share is unknown.
+- **The searcher used for the primary is EXP-010's** — uniform-`c_puct`, rollout
+  evaluation, deduplicated expansion. Whatever is wrong with it is wrong here too.
+
+**Artefact.** `results/exp011-factored-head-5x3-h2.json` (this line first
+named `exp011-policy-head-…`, which was never the filename the instrument writes;
+corrected 2026-09-01).
+
+### EXP-012 — fallback (b), and whether the cell is what rotation depends on
+
+- **Registered.** 2026-09-01. **Two red-team passes, both before any instrument
+  existed; nothing has been run.** Pass 1 killed the first draft's central claim
+  (see below). Pass 2 found that the repaired design was still biased toward its
+  own registered predictions, and added the frozen-tower condition, the
+  equivalence test on the control, and the corrections to arm E. Drafts 1 and 2
+  are superseded in full.
+- **Why it exists.** EXP-011's rule fired. adr-005 lists mitigations in order,
+  (a) is refuted, so the next is **(b) — rotation logits conditioned on the
+  chosen cell**.
+- **Hypothesis.** — none. A result here changes the architecture, not a claim
+  about FLIPHEX.
+
+#### What the first draft got wrong, and it was the premise
+
+It promised to separate *"cell, tile and rotation are not conditionally
+independent"* from *"34 logits is not enough capacity"*, using a fourth arm that
+matched parameter counts while keeping the factored structure. **That cannot
+work, and not for want of a better control.**
+
+EXP-011's confound lives on the **output width** — the dimension of the score
+function the head can express over the action set — and the first draft's control
+held that constant at 34 while the treatment raised it to 118. It varied the
+wrong axis. Worse, the repair is not to pick a different control: in this
+parameterisation *any* relaxation of the factorisation **adds output dimensions**,
+because relaxing the factorisation is what adding them means. Independence and
+output-width capacity are **the same axis**, and no experiment that varies the
+head's factorisation can separate them.
+
+So the question is replaced by one that can be answered, and which is closer to
+what adr-005 actually asserts. The ADR does not say "the head needs more
+capacity"; it says **"the best rotation depends heavily on the cell"**. That is a
+claim about *which variable* rotation depends on, and it is testable at fixed
+capacity.
+
+#### Arms
+
+One rotation tensor of shape `(15, 6)` is shared by three arms. **They are
+identical in parameter count and tensor shape, and differ only in the index used
+to read a row.**
+
+They do *not* share a loss code path, and an earlier draft claimed they did. A
+and C run `az/train.py`'s existing normaliser unchanged; **E needs a shape change**
+(the closed form builds a `(B, 13, 6)` tile–rotation block against a `(B, 6)`
+rotation vector); **B needs a structural change**, because its score is not
+additively separable. Three paths across five arms, each verified separately —
+see Correctness preconditions.
+
+| arm | rotation term in the score | total params |
+|---|---|--:|
+| **A — factored** | `rot[r]`, a 6-vector (the incumbent) | 332,965 |
+| **B — rotation given cell** | `rot[cell, r]` — fallback (b) | **373,369** |
+| **C — pooled control** | `sqrt(15) × mean over rows of rot[·, r]` | **373,369** |
+| **E — rotation given tile** | `rot[tile, r]` — **8 live rows**, see below | 373,369 nominal, **353,167 live** |
+| **D — flat** | one logit per triple, 1,170 — fallback (c) | 879,381 |
+
+C carries B's parameters and B's shape while its **function class is exactly
+A's**: pooling collapses the 90 weights to a 6-vector, so its expressive
+dimension over actions is 32, the same as A's. Gradients still reach all 90
+weights. That is the point — C is *"B's parameterisation without the
+conditioning"*.
+
+**The `sqrt(15)` is not cosmetic.** `Linear(480, 90)` initialises its rows
+independently, so a plain row mean has `1/sqrt(15) = 0.26×` the initial standard
+deviation of a single row: C's rotation term would start at a quarter of A's and
+B's scale. Identical parameter count and tensor shape do **not** imply identical
+initialisation of the *function*, and this is the one place the difference is
+systematic rather than random. Scaling by `sqrt(15)` leaves the function class
+untouched and matches the initial variance exactly.
+
+**C's equivalence to A depends on the optimiser being Adam**, and that is
+load-bearing rather than incidental. Pooling gives each of C's 15 rows
+`1/15` of the gradient A's single row receives; Adam's per-parameter
+normalisation is scale-invariant, so all 15 rows take identical steps and the
+pooled logit moves at A's rate. Under plain SGD the pooled logit would train 15×
+slower and `C − A` would fail for a reason having nothing to do with the design.
+The rotation tensor sits in a `weight_decay = 0` parameter group in **every** arm,
+so that decay-to-signal ratios do not differ across parameterisations.
+
+**Arm E is not capacity-matched to B, and an earlier draft said it was.** The
+tensor has 15 rows; the 5×3-h2 deck holds **8 tiles**, so rows 7, 8, 9, 10 and 12
+are never in any hand and rows 13–14 are not tile ids at all. **Seven of fifteen
+rows receive no gradient**: 7 × 6 × 481 = **20,202 dead parameters, 5.4% of the
+total.** Free score dimensions differ too — B has `15×6 + 13 − 1 = 102`, E has
+`15 + 13×6 − 1 = 92`, so B is 11% more expressive.
+
+`B − E` is therefore **confounded**, and the direction is not obvious: B is more
+expressive, which helps when the sample suffices, and has 15 live rows to fit
+against E's 8, which hurts when it does not. The training-loss diagnostic
+registered below is what distinguishes the two readings. Stating the confound is
+the repair; pretending to an exact match, as the previous draft did, is what is
+being corrected. The previous draft was criticised for resting a design on a
+0.12% parameter match — this deficit is 45× larger.
+
+| contrast | what it asks |
+|---|---|
+| **B − C** | Does conditioning on the cell help, at identical parameters and shape? **adr-005's named mechanism.** |
+| **E − C** | Does conditioning on the *tile* help, on identical terms? |
+| **B − E** | Is the **cell** specifically the right conditioner, as the ADR claims? |
+| **D − B** | Adoption: does (b) reach the flat head? |
+| **C − A** | **Validity precondition** — see below. |
+
+**C − A is a precondition, not a finding — and it is an equivalence test, not a
+null test.** C and A have the same function class, so C − A should be
+indistinguishable from zero. If C is materially *worse* than A, the control is
+handicapped by its own parameterisation and `B − C` is positive by that handicap
+alone, firing the mechanism branch on an artefact.
+
+The obvious form — "the interval must contain zero" — is worthless here, and an
+earlier draft used it. With a ±2.1-point half-width the interval contains zero
+unless `|C − A|` exceeds 2.1, so **the noisier the run, the more certainly the
+check passes**. A gate satisfied by failing to measure is not a gate, and a real
+1.5-point handicap sits comfortably inside the band that would pass.
+
+**The registered form is TOST at δ = 2 points**: the *entire* `C − A` interval
+must lie within ±2. That is the right shape for "these should be the same", and
+it fails when the run is underpowered instead of passing. δ = 2 because it is
+about the half-width and about half the adoption margin. **If it fails, every
+mechanism contrast is recorded as unresolved regardless of what it shows.**
+
+Identical tower, optimiser, epochs, batch order and training positions across all
+five. Trained jointly, tower and head together — the deployment configuration.
+
+#### The frozen-tower condition
+
+**Added after red-team pass 2.** Every arm above trains tower and head jointly,
+which is right for the *adoption* decision — that is a pipeline decision and must
+be measured in the deployment configuration. It is wrong for the **mechanism**
+contrasts: a jointly trained tower can compensate for a head's structural
+limitation, which shrinks `B − C` and `E − C` **toward zero**, which is the
+direction of the registered predictions.
+
+EXP-011 pre-registered a frozen-shared-tower arm as the diagnostic for exactly
+this contingency, and two earlier drafts of this entry declined it. It is
+included.
+
+**Procedure.** At each seed, arm A's tower and `policy_conv` are trained as
+usual, then **frozen**; the heads of B, C and E are fitted on the frozen
+features. All three then see literally the same tower, so their difference is a
+difference between heads and nothing else.
+
+**Cost is small on the training side and not on the evaluation side.** With
+everything up to the 480-dimensional features frozen, those features are computed
+once per seed and cached, so the 15 head fits are close to free. The 400-simulation
+search evaluation is not cached and adds 15 × 500 position-searches, about 1.9 h.
+
+**How the two conditions are read together.** The frozen contrasts are the
+head-level mechanism result; the joint contrasts are the deployment-level one. If
+they agree, the mechanism claim is on firm ground. **If they disagree — the
+mechanism visible frozen and absent jointly — that is itself the finding**: the
+tower absorbs the head's limitation, which is an argument for the factored head
+that adr-005 never made and which would be worth more than either contrast alone.
+
+#### Arm B is one implementation of fallback (b), and not the efficient one
+
+`Linear(480, 90)` is fifteen independent 480→6 maps with **no weight sharing
+across cells** — 43,290 parameters to learn "which rotation, given which cell"
+fifteen separate times.
+
+The tower is convolutional and `policy_conv` already produces a `(32, 15)`
+spatial map before its `Flatten`. A **1×1 convolution from 32 to 6 channels** on
+that map gives per-cell rotation logits from shared weights over each cell's own
+features: **198 parameters**, fully cell-conditioned, and statistically efficient
+in precisely the way arm B is not. It would also not carry the data-efficiency
+handicap recorded below, since the handicap is caused by the unshared
+parameterisation.
+
+**Recorded so the conclusion cannot overreach: a null on B is a null on *this* B.**
+Neither branch of the decision rule licenses a statement about fallback (b) in
+general. The convolutional form is the obvious follow-up and is not run here.
+#### Ground truth and sample
+
+`data/subgame-solutions/5x3-h2.json`, V5 digest
+`51192b4d403ac1cb45c22d92ce58bab215843f457f245e7aca6d18744f8a3f43`, verified
+before drawing.
+
+- **2,500 positions, seed 29**, stratified uniformly across `t = 5..14`,
+  restricted to WIN positions for the side to move.
+- **2,000 train / 500 held out. Every reported number is on the held-out 500.**
+- **5 seeds per arm**, 25 training runs, plus 15 frozen-tower head fits and 5
+  convergence re-runs. EXP-011 took 2h16 for 10 runs. **Budget ~8 h**, of which
+  about 1.9 h is the frozen condition's search evaluation.
+- **Disjointness is measured, not asserted.** The artefact records a sorted list
+  of the drawn layer indices and the measured intersection with EXP-010's seed-17
+  and EXP-011's seed-23 draws. Both prior entries claimed checkable disjointness
+  while recording only the seed, which makes the check depend on `draw_layer`
+  never changing.
+
+#### Schedule, pinned
+
+EXP-011 left these to the instrument. With five arms whose heads span 16k to 563k
+parameters at one fixed schedule, "capacity" and "optimisation budget at this
+schedule" are not separable unless the schedule is fixed and convergence is
+shown.
+
+**40 epochs, batch 64, Adam at lr 1e-3, weight decay 1e-4** — EXP-011's values, so
+the two entries are readable together.
+
+**Convergence is reported, not assumed.** The criterion is the **training-loss
+trajectory** — mean per-epoch improvement over the final five epochs, per arm and
+seed — because that is what "under-trained" means and it is orders of magnitude
+less noisy than the held-out metric.
+
+One seed per arm is re-run at 80 epochs. That comparison is **paired on the same
+500 positions and the same seed** (McNemar on per-position hits), which removes
+position variance. An earlier draft triggered on "the held-out primary moves by
+more than 2 points" *unpaired* — one seed's held-out primary has a Wilson
+half-width of about ±4 points, so a 2-point movement is inside noise in both
+directions and the trigger would have fired or not essentially at random, with
+the power to void the whole run. EXP-011 inferred "more epochs would not close
+it" from a final loss value with no convergence check behind it at all.
+
+#### Metrics
+
+1. **Primary — top-1 optimality after 400 PUCT simulations**, each head supplying
+   the prior, on the held-out 500, 5 seeds per arm.
+2. **Secondary — supervised top-1 agreement and cross-entropy**, position level.
+3. **Reported beside both** — the random-legal-move floor, and a **pre-registered
+   stratified read by layer parity**. EXP-010 measured the effect concentrated on
+   odd layers (+8.9) against even ones (+0.6, floor 66.8%), where a random move
+   is already optimal two thirds of the time. Against contrasts expected at 2–3
+   points, pooling the two dilutes the signal. Registered here so it is a planned
+   read and not a subgroup hunt.
+
+The unit is the **position**, not the action label.
+
+#### The test, named
+
+EXP-011 said "the interval" without saying which, and two candidates in its own
+artefact differ by more than 2×.
+
+- **Adoption and mechanism are read on the paired *t* over the 5 seed means**,
+  `t(4) = 2.776`, **conditional on the fixed held-out set**. This interval
+  captures training-seed variance only.
+- **The position-sampling component is reported separately** as a bootstrap
+  **clustered on the 500 positions**, and the write-up quotes the wider of the
+  two.
+- **EXP-011's `mcnemar()` is not reused as written.** It divided by `n = 2500`
+  where those rows are 5 seeds × the same 500 positions, understating the
+  half-width by about `sqrt(5)`. The correction is recorded in EXP-011's result
+  section; the instrument here clusters on positions.
+
+#### Decision rule
+
+**Adoption**, read on `D − B` at α = 0.05, following adr-005's order:
+
+- **Interval entirely below 5 points** → **adopt (b)**. The architecture record
+  is amended to the conditioned head; (c) is not run.
+- **Interval entirely above 5 points** → (b) is refuted; **adopt (c)**, the flat
+  head. Recorded now: **(c) does not fix action aliasing** — 1,170 logits over
+  540 legal moves is the same redundancy with more parameters.
+- **Interval spanning 5** → **not a result**; see the extension rule.
+
+**Operating characteristics, computed in advance.** At the half-width EXP-011
+observed (≈2.1 points on seed means):
+
+| `D − B` | verdict |
+|---|---|
+| < 2.9 | adopt (b) |
+| 2.9 – 7.1 | **not a result** |
+| > 7.1 | refute (b), adopt (c) |
+
+Two things follow and are accepted deliberately rather than discovered later.
+The expected `D − B` is roughly 1 to 3.5, so **"not a result" is a likely
+outcome**. And the refutation branch needs B to trail D by more than A did
+(`D − A` was 7.0) — B strictly contains A, so **that branch is close to
+unreachable**. This experiment is powered to *adopt or fail to decide*, not to
+refute.
+
+**Extension, bounded.** If the rule does not resolve at 5 seeds, **exactly one**
+extension to **12 seeds** is run and the rule re-read **once**, at Bonferroni
+α = 0.025. At 12 seeds the half-width falls to ≈1.27 and the indecision band
+narrows from 2.9–7.1 to roughly **3.7–6.3** — tabulated here because the
+extension is now the registered path for the *modal* outcome, not a remote
+contingency. No further extension. Unbounded "add seeds until it clears" is
+optional stopping, and it is also the channel by which the mechanism read leaks
+into adoption — when the adoption interval straddles 5, the mechanism contrasts
+are already visible and would inform how hard one pushes.
+
+**Arm C is not adoptable.** It exists to be a control. If C is the strongest arm,
+that is recorded and a new entry is registered; nothing is adopted from this one.
+Arm E is likewise diagnostic — it is not one of adr-005's fallbacks.
+
+**Mechanism**, exploratory, **never used to adopt**, and void unless the C − A
+equivalence precondition passes.
+
+**Only two of the three contrasts are independent**: `B − E = (B − C) − (E − C)`
+exactly. The Bonferroni divisor is therefore **2**, giving α = 0.025 per contrast
+and `t(4) = 3.169`, half-width **≈2.4** points. An earlier draft used 0.025 as if
+for a family of two without noticing that three contrasts were registered; the
+divisor is right and the *reason* was missing. A reader must also not treat three
+agreeing contrasts as three pieces of evidence — the third is a linear
+combination of the other two.
+
+- `B − C` above zero → conditioning on the cell helps at fixed capacity; the
+  ADR's named mechanism is supported.
+- `B − C` containing zero → it is not supported at this sample.
+- `E − C` above zero **and** `B − E` containing zero → conditioning helps but
+  **the cell is not what matters** — the tile does as well. That would leave
+  adr-005's remedy standing and its stated reason wrong, which is the outcome
+  this design exists to be able to see.
+
+**Power, stated in advance and at the corrected level.** Adoption is read at
+α = 0.05 (half-width ≈2.1); the mechanism contrasts at α = 0.025 (half-width
+≈2.4). At the mechanism level that is roughly 80% power at a true **3.4**-point
+difference and about 55% at 2.4 points. **A true `B − C` below ~3.4 points will
+not resolve**, and "not resolved" is then the reported outcome. An earlier draft
+quoted a 3-point MDE computed at the uncorrected α; the corrected figure is worse.
+
+The split one might most expect — "conditioning explains 2 points, the rest is
+width" — sits below the detectable range **by design**, and no reinterpretation
+after the fact changes that.
+
+**The pairing buys nothing, and that is measured.** Backing the correlation out of
+EXP-011's numbers gives ≈ −0.05 between arms across seeds: despite a shared
+position sample, batch order and MCTS seeds, the paired design produced no
+variance reduction. The power figures above assume independence and are correct
+on that basis, but this design must not be described as paired-and-therefore-
+powered. One repair is available and is taken: `FlipHexNet` constructs the value
+head **after** the policy heads, so a change in head size shifts the RNG stream
+and the value head initialises differently across arms at the same seed.
+Constructing it first makes the entire non-policy network bit-identical across
+arms. The artefact reports `sd(differences)` and the implied correlation.
+
+#### Every registered prediction is a null, and the instrument leans that way
+
+This is the structural finding of red-team pass 2 and it is recorded here because
+no local repair removes it.
+
+Predictions 1, 3 and 4 are all nulls, and **four independent properties of the
+design push the contrasts toward zero**:
+
+| force | effect |
+|---|---|
+| joint tower training lets the tower absorb a head's limitation | mechanism contrasts → 0 |
+| B's rotation row `c` gets gradient only when cell `c` is empty — **36.7%** of positions against C's 100%, a 2.7× data-efficiency handicap | `B − C` → 0 |
+| B has 15 live rows to fit against E's 8, from the same 2,000 positions | `B − E` → 0 |
+| Bonferroni widening | all → 0 |
+
+The frozen-tower condition removes the first. The other three remain.
+
+None of this is misconduct — the biases are conservative rather than
+self-serving, and the predictions were registered before any data existed. But it
+means **a null confirms a prediction the design was going to produce anyway**.
+
+Two consequences are registered now, so they cannot be forgotten when the numbers
+are in:
+
+1. **A null mechanism contrast is reported as "not detected", never as "absent".**
+   No sentence in any artefact, note or write-up may convert one into the other.
+2. **Per-arm final training loss is reported beside the held-out primary**, which
+   is the diagnostic that separates the two readings. If B fits the *training* set
+   better than C while not beating it on held-out, the limit is data efficiency
+   and not the absence of the mechanism. This is exactly the move that let EXP-011
+   say "expressiveness, not generalisation"; it costs nothing, since the loss is
+   already logged.
+
+#### Correctness preconditions
+
+Both must pass before the run counts as evidence.
+
+1. **Each arm's normaliser is verified against brute force.** Arm B's score is
+   **not additively separable**, so the closed form `az/train.py` uses is invalid
+   for it; the correct one is nested,
+   `Z = LSE over empty c of ( cell[c] + LSE over available (t,r) of (tile[t] + rot[c,r]) )`.
+   A and C are separable (a pooled rotation row is a 6-vector); E is separable
+   too, since `rot[tile, r]` folds into the tile-rotation factor. Only B changes.
+   A wrong normaliser does not raise — it optimises the wrong distribution and
+   reads as a slightly worse arm, and it would land on **B specifically**, in the
+   direction that refutes (b). Each arm must reproduce a
+   `logsumexp`-over-generated-moves equivalence on three variants and three
+   depths, matching the existing test's coverage.
+2. **The C − A precondition above.**
+
+#### Threats to validity
+
+EXP-011 had a threats section; this inherits it and adds to it.
+
+- **The targets are exact optimal play; deployment trains on MCTS visit counts.**
+  EXP-011 framed this as a bound on *level*. The sharper risk is a **rank
+  inversion between arms**: a constrained head is a regulariser, and against
+  clean near-deterministic labels extra capacity is pure gain, while against
+  noisy non-stationary self-play targets the ordering can change. Every arm here
+  trains on labels the pipeline never sees. **If the ordering inverts under
+  self-play targets, the architecture shipped by this entry is wrong in the
+  deployed condition while the measurement reads clean.**
+- **The sample is the low-branching tail.** Layers 5–14 of 16, WIN-for-mover
+  only. The factored head's weakness should be largest where the joint
+  cell×tile×rotation structure is richest — near the root, at 540 moves on this
+  board and 1,450 on the 5×5. This measures it where it is **least** stressed,
+  which biases toward accepting the factored family.
+- **`dirichlet_weight = 0` at evaluation.** Deployment puts noise at the root,
+  which partially masks prior differences, so this overstates the prior's
+  influence relative to deployment.
+- **The 5×3 understates (b) specifically.** B's conditioning is 15×6 here and
+  25×6 on the 5×5, and cell–rotation interaction grows with the board. A
+  (b)-loses result here would not license refuting (b) on the 5×5 — which is one
+  more reason the refutation branch is not the one to lean on.
+- **Mechanism claims are network-level, not head-level.** All arms train tower
+  and head jointly, so `B − C` is a difference between two networks whose heads
+  differ, not the isolated effect of a head term. **EXP-011 pre-registered a
+  frozen-shared-tower arm as the diagnostic for exactly this**, and it is
+  declined here deliberately: the adoption decision is a pipeline decision and
+  must be measured in the deployment configuration. The cost is that the
+  mechanism contrasts carry this limitation, and the C arm — identical shapes,
+  identical parameters, same code path — is the mitigation, not a substitute.
+- **Nothing here is evidence about the 5×5.**
+
+#### Anti-circularity
+
+The first draft claimed this entry "does not deepen the leak". **That was wrong
+in three ways** and is replaced by a count.
+
+1. The choice set is not adr-005's three fallbacks. Arms C and E are
+   architectures invented for this experiment; C is explicitly not adoptable and
+   E is diagnostic, but the enumeration is larger than the ADR's.
+2. The selection is **cumulative and conditioned**: EXP-012's arms were chosen
+   after seeing EXP-011's numbers. What adr-004 R1 protects is how much of the
+   deployed architecture is a function of Axis 1's answers on a variant inside
+   H3's comparison set, and that grows with each *decision*, not with each
+   dataset.
+3. Drawing seed 29 disjointly prevents statistical overlap between the selection
+   sample and H3's evaluation sample. It does **not** touch the mechanism of the
+   rule — the architecture is a function of solver labels on the 5×3, and H3
+   reports agreement with the solver on a set including the 5×3. Disjointness is
+   necessary and nowhere near sufficient.
+
+**Therefore:** H3's 5×3 evidence class records **the number of architecture
+decisions taken against 5×3 ground truth** — after this entry, **two**, over an
+*adoptable* choice set of **three** (A stands, B, D). Five architectures are
+trained; C and E are declared non-adoptable in this entry and are diagnostics.
+The adoptable count is the one that measures the leak. The caveat scales with the thing it qualifies
+instead of being a fixed sentence. The clean escape, if one is wanted later, is
+to select on something that is not solver agreement: final self-play training
+loss, or the plain-UCT floor adr-005's Phase 2 amendment already defines.
+
+#### Expected result
+
+Stated as interval claims the design can adjudicate, rather than point guesses
+inside its own blind spot.
+
+1. **The `C − A` interval contains zero.** If it does not, the precondition fails
+   and the mechanism contrasts are void — this is the prediction whose failure
+   costs the most.
+2. **`D − B` lands in the "not a result" band (2.9–7.1).** Registered as the
+   modal outcome so that indecision is not later reported as a surprise.
+3. **The `B − C` interval contains zero.** The rotation-inertness measurement in
+   EXP-011 — 11.4% over multi-orbit pairs — already undercut the ADR's claim that
+   much of the rotation factor models no choice; this predicts its other claim,
+   that rotation depends heavily on the *cell*, is also weaker than stated.
+4. **`B − E` contains zero** — cell and tile work about as well as each other as
+   conditioners.
+
+Predictions 3 and 4 together say the ADR's stated mechanism is not what is
+happening. If they hold while `D − B` is small, the honest reading is that the
+flat head's advantage in EXP-011 was width, the conditioning recovers part of it
+for reasons the ADR did not name, and the write-up must say so.
+
+#### Artefact
+
+`results/exp012-conditioned-head-5x3-h2.json`, written by
+`scripts/exp012_conditioned_head.py`. Both named here so the provenance drift in
+EXP-011's entry — which registered a filename the instrument never wrote — is not
+repeated.
+
+#### Result (2026-09-02) — the rule does not resolve at 5 seeds
+
+Run `scripts/exp012_conditioned_head.py`, 8h50 (31,815 s), artefact
+[`exp012-conditioned-head-5x3-h2.json`](../results/exp012-conditioned-head-5x3-h2.json),
+log [`exp012-run.log`](../results/exp012-run.log). The verdict below is applied
+by a separate script, `scripts/exp012_analysis.py`, so that it is reproducible
+from the raw artefact rather than from an 8.8-hour run.
+
+| arm | params | top-1 after 400 sims | sd | supervised | final train loss |
+|---|--:|--:|--:|--:|--:|
+| A_factored | 332,965 | 68.0% | 1.6 | 60.1% | 2.5787 |
+| B_cell | 373,369 | **73.4%** | 1.8 | 66.1% | 2.4918 |
+| C_pooled | 373,369 | 70.0% | 1.4 | 61.3% | 2.5853 |
+| E_tile | 373,369 | 69.9% | 1.7 | 60.4% | 2.5126 |
+| D_flat | 879,381 | **77.1%** | 1.6 | 69.7% | 2.3334 |
+| random legal | — | 39.4% | — | — | — |
+
+`D − B = +3.76 pts [+1.78, +5.74]` at t(4), α = 0.05. **The interval spans the
+5-point margin: not a result.** That was registered as the modal outcome, and the
+branch it selects is the one bounded extension — reported below.
+
+**The pairing worked this time, and that was a registered repair.** `sd(differences)`
+is 1.60 against arm sds of 1.6–1.8, implying a between-arm correlation of
+**+0.554**. EXP-011 measured ≈ −0.05 and this entry recorded that its power
+figures therefore assume independence. Constructing the value head **before** the
+policy heads, so the entire non-policy network is bit-identical across arms at
+one seed, is what changed, and it is now measured rather than argued.
+
+#### The validity precondition failed, and it could not have passed
+
+`C − A = +2.00 pts [−0.43, +4.43]`, half-width 2.43. TOST at δ = 2: **FAIL**.
+
+The number that matters is not the estimate. **The half-width alone (2.43)
+exceeds δ (2.00)**, so no point estimate whatsoever — not even exactly zero —
+could have cleared this gate at five seeds. The test was unpassable before any
+data existed.
+
+The cause is in this entry's own text. δ was set at 2 points *because* that was
+the forecast half-width. An equivalence test whose δ equals its expected
+half-width passes only if the estimate lands near-exactly on zero **and** the
+noise comes in under its own forecast. The observed `sd(differences)` was 1.95
+against the ~1.5 the forecast implied, and the gate closed. **This is a design
+defect, not a property of the arms**, and it is the second time in two entries
+that a validity check has been written in a form that could not do its job — the
+first was the "interval contains zero" form this TOST replaced.
+
+Consequence, applied without discretion: **every mechanism contrast is
+UNRESOLVED, regardless of what it shows.**
+
+One observation is recorded and explicitly does **not** rescue the entry. The
+gate's stated rationale above is that *if C is materially worse than A, the
+control is handicapped and `B − C` is positive by that handicap alone*. C came
+out **+2.0 points better** than A. The violation is in the opposite direction to
+the artefact the gate exists to prevent, which makes `B − C` conservative rather
+than inflated. That is post-hoc reasoning about a failed gate; it is a candidate
+for a future registered entry and it changes nothing here.
+
+#### Mechanism: joint and frozen disagree, and not in the anticipated direction
+
+Recorded for completeness. **All six intervals are void** under the precondition.
+
+| contrast | joint (deployment) | frozen tower (head-level) |
+|---|--:|--:|
+| B − C | +3.32 [+2.18, +4.46] | +0.88 [−1.10, +2.86] |
+| E − C | −0.12 [−2.71, +2.47] | +1.16 [−0.53, +2.85] |
+| B − E | +3.44 [+0.29, +6.59] | −0.28 [−1.94, +1.38] |
+
+Frozen, the three arms land at **68.5% / 67.6% / 68.8%** — on top of A's own
+joint 68.0%. **On a tower trained for the factored head, no head architecture
+makes any difference at all.**
+
+This entry registered the disagreement case in advance and named the direction it
+expected: *"the mechanism visible frozen and absent jointly"*, the tower absorbing
+a head's limitation. **The observed disagreement is the exact inverse.** Two
+readings fit and neither is decided here:
+
+1. The head only pays when it can rewrite the features — conditioning is a
+   property of the co-adapted network, not of the head.
+2. An A-optimal tower supplies no cell-conditional features, so a real mechanism
+   would be invisible under freezing regardless.
+
+The frozen condition was added after red-team pass 2 to *remove* a confound. It
+introduced a different one, and the honest statement is that it did not resolve
+what it was added to resolve.
+
+#### The training-loss diagnostic, registered for exactly this
+
+Registered so that "no mechanism" could be told apart from "not enough data":
+
+- **B** fits the training set better than C (2.4918 vs 2.5853) **and** beats it
+  held-out. Not a data-efficiency limit — expressiveness that realises.
+- **E** fits better than C (2.5126) but is level with it held-out (69.9 vs 70.0).
+  That is fitting without generalising, and it is where the data-efficiency
+  reading applies.
+- **D** is far below all of them at 2.3334 and best held-out, consistent with
+  EXP-011: width.
+
+#### Layer parity — the effect is on the odd layers
+
+| arm | odd | even |
+|---|--:|--:|
+| A_factored | 48.2% | 86.3% |
+| B_cell | 56.3% | 89.1% |
+| C_pooled | 50.9% | 87.7% |
+| E_tile | 51.2% | 87.2% |
+| D_flat | 61.0% | 92.0% |
+
+`B − A` is **+8.1** on odd layers against +2.8 on even; `D − B` is **+4.7**
+against +2.9. The pooled figures are a mixture, and where the position actually
+carries a decision the flat head's lead is larger than the headline.
+
+#### Two registered reads the instrument never wrote
+
+Both were recovered offline by `scripts/exp012_analysis.py`, because per-position
+hits were saved:
+
+- **The bootstrap clustered on the 500 positions.** For `D − B` its half-width is
+  1.98, indistinguishable from the seed-mean interval's 1.98; for `C − A` it is
+  **narrower** (1.64 vs 2.43). The registered rule is to quote the wider, so the
+  seed-mean interval stands in both cases. The dominant variance is training-seed
+  variance, not position sampling — which is what a fixed shared held-out set
+  should produce.
+- **`sd(differences)` and the implied correlation**, reported above.
+
+A third registered read — the 80-epoch re-run — was **not** recoverable and had
+never been implemented. It is discharged in the next section.
+
+#### Result — convergence (2026-09-02): 40 epochs is the generalisation limit
+
+Run `scripts/exp012_followup.py --leg convergence`, 1h53 (6,797 s), artefact
+[`exp012-convergence-5x3-h2.json`](../results/exp012-convergence-5x3-h2.json).
+Seed 0 per arm at 80 epochs, paired by McNemar against the 40-epoch row on the
+same 500 positions. The registry does not name a seed; seed 0, the first
+registered, is named here.
+
+| arm | 40 ep | 80 ep | McNemar | train loss 40 → 80 |
+|---|--:|--:|--:|--:|
+| A_factored | 69.6% | 67.4% | −2.2 [−5.6, +1.2] | 2.5685 → 2.5387 |
+| B_cell | 74.8% | 73.6% | −1.2 [−4.3, +1.9] | 2.4901 → 2.4437 |
+| C_pooled | 71.4% | 71.4% | +0.0 [−3.4, +3.4] | 2.5738 → 2.5423 |
+| E_tile | 70.8% | 71.0% | +0.2 [−2.8, +3.2] | 2.5062 → 2.4698 |
+| D_flat | 79.6% | 76.4% | −3.2 [−6.4, +0.0] | 2.3315 → 2.2984 |
+
+**Every interval contains zero: doubling the schedule moves no arm.** But
+training loss fell in all five while held-out rose in none, and four of five
+point estimates are negative. That is the signature of the arms sitting **at or
+past** their generalisation optimum at 40 epochs, not short of it.
+
+**This corrects a reading taken from the trajectory alone.** The per-epoch
+improvement over the final five epochs was 0.0060–0.0087 across arms at 40
+epochs on seed 0 and is still 0.0014–0.0032 at 80, so by the registered criterion
+the loss is indeed descending throughout — and the first reading of that was "no
+arm converged". (The 5-seed means at 40 epochs are lower, 0.0029–0.0043; seed 0
+sits at the high end, which makes it the harder seed on which to argue that more
+epochs would not help.) The trajectory answers
+whether *optimisation* has finished, not whether *generalisation* has, and
+generalisation finished first. The 40-epoch schedule is defensible and `D − B` is
+not an artefact of the optimisation budget.
+
+Two further readings, both weak and labelled as such. D degrades most (−3.2, the
+only interval touching zero at its upper end), so on seed 0 `D − B` narrows from
++4.8 to +2.8 with more training — the opposite of "D leads because it needs more
+epochs than it got". One seed at ±3 is inside noise and this is not treated as a
+finding. And the **arm ordering is preserved at 80 epochs** (D > B > C ≈ E > A),
+so the ranking-inversion threat did not materialise under more training; it
+remains live under self-play targets, which is a different condition.
+
+#### Result — the bounded extension (2026-09-03): adopt (b), by a quarter of a point
+
+Run `scripts/exp012_followup.py --leg extension`, 3h54 (14,017 s), artefact
+[`exp012-extension-5x3-h2.json`](../results/exp012-extension-5x3-h2.json). Seeds
+5–11 for **B and D only**: adoption is read on `D − B`, and extending arms whose
+contrasts are void would spend compute making unresolved numbers precise.
+
+**`D − B = +3.32 pts [+1.88, +4.75]`** at n = 12, t(11) = 2.593, α = 0.025.
+Entirely below the 5-point margin.
+
+> **The rule fires: adopt fallback (b).** The architecture record in adr-005 is to
+> be amended to the conditioned head. Fallback (c) is not run.
+
+**It clears by 0.25 points**, and that is the number this result should be
+remembered by. The indecision band at n = 12 with the observed variance is
+3.56–6.44; the estimate landed at 3.32.
+
+The 5-seed projection was optimistic on both axes. It assumed `sd(differences)`
+would hold at 1.60 and gave [+2.57, +4.95]; the sd rose to **1.92** — five seeds
+understated the variance — and the point estimate fell 0.44. The real interval is
+both wider and lower than projected. At an uncorrected α = 0.05 the interval is
+[+2.10, +4.54], so the significance level did not decide this; the margin did.
+
+**The merge is guarded, not assumed.** Merging seeds 5–11 with rows 0–4 is only
+legitimate if the pipeline still produces those rows, so `B_cell` seed 0 — the
+conditioned path with the nested normaliser — was retrained and its hit vector
+compared **element-wise**: 500/500 positions identical, training loss matching to
+1e-9. A mean comparison would not have been evidence, since two runs can score
+74.8% on different positions; the guard's failure path was validated on a
+poisoned vector with two positions swapped in opposite directions, leaving the
+mean unchanged.
+
+#### What the adoption does not establish
+
+Three limits, each already recorded above this section and none weakened by the
+verdict.
+
+1. **D still leads B by 3.3 points** (76.5% vs 73.2% at 12 seeds). The margin is a
+   tolerance — the price adr-005 was willing to pay for the factored structure —
+   not a claim of equivalence.
+2. **The mechanism is unresolved.** adr-005's remedy is adopted while its stated
+   reason, *"the best rotation depends heavily on the cell"*, is **not verified**.
+   The precondition that would have licensed reading `B − C` failed.
+3. **This is an adoption of *this* B.** The entry records above that
+   `Linear(480, 90)` is fifteen unshared 480→6 maps at 43,290 parameters, and that
+   a 1×1 convolution over `policy_conv`'s spatial map gives full cell
+   conditioning in **198**. The entry's own sentence — "a null on B is a null on
+   *this* B" — holds symmetrically for an adoption. The efficient form is
+   unmeasured and is registered as the follow-up.
+
+#### The margin changed role and was never rejustified
+
+Recorded as the principal threat to this verdict.
+
+Five points was EXP-011's **detection threshold** — a difference smaller than
+this is not worth acting on. In this entry it is an **adoption tolerance** — a
+loss up to this is an acceptable price for the factored structure. Those are
+different quantities and the number was carried across without being rewritten.
+
+Red-team pass 2 raised this and it was left unaddressed, which was a cheap
+omission while it was hypothetical. **A decision that closes by a quarter of a
+point against that constant makes it load-bearing.** Any future entry that
+re-reads adoption on this margin must justify it in its adoption sense first.
+
+#### Every registered prediction, scored
+
+| # | prediction | outcome |
+|---|---|---|
+| 1 | `C − A` contains zero | The interval does contain zero — but the **registered form is TOST**, and it failed, unpassably. Scored as **failed**: the operative test is the registered one. |
+| 2 | `D − B` lands in the 2.9–7.1 "not a result" band | **Correct** (+3.76). Indecision was registered as modal and was not a surprise. |
+| 3 | `B − C` contains zero | **Wrong jointly** (+3.32, entirely above zero); right frozen (+0.88). Both void. |
+| 4 | `B − E` contains zero | **Wrong jointly** (+3.44); right frozen (−0.28). Both void. |
+
+The entry's own summary of 3 and 4 — *"together they say the ADR's stated
+mechanism is not what is happening"* — cannot be claimed. The joint contrasts
+point the other way and the frozen ones cannot arbitrate, because the
+precondition that made either readable never passed.
+
+#### Anti-circularity — the count after this entry
+
+**Two** architecture decisions have now been taken against 5×3 ground truth
+(EXP-011 refuting the factored head as sufficient; EXP-012 adopting the
+conditioned head), over an *adoptable* choice set of **three** (A stands, B, D).
+Five architectures were trained; C and E were declared non-adoptable in advance
+and are diagnostics. H3's 5×3 evidence class carries this count.
+
+#### Threats to validity, added by the result
+
+The entry's own threats stand. These are added by what happened.
+
+- **The verdict is a function of one constant that was reused across roles.** See
+  above. The interval's upper limit is +4.75, so the adoption survives any margin
+  above 4.75 points and flips below it. A margin of 4.7 — a 6% change in a number
+  that was never rejustified for the role it is playing — reverses the verdict.
+- **Five seeds understated the variance by 20%** (1.60 → 1.92). Any future power
+  calculation on this pipeline that uses a 5-seed sd will be optimistic.
+- **The frozen-tower condition introduced a confound while removing one.** It
+  cannot distinguish "no head-level mechanism" from "an A-optimal tower supplies
+  no features the mechanism could use".
+- **Convergence was read on one seed per arm.** The McNemar half-widths are ±3
+  points, so the 80-epoch comparison detects only large movements. "No arm moved"
+  means no arm moved by more than about 3 points.
+- **The adopted head is the inefficient implementation**, and the efficient one
+  differs by 218× in parameter count in the part of the network the decision is
+  about. It is not obvious that the two behave alike, and nothing here tests it.
+
+#### Artefacts
+
+| file | produced by |
+|---|---|
+| [`exp012-conditioned-head-5x3-h2.json`](../results/exp012-conditioned-head-5x3-h2.json) | `scripts/exp012_conditioned_head.py` |
+| [`exp012-convergence-5x3-h2.json`](../results/exp012-convergence-5x3-h2.json) | `scripts/exp012_followup.py --leg convergence` |
+| [`exp012-extension-5x3-h2.json`](../results/exp012-extension-5x3-h2.json) | `scripts/exp012_followup.py --leg extension` |
+| [`exp012-guard-receipt.json`](../results/exp012-guard-receipt.json) | the reproduction guard, recording commit and digest |
+
+The verdict is applied by `scripts/exp012_analysis.py` from the artefacts, not by
+the run.
+
+#### Follow-ups this entry creates
+
+1. **adr-005 amendment** — the architecture record moves to the conditioned head.
+   Required by the decision rule; the Axis 2 architecture may only change by ADR.
+2. **A new entry for the convolutional form of (b)** — 198 parameters against
+   43,290, full cell conditioning, named in this entry as the obvious follow-up
+   and deliberately not run.
+3. **An entry that can actually read the mechanism**, if the mechanism is still
+   wanted. It needs an equivalence gate whose δ is not equal to its own forecast
+   half-width, and a head-level condition that does not freeze the tower into one
+   arm's optimum.
+
+
+### EXP-013 — the efficient parameterisation of (b): does sharing weights across cells cost anything?
+
+**Registered 2026-09-03, before the instrument exists.** Follow-up 2 of EXP-012.
+
+#### What this asks, and what has already been committed
+
+adr-005 now specifies a conditioned policy head, adopted by EXP-012 and amended
+into the ADR on 2026-09-03. **That amendment adopted an implementation both it
+and EXP-012 record as the inefficient one**, and both name this experiment as the
+obligation that follows.
+
+The adopted form is `Linear(policy_features, n_cells × 6)`: as many independent
+maps as there are cells, with **no weight sharing**, learning "which rotation,
+given which cell" once per cell. The tower is convolutional and `policy_conv`
+already produces a `(32, n_cells)` spatial map. A **1×1 convolution from 32 to 6
+channels** on that map produces per-cell rotation logits from weights shared
+across cells, reading each cell's own 32-dimensional features.
+
+| board | rotation head: factored (superseded) | linear-conditioned (adopted) | **1×1 conv** |
+|---|--:|--:|--:|
+| 5×5 (shipped) | 4,806 | 120,150 | **198** |
+| 5×3 (measured here) | 2,886 | 43,290 | **198** |
+
+The convolutional form is **218× smaller in the component the whole decision is
+about**, and on the 5×5 it makes the conditioned network *smaller than the
+factored incumbent it replaced* — 347,887 against 352,495. If it is not worse,
+adr-005's parameter-efficiency thesis is served better by it than by the head
+currently written into the ADR.
+
+**The question is narrow and it is a parameterisation question, not a
+mechanism question.** Both arms compute the same score,
+`cell[c] + tile[t] + rotation[c, r]`, over the same nested normaliser. They
+differ only in how `rotation[c, r]` is produced.
+
+#### The two arms
+
+| arm | rotation rows from | rotation parameters (5×3) |
+|---|---|--:|
+| **L_linear** | `Linear(480, 15 × 6)` — the adopted head, EXP-012's arm B | 43,290 |
+| **V_conv** | `Conv2d(32, 6, kernel_size=1)` over the pre-flatten `(32, 15)` map | 198 |
+
+**The linear arm is not retrained.** Its twelve rows already exist — EXP-012's
+`B_cell` at seeds 0–11, on this sample, this schedule and this code. Reusing them
+halves the run, and the reproduction guard built for EXP-012's extension is
+exactly the instrument that makes the reuse legitimate rather than assumed.
+
+#### Why the conv form is not obviously equal, and could be better
+
+Two forces pull in opposite directions and the entry does not pre-judge them.
+
+**Against the conv form.** Shared weights cannot express cell-specific behaviour
+that is not a function of that cell's own feature vector. If the right rotation
+at A1 depends on something the tower does not put into A1's 32 channels, the
+unshared form can memorise it and the shared form cannot.
+
+**For the conv form, and this is the sharper one.** EXP-012 recorded that the
+adopted head carries a **data-efficiency handicap**: the rotation row for cell `c`
+receives gradient only on plies where `c` is empty, about **36.7%** of positions.
+Shared weights receive gradient from **every cell on every position**. The conv
+form should therefore be better exactly where EXP-012 found the signal
+concentrated — the **odd layers**, where `B − A` was +8.1 against +2.8 on even
+layers.
+
+The registered prediction is that the conv form is **not worse**, and it is
+plausible that it is better. The design is one-sided for that reason; see the
+test.
+
+#### The initialisation must be measured, not assumed
+
+EXP-012's pooled control needed a `sqrt(15)` correction because `Linear`
+initialises rows independently and a mean of fifteen rows starts at a quarter of
+one row's scale. **Identical function class did not imply identical initial
+function**, and it was the one systematic difference in that entry.
+
+The same trap is live here and is worse, because the two arms differ in input
+dimensionality: the linear form's rotation logit is a dot product over 480
+features, the conv form's over **32**. Default initialisation bounds are
+`1/sqrt(fan_in)` in both cases, so the two logits start at different scales by
+construction.
+
+**Registered as a step, not an assumption.** Before any arm is trained, the
+standard deviation of the rotation logit at initialisation is measured for both
+forms over 1,000 sampled positions, and the conv form's output is scaled by a
+fixed constant chosen to match. The measured constants and the two standard
+deviations go in the artefact. Scaling the output leaves the function class
+untouched. An unreported mismatch here would read as "the shared form is worse"
+for a reason that has nothing to do with sharing.
+
+#### Ground truth and sample
+
+Identical to EXP-011 and EXP-012, so the three entries are readable together, and
+required identical because the linear arm's rows are reused rather than retrained.
+
+`data/subgame-solutions/5x3-h2.json`, V5 checksum
+`51192b4d403ac1cb45c22d92ce58bab215843f457f245e7aca6d18744f8a3f43`, termination
+`exhausted`. Sampler seed **29**, layers 5–14, 250 WIN-for-mover positions per
+layer, shuffled, split 2,000 train / 500 held out.
+
+#### Schedule, pinned
+
+**40 epochs, batch 64, Adam at lr 1e-3, weight decay 1e-4**, with the rotation
+parameters in a `weight_decay = 0` group in **both** arms — as in EXP-012, so the
+decay-to-signal ratio does not differ across parameterisations. That matters more
+here than there: decay applied equally to 43,290 and to 198 parameters is not the
+same intervention.
+
+**40 epochs is now justified rather than inherited.** EXP-012's convergence leg
+re-ran one seed per arm at 80 epochs: every McNemar interval contained zero,
+training loss fell in all five arms, and held-out rose in none. The arms sit at
+or past their generalisation optimum at 40. **No convergence re-run is registered
+here** — the question was asked and answered on this pipeline, this sample and
+this schedule.
+
+#### Metrics
+
+1. **Primary — top-1 optimality after 400 PUCT simulations**, each head supplying
+   the prior, on the held-out 500, 12 seeds per arm.
+2. **Secondary, and non-solver — final training loss**, per arm and seed.
+3. **Reported beside both** — the random-legal-move floor, and the stratified
+   read by **layer parity**, which is where the registered prediction lives.
+
+The unit is the **position**.
+
+#### The test, named — non-inferiority, not equivalence
+
+Read on the paired *t* over the twelve seed means, conditional on the fixed
+held-out set, with the bootstrap clustered on the 500 positions reported beside
+it and **the wider of the two quoted** — EXP-012's rule, and its instrument
+omitted it, so it is named here as an output the artefact must contain.
+
+**The shape is one-sided.** The hypothesis is directional: the conv form must not
+be materially *worse*. An equivalence test would spend power ruling out the
+conv form being better, which is an outcome nobody needs protection from.
+
+`V_conv − L_linear`, non-inferiority margin **δ = 1.7 points**, one-sided
+α = 0.05, `t(11) = 1.796`.
+
+#### The margin is derived, and its derivation imports an interval
+
+EXP-012's principal threat is that its 5-point margin changed role — detection
+threshold to adoption tolerance — and was carried across without being
+rejustified. **This entry does not reuse it.**
+
+adr-005 adopted a head that concedes **3.3 points** to the flat head, under a
+tolerance of **5.0**. A parameterisation that gives back more than the remaining
+**1.7 points** would push the shipped architecture outside the tolerance the
+adoption decision was actually taken under. That is the derivation:
+`δ = 5.0 − 3.3 = 1.7`.
+
+**And the derivation is not clean, which is stated rather than hidden.** The 3.3
+is a point estimate with interval [1.88, 4.75]. A reader who takes the
+conservative end derives `δ = 5.0 − 4.75 = 0.25`, which is not measurable at any
+affordable seed count; the optimistic end gives `δ = 3.12`. **δ = 1.7 is the
+point-estimate derivation and it inherits that uncertainty.** It is registered
+with the range visible so that no later write-up can present it as a clean
+consequence of the adoption.
+
+#### Feasibility, checked before the fact — the repair for EXP-012's defect
+
+EXP-012's validity gate was **unpassable**: its δ equalled its forecast
+half-width, so no point estimate could clear it. That failure mode is checked
+here explicitly and the check is registered as a project-wide rule.
+
+Measured on this exact pipeline, `sd(differences)` between arms across seeds is
+1.60 (5 seeds), 1.92 (12 seeds) and 1.95. **The conservative figure 1.95 is used.**
+
+| quantity | value |
+|---|--:|
+| `sd(differences)`, assumed | 1.95 |
+| standard error at n = 12 | 0.563 |
+| one-sided half-width, `t(11) = 1.796` | **1.011** |
+| margin δ | 1.700 |
+| **room the point estimate has** | **0.689** |
+
+The test passes when the observed `V_conv − L_linear` exceeds **−0.689 points**.
+That number is positive, which is the whole point: the gate is passable, and by
+how much is known before the run.
+
+> **Registered as a standing rule for this project.** No equivalence or
+> non-inferiority test may be registered whose δ does not exceed its forecast
+> half-width, and the *room* — δ minus that half-width — must be tabulated in the
+> entry. A gate that cannot be passed is not a gate.
+
+#### Power, at the registered margin
+
+Approximate, treating the estimated sd as known:
+
+| true `V_conv − L_linear` | probability the gate passes |
+|---|--:|
+| +1.0 (conv better) | >99% |
+| 0.0 (a true tie) | **89%** |
+| −0.5 | 63% |
+| −1.0 | 29% |
+| −1.7 (the margin itself) | 4% — α, which is 5% exactly under the *t*; the gap is the normal approximation |
+
+At a true tie the design resolves nine times in ten, and it correctly refuses
+when the conv form is a full point worse. **A true difference between −0.5 and
+−1.0 will often not resolve**, and "not resolved" is then the reported outcome.
+
+#### Decision rule
+
+Read on the one-sided interval for `V_conv − L_linear`.
+
+- **Lower limit above −1.7** → **adopt the convolutional form.** adr-005 is
+  amended again; the rotation head becomes the 1×1 convolution. Parsimony breaks
+  a tie in a decision whose stated purpose is parameter efficiency, and the
+  saving is 119,952 parameters on the shipped board.
+- **Lower limit at or below −1.7** → **the adopted linear form stands.** Recorded
+  as a finding, not a non-result: it would mean unshared per-cell weights buy
+  something the shared form cannot express, which contradicts the efficiency
+  argument that motivated this entry.
+- **Additionally, if the interval lies entirely above zero** → the conv form is
+  not merely non-inferior but better, and see below.
+
+**Twelve seeds, and no extension.** EXP-012 ran five and needed its one permitted
+extension, at three hours, to clear by a quarter of a point — and its five-seed
+`sd` understated the twelve-seed value by 20%. This design is powered at twelve
+from the measured variance up front. **If it does not resolve, that is the
+result**, and the incumbent stands by incumbency. Registering an extension here
+would be registering optional stopping with extra steps.
+
+#### What this entry does not re-read
+
+**It does not re-read EXP-012's adoption.** That rule permitted one extension and
+it is spent. If the conv form comes out **materially better** than the linear
+form, the 3.3-point gap to the flat head was measured against a parameterisation
+that is no longer the shipped one, and a **fresh adoption entry** is required —
+registered separately, not read out of this one. This is written down now so that
+a favourable result cannot be quietly converted into a stronger claim about the
+flat-head comparison.
+
+#### Correctness preconditions
+
+Both must pass before the run counts as evidence.
+
+1. **The reproduction guard runs *after* the `az/network.py` change, not before.**
+   Its entire purpose here is to catch that change perturbing the incumbent arm
+   whose rows are being reused. `B_cell` seed 0 is retrained and its held-out hit
+   vector compared **element-wise** against EXP-012's artefact — a mean
+   comparison is not evidence, since two runs can score the same on different
+   positions. Any mismatch voids the reuse and the linear arm must be retrained
+   in full.
+2. **The conv arm's normaliser is verified against brute force.** The score is
+   the same non-separable form as the adopted head, so the nested closed form
+   applies unchanged — but "applies unchanged" is a claim about code that must be
+   checked, on three variants and three depths, matching the existing test's
+   coverage. A wrong normaliser does not raise; it optimises the wrong
+   distribution and reads as a worse arm, and it would land on **V_conv
+   specifically**, in the direction that keeps the incumbent.
+
+Also asserted, as in EXP-012: stem, tower, `policy_conv` and value head are
+**bit-identical across both arms at one seed**. Restructuring `policy_conv` to
+expose the pre-flatten map must not shift the RNG stream. `nn.Flatten` holds no
+parameters, so moving it to the call site should be inert — *should be* is why it
+is asserted rather than reasoned about.
+
+#### Threats to validity
+
+Inherits EXP-011's and EXP-012's. Added here:
+
+- **The 5×3 has 15 cells and the shipped board has 25.** Weight sharing gets
+  *more* attractive as cells multiply — 25 unshared maps against one shared one —
+  so a conv-form win here understates the 5×5 case, and a conv-form loss here
+  would be the more transferable result. The asymmetry is in the direction that
+  makes a negative result the more informative one, which is unusual and worth
+  saying.
+- **The two arms are not parameter-matched, deliberately.** Every previous entry
+  in this family matched parameters to isolate a mechanism. This one is a
+  parameterisation question and matching would destroy it: the 218× difference
+  *is* the treatment. It follows that a conv-form win is confounded with
+  regularisation-by-fewer-parameters, and the entry cannot separate "sharing is
+  the right inductive bias" from "43,290 parameters was too many". **That
+  separation is not attempted and no sentence may claim it.**
+- **Reusing the linear arm's rows means one arm's numbers predate the other's
+  code.** The guard checks reproduction on one cell of twelve. A defect that
+  perturbs only seeds 3 and 7 would pass it. The guard is a strong check, not a
+  proof.
+- **Targets are exact optimal play; deployment trains on MCTS visit counts.** The
+  rank-inversion risk EXP-012 records applies unchanged, and applies with more
+  force to a regularisation-flavoured comparison: fewer parameters help more
+  against noisy targets than against clean ones, so a conv-form tie here could be
+  a conv-form win in deployment, unmeasured either way.
+
+#### Anti-circularity
+
+Under [adr-004](../docs/adr/adr-004-solver-approach.md) R1 this is the **third**
+architecture decision taken against 5×3 ground truth, over an adoptable choice
+set of **four** (factored, linear-conditioned, conv-conditioned, flat).
+
+**The refinement argument does not exempt it.** One could argue this only chooses
+between two implementations of a decision already taken, and therefore adds no
+new family. It still makes the shipped architecture a function of solver labels
+on a variant inside H3's comparison set, and R1 counts *decisions*, not families.
+The count is three.
+
+**A partial repair is registered.** Final training loss — a non-solver quantity —
+is a pre-registered secondary. **If the two disagree in direction, this entry
+adopts nothing** and the disagreement is the finding. That uses the non-solver
+signal as a check on the solver-selected decision rather than as a second
+selector, which is the only use of it that does not simply move the leak.
+
+#### Amendment (2026-09-03, before the run) — the secondary was not a secondary
+
+Found while building the instrument, with no data in existence. Registered here
+rather than fixed silently, because the defect is in the anti-circularity repair
+and that is the part of the entry most worth being able to trust.
+
+**Defect 1 — final training loss is not a non-solver quantity.** The training
+targets are optimal moves read from the exact solver. A loss computed against
+solver labels cannot check a solver-selected decision; it is the same evidence in
+a different unit. The section above called it "a non-solver quantity" and it is
+not one.
+
+**Defect 2 — the direction rule contradicted this entry's own prediction.** The
+repair said the entry adopts nothing if the primary and the secondary "disagree
+in direction". Expected result 4 predicts the conv arm fits training **worse**
+(198 parameters against 43,290) while generalising **no worse** — the textbook
+outcome for a smaller model, and the cleanest possible statement of the entry.
+The rule as written would have scored exactly that as a disagreement and refused
+to adopt. **The registered rule and the registered prediction could not both be
+satisfied.**
+
+**The replacement — head-to-head play.** The two arms at seed 0 play a match of
+**200 games**, seats alternating, 400 simulations, temperature for the first four
+plies so the games are not replays of one another. The winner is decided by the
+game, not by agreement with the solver, which puts it genuinely outside Axis 1.
+
+- **It costs no extra training.** The reproduction guard already trains the
+  incumbent at seed 0; its net is kept and played. Only match time is added,
+  about 30 minutes.
+- **It is one seed pair and therefore weak**, so it is used only as a veto and
+  only when decisive: the check fires when the conv arm's Wilson interval lies
+  **entirely below 50%**. At 200 games that is roughly a win rate under 43%. A
+  single seed pair cannot overturn a twelve-seed primary on noise.
+
+**Training loss stays, as a reported diagnostic and never as a gate.**
+Prediction 4 is read against it.
+
+#### A defect in the shipped pipeline, found by building this entry
+
+Not a result of EXP-013 and recorded because it was found here.
+
+`az/network.py::NetworkEvaluator` computes priors through the **factored**
+`masked_log_policy`, which expects a 6-wide rotation vector. Handed the
+conditioned head adr-005 adopted on 2026-09-03, it raises. Both `az/player.py`
+and `az/selfplay.py` constructed it by name, so **self-play, the evaluator gate
+and the agents were all still factored-only after the architecture record had
+moved.** The adoption changed the ADR and the training path and left the play
+path behind.
+
+It fails loudly rather than quietly, which is the only good thing about it. The
+repair is a `ConditionedNetworkEvaluator` and an `evaluator_for(net, board)`
+factory that both call sites now use, pinned by two tests — one that every head
+type gets the right evaluator and produces a normalised prior over legal moves,
+and one that the evaluator's distribution matches the one
+`conditioned_policy_loss` optimises. Without the second, a network could be
+trained on one distribution and played on another with nothing raising.
+
+**This does not perturb the reused rows.** EXP-012's instrument scored arms
+through its own `_ArmEvaluator`, never through `NetworkEvaluator`, so the repair
+cannot touch the incumbent's twelve rows — and the reproduction guard is what
+checks that claim rather than asserting it.
+
+#### One registered precondition turned out to be unnecessary
+
+The correctness preconditions above anticipate restructuring `policy_conv` to
+expose its pre-flatten map, and require asserting that the restructuring does not
+shift the RNG stream. **No restructuring was needed:** `policy_conv` is a
+`Sequential` and the map is available as `policy_conv[:3](features)`, with the
+flatten applied as `policy_conv[3]`. `FlipHexNet` is untouched.
+
+That strictly strengthens the reuse argument — the incumbent's class did not
+change at all — and the bit-identity assertion is kept anyway, as a test, because
+"untouched" is a claim about code.
+
+#### Expected result
+
+1. **The gate passes**: `V_conv − L_linear` lands above −0.689 and the
+   convolutional form is adopted.
+2. **The point estimate is non-negative**, on the data-efficiency argument: the
+   shared weights train on every cell of every position against the unshared
+   form's 36.7%.
+3. **Any advantage concentrates on the odd layers**, where EXP-012 measured the
+   head effect at +8.1 against +2.8.
+4. **Training loss is higher for the conv form** — 198 parameters fit the training
+   set less well than 43,290 — **while held-out is not worse.** If that pair
+   holds, it is the clean statement of the entry: the unshared parameters were
+   fitting the training set and not the game.
+
+Prediction 4 is the one that can most cleanly be wrong, and it is the one worth
+watching: if the conv form fits training *better*, the data-efficiency story is
+doing more work than the capacity story and the entry should say so.
+
+#### Artefact
+
+`results/exp013-conv-rotation-5x3-h2.json`, written by
+`scripts/exp013_conv_rotation.py`, with the verdict applied by
+`scripts/exp013_analysis.py` from the artefact rather than by the run. The
+network class is `az/network.py::ConvRotationNet`. All four named before the
+instrument exists.
+
+**Estimated cost.** Twelve training runs plus evaluation at ~920 s each, plus the
+reproduction guard at ~770 s: **≈ 3.4 h**. The linear arm's twelve rows are
+reused, which is the half that is not paid.
+
+#### Result (2026-09-04) — the rule fires: adopt the convolutional form
+
+Run `scripts/exp013_conv_rotation.py`, 4h20 (15,596 s), artefact
+[`exp013-conv-rotation-5x3-h2.json`](../results/exp013-conv-rotation-5x3-h2.json),
+log [`exp013-run.log`](../results/exp013-run.log). Verdict applied by
+`scripts/exp013_analysis.py`, which recomputes every quantity from `results` and
+refuses to print if it disagrees with what the run stored. It agreed.
+
+| arm | rotation params (5×3) | top-1 after 400 sims | sd | supervised | final train loss |
+|---|--:|--:|--:|--:|--:|
+| L_linear (adopted 2026-09-03) | 43,290 | 73.2% | 1.4 | 66.0% | 2.4967 |
+| **V_conv** | **198** | **74.2%** | 1.2 | 67.8% | 2.5068 |
+| random legal | — | 39.4% | — | — | — |
+
+**`V_conv − L_linear = +0.95 pts`, lower limit −0.06%** against a margin of
+−1.70%, at `t(11) = 1.796`. The clustered bootstrap on the 500 held-out positions
+gives −0.05%; the seed-mean interval is the wider and is quoted, and the two
+agree on the branch.
+
+> **The rule fires: adopt the convolutional form.** adr-005's rotation head
+> becomes a 1×1 convolution. On the shipped 5×5 that is **347,887** parameters
+> against the linear-conditioned head's 467,839 and the factored head's 352,495 —
+> **full cell conditioning for less than not conditioning**, and 119,952
+> parameters saved against the form the ADR carried for one day.
+
+#### The feasibility repair worked on its first use
+
+This is the part worth keeping.
+
+| | forecast | observed |
+|---|--:|--:|
+| `sd(differences)` | 1.95 | **1.94** |
+| one-sided half-width | 1.011 | **1.011** |
+| δ | 1.700 | 1.700 |
+| **room** | **+0.689** | **+0.689** |
+
+EXP-012's validity gate was **unpassable** — its δ equalled its forecast
+half-width, so no point estimate whatsoever could have cleared it, and every
+mechanism contrast in that entry is void as a result. The standing rule this
+entry introduced — *no equivalence or non-inferiority test may be registered
+whose δ does not exceed its forecast half-width, with the room tabulated* — was
+applied here for the first time, and the forecast landed to the second decimal.
+
+The analysis script recomputes the room from the **observed** spread and refuses
+to print an adoption if it is not positive, so a run that turned out noisier than
+forecast could not have produced a verdict at all.
+
+#### What the adoption does not establish
+
+**The convolutional form is not better. It is not worse.** The registered test is
+one-sided and it passed; the two-sided read is `+0.95 [−0.29, +2.19]` and
+**contains zero**. Seven of twelve seeds favour the conv form, five the linear
+one. No sentence in any artefact may say the convolution won.
+
+**The pairing bought nothing here.** Implied between-arm correlation **−0.108**,
+against the **+0.554** EXP-012 measured on `D − B`. Constructing the value head
+before the policy heads was that entry's registered repair and it is now clear
+that it fixed *that pair of arms*, not pairing in general. The forecast `sd` was
+taken conservatively and happened to be right anyway; a future entry must not
+assume the pairing is worth variance reduction.
+
+**The arms are not parameter-matched, deliberately, so the win is confounded.**
+The 218× difference *is* the treatment. This entry cannot separate "sharing is
+the right inductive bias" from "43,290 parameters was too many", and it was
+registered as unable to.
+
+**It does not re-read EXP-012's adoption.** Descriptively the gap to the flat
+head narrows from **+3.32** to **+2.37** points. That number is recorded and
+**not acted on**: EXP-012's rule permitted one extension and it is spent, and
+this entry registered in advance that a materially better conv form requires a
+fresh adoption entry rather than a re-read. The narrowing is a reason to consider
+registering one, not a result about it.
+
+#### Every registered prediction, scored — three of four
+
+| # | prediction | outcome |
+|---|---|---|
+| 1 | the gate passes, above −0.689 | **holds** — +0.95 |
+| 2 | the point estimate is non-negative | **holds** — +0.95 |
+| 3 | any advantage concentrates on the **odd** layers | **fails** — +0.8 odd against **+1.1 even** |
+| 4 | conv fits training worse while generalising no worse | **holds** — 2.5068 vs 2.4967, and +0.95 held-out |
+
+**Prediction 3 is the informative failure.** It was derived from the
+data-efficiency argument: shared weights receive gradient from every cell on
+every position against the unshared form's 36.7%, so the gain should appear where
+the head effect is largest — the odd layers, where EXP-012 measured `B − A` at
++8.1 against +2.8. The advantage came out **flat across parity, marginally
+larger on the even layers**.
+
+That weakens data efficiency as the mechanism and **replaces it with nothing.**
+The design cannot arbitrate, having been registered as unable to separate sharing
+from size. What can be said is that the *reason* given for expecting the
+convolution to win is not visible in the place it should have been most visible.
+
+**Prediction 4 holding is the clean statement of the entry:** 198 parameters fit
+the training set worse than 43,290 and generalise better. The unshared parameters
+were fitting the training set and not the game.
+
+#### The initialisation match was not cosmetic
+
+Measured over 500 held-out positions and three seeds before any training:
+
+```
+incumbent rotation-logit sd 0.04354, conv 0.09021 -> scale 0.4826
+```
+
+**The conv arm's rotation logits start at 2.07× the incumbent's.** The two heads
+differ in input dimensionality — 480 features against 32 — and default
+initialisation bounds go as `1/sqrt(fan_in)`, so equal weight scales give unequal
+logit scales. Without the constant, the comparison would have measured an
+initialisation difference and attributed it to weight sharing. This is the same
+trap EXP-012's pooled control hit with its `sqrt(15)`, and larger.
+
+#### The head-to-head did not veto
+
+`conv 106/200 = 53.0% [46.1%, 59.8%]`, seats alternating. The interval crosses
+50%, so the veto — registered as firing only when the interval lies **entirely**
+below 50% — does not fire. It agrees in direction with the primary without adding
+strong evidence, which is what one seed pair is worth.
+
+Recorded plainly: this is the **only** non-solver evidence in the entry, it is
+weak, and the amendment that introduced it exists because the originally
+registered secondary was neither non-solver nor coherent.
+
+#### The reproduction guard, and what it licensed
+
+```
+guard passed in 694s: 500/500 positions identical, digest aa8690a5eee5
+```
+
+Run **after** the change to `az/network.py`, retraining EXP-012's `B_cell` at
+seed 0 and comparing hit vectors element-wise. All 500 positions identical and
+the training loss matching to 1e-9, which is what makes reusing that arm's twelve
+rows legitimate rather than assumed — and what halved the run.
+
+The analysis script independently recomputes the digest from the incumbent rows
+**as stored in this artefact** and refuses to proceed if it differs from the one
+the guard reported. Without that, the guard could have compared against one thing
+while something else was written down, and the reuse argument would cover nothing.
+
+#### Threats to validity, added by the result
+
+The entry's own threats stand. These are added by what happened.
+
+- **The mechanism is now doubly unexplained.** EXP-012 could not read why
+  conditioning helps; this entry predicted *where* the efficient form's advantage
+  should appear and was wrong. Two entries have adopted architecture changes that
+  work for reasons neither could establish.
+- **The margin is derived from a point estimate that carries an interval.**
+  δ = 1.7 comes from 5.0 − 3.3, and the 3.3 carries [1.88, 4.75]. The
+  conservative derivation is δ = 0.25, at which the observed lower limit of
+  −0.06% would **still** pass — which is worth stating, because it is the one
+  place in this family of entries where the conservative reading does not change
+  the verdict.
+- **Nothing is measured on the 5×5**, where weight sharing should be *more*
+  attractive: 25 unshared maps against one shared one. A conv win here understates
+  the shipped case, which is the favourable direction, but it remains an argument.
+- **The adopted head has never played a full self-play loop.** Building this
+  entry exposed that `NetworkEvaluator` could not drive the conditioned head at
+  all; the repair is tested but the architecture's first real training run is
+  still ahead of it.
+
+#### Artefacts
+
+| file | produced by |
+|---|---|
+| [`exp013-conv-rotation-5x3-h2.json`](../results/exp013-conv-rotation-5x3-h2.json) | `scripts/exp013_conv_rotation.py` |
+| [`exp013-run.log`](../results/exp013-run.log) | the same run |
+
+Verdict applied from the artefact by `scripts/exp013_analysis.py`, which was
+smoked on nine synthetic artefacts — the four verdict branches and five guards,
+each on an input built to trip it.
+
+#### Follow-ups this entry creates
+
+1. **adr-005 amendment** — the rotation head becomes the 1×1 convolution.
+   Required by the decision rule; the Axis 2 architecture may only change by ADR.
+2. **A fresh adoption entry against the flat head**, if wanted. The gap narrowed
+   to +2.37 and EXP-012's extension is spent, so the question can only be reopened
+   by registering it anew.
+3. **The first self-play run on the adopted architecture.** Everything measured
+   in EXP-011, EXP-012 and EXP-013 trains on exact solver labels; the pipeline the
+   architecture was chosen for has never trained on its own visit counts with this
+   head.
+
+
+### EXP-014 — pipeline shakedown: does the loop close on the adopted architecture?
+
+**Registered 2026-09-04, before the run.**
+
+#### What this is, and what it is not
+
+**It is a pre-flight check on the instrument, not evidence about the game.** No
+number produced here may be quoted about H1, H2 or H3, and no architecture or
+hyperparameter decision may be taken from it. It exists because the training loop
+`az/loop.py` was written today, the head it will run was adopted yesterday, and
+the two have never met at full scale.
+
+The alternative to running it is committing **≈ 60 hours** to a pipeline whose
+first end-to-end execution would be that run.
+
+#### Why it exists — three things are unexercised
+
+1. **The loop has never run at deployment scale.** Its tests use a 3×3 board,
+   four games, four simulations and an in-process worker. The real run is a 5×5
+   board, 200 games, 400 simulations and eight spawned processes.
+2. **`workers > 1` was broken until today.** `_init_worker` rebuilt every network
+   as a factored head, which is correct only while the factored head is the only
+   head. The repair is tested at two workers on a 3×3; it has not been run at
+   eight workers on the shipped board.
+3. **R8 carries one figure that was never measured.** Its own text says the
+   4.31× parallel speedup and the ~705 games/hour that follow from it were
+   measured **engine-only, with torch not yet competing for those cores**. The
+   59.6-hour budget for H3's five seeds rests on that figure. This entry closes
+   it.
+
+#### Configuration
+
+The **shipped 5×5**, because a shakedown on a smaller board would validate
+neither the throughput figure nor the memory profile of the run it is clearing.
+
+| | |
+|---|---|
+| variant | 5×5, `h1` |
+| architecture | `ConvRotationNet`, adr-005 as amended 2026-09-04 |
+| generations | 3 |
+| games per generation | 20 |
+| simulations | **400** — deployment's value, since the point is the real cost |
+| gate | every 2 generations, 20 games, threshold 0.55 |
+| steps / batch | 400 / 64 |
+| buffer capacity | 20,000, crossing generations |
+| workers | 8, spawn |
+| seed | 1 |
+
+Small in generations and games, **identical in shape** to the registered run.
+
+#### Four checks, each with its pass criterion
+
+| # | check | passes when |
+|---|---|---|
+| C1 | the loop closes | 3 generations complete; a checkpoint and 3 history rows exist |
+| C2 | parallel self-play runs the adopted head | 8 workers produce a full generation with no worker error |
+| C3 | the gate decides | both gates return a result with a Wilson interval and a seat split |
+| C4 | **a real kill resumes indistinguishably** | see below |
+
+**Any check failing stops the 60-hour run.** That is the entry's only decision
+rule and it is one-directional: passing does not license anything, it removes an
+objection.
+
+#### C4 — the kill is real, and that is the point
+
+`tests/test_az_loop.py` simulates interruption by calling `run` twice. That
+cannot catch a **torn write**: a process killed between writing the payload and
+writing the manifest, or halfway through either. `atomic_write` and "manifest
+last" exist for exactly that, and **neither has ever been exercised by an actual
+kill**.
+
+Procedure:
+
+1. Run the shakedown straight through. Record the SHA-256 of the final
+   challenger and champion `state_dict`s.
+2. Delete the run directory. Run it again, and `kill -9` the process **during the
+   first gate** — the longest uninterruptible unit, and the only place the
+   mid-match checkpoint path is reachable.
+3. Resume. Let it finish.
+4. **The two digests must be equal.**
+
+Not "the losses look similar" and not "it continued without crashing". Equal.
+
+A caveat registered in advance so it is not discovered as a surprise: this
+compares two runs of the same code, so a defect present in both cancels out. The
+loop's unit tests already have that weakness and it was measured — removing
+`restore_rng` leaves them green. **C4 tests durability under a real kill, which
+those tests cannot reach; it does not re-test determinism, which they can.**
+
+#### The one measurement: throughput, and what may be done with it
+
+Reported: games/hour composed (self-play with the network in the loop, at eight
+workers), seconds per generation, and peak resident memory.
+
+This is a **cost** measurement, not a strength one, so acting on it is not
+circular. What it may change and what it may not:
+
+- **May change:** `workers`, and the games-per-generation or generation count of
+  the registered run, by dated amendment.
+- **May not change:** the **five seeds**. If the composed rate makes the schedule
+  unaffordable, the seed count is the *last* thing cut and only in an amendment
+  that states the power consequence explicitly. Cutting seeds is the cheapest way
+  to make a budget work and the fastest way to make a comparison meaningless.
+
+If the composed rate is materially below the engine-only 705 games/hour — and it
+will be, since the network is now in the loop — **R8's residual is closed with
+the real number** rather than left as a known-optimistic estimate.
+
+#### What may and may not be decided from this
+
+- **May not:** anything about the architecture, the head, the schedule's
+  statistical parameters, or the game.
+- **May:** whether the 60-hour run starts, and the compute parameters above.
+
+Nothing here is measured against solver ground truth, so **the anti-circularity
+count is unchanged at three** (EXP-011, EXP-012, EXP-013). That is deliberate:
+the shakedown is the one Phase 4 entry that touches the pipeline without touching
+the leak, and keeping it that way is worth more than any sanity check against
+known values would have been.
+
+#### Expected result
+
+All four checks pass, and the composed throughput comes in **below** 705
+games/hour — the engine-only figure has no network in it. A composed rate near
+the engine-only one would be the surprising outcome and would mean the network's
+cost is being hidden somewhere.
+
+The registered run's cost is then recomputed from the measured rate, before it
+starts rather than after.
+
+#### Artefact
+
+`results/exp014-shakedown-5x5.json`, written by `scripts/exp014_shakedown.py`,
+with the run's own per-generation history at `data/az-runs/shakedown/history.jsonl`.
+Named before the instrument exists.
+
+#### Result (2026-09-04) — all four checks pass, and the measurement is the finding
+
+Run `scripts/exp014_shakedown.py`, 48 min (2,861 s), artefact
+[`exp014-shakedown-5x5.json`](../results/exp014-shakedown-5x5.json), log
+[`exp014-run.log`](../results/exp014-run.log). Registered scale, confirmed by the
+artefact's own `is_registered_scale` flag.
+
+| check | result |
+|---|---|
+| C1 the loop closes | **PASS** — 3 generations, 3 history rows, checkpoint at generation 3 |
+| C2 eight workers run the adopted head | **PASS** — 500 samples per generation, no worker error |
+| C3 the gate decides | **PASS** — interval and seat split present |
+| C4 `SIGKILL` mid-gate resumes byte-equal | **PASS** — `1929309feee0` both times |
+
+> **The objection to starting the registered run is removed.** The rule is
+> one-directional: this licenses nothing else, and in particular the run it
+> clears is **not the run that was budgeted** — see below.
+
+#### C4 failed first, and the defect was real
+
+Recorded because it is the entry's whole justification.
+
+On the first execution, at toy scale, **C4 failed**: `1331009c1664` against
+`325477f94bde`. A checkpoint written *inside* a gate carries a generation whose
+self-play and training have already happened — they are baked into the buffer and
+the challenger it stores. The loop re-entered the generation body on resume and
+replayed both, extending the buffer with the same games twice and taking another
+400 gradient steps. **Nothing raises.** The weights simply diverge, which is
+invisible without a byte comparison against an uninterrupted run.
+
+`tests/test_az_loop.py` could not have caught it: it simulates interruption by
+calling `run` twice, and two probes had already shown that comparison passes on
+broken code. The defect needed a real kill at a real checkpoint boundary.
+
+Two smaller defects surfaced the same way. The mid-gate checkpoint cadence was a
+module constant, so a 20-game gate against the loop's default of 25 would have
+written no mid-gate checkpoint at all and the kill would have landed where the
+path had never run — C4 would have tested nothing. And the shakedown's scale
+lived in module constants while its child is a fresh interpreter, so a smaller
+debugging run would silently have been the full one.
+
+All three are fixed and pinned, the mid-gate one by a test probed against the old
+behaviour.
+
+#### Throughput: the registered run is not the run that was budgeted
+
+**145 games/hour composed, 0.21× the engine-only 705.** Peak child RSS 385 MB.
+
+The registered prediction was that the composed rate would come in *below* 705,
+since that figure has no network in it. It came in at a fifth. R8's likelihood
+was dropped to 1 on 2026-08-31 on the grounds that "the binding numbers are now
+measured rather than estimated" — **the binding number was wrong by 4.9×**,
+because it was measured engine-only with torch not competing for the cores, which
+R8's own text says.
+
+**A defect in this entry's metric, stated before its numbers are used.**
+`composed_games_per_hour` divides *self-play* games by *total* elapsed, which
+includes the gate and training — three activities whose per-game costs differ by
+a factor of four. The 145 is not a rate of anything in particular. The
+decomposition below is the usable reading.
+
+#### Where the time goes, decomposed from the run's own generations
+
+Generations 0 and 2 are ungated, generation 1 is gated, and training was timed
+separately on the run's final state. So the split is arithmetic on measurements,
+not an allocation:
+
+| component | cost | per game | rate |
+|---|--:|--:|--:|
+| ungated generation | 224.5 s | — | — |
+| training, 400 steps | 19.7 s | — | 49.3 ms/step |
+| self-play, 20 games at 8 workers | 204.8 s | 10.24 s | 352 games/h |
+| **gate, 20 games serial** | **808.5 s** | **40.42 s** | **89 games/h** |
+
+**Confirmed by a second route**: a direct serial gate on the 5×5 measured
+**39.81 s/game**, against the 40.42 obtained by subtracting the ungated
+generations. The decomposition holds.
+
+Projecting the registered run — 5 seeds × 30 generations × 200 games, gate every
+5, so 6 gates of 400:
+
+| | h/seed | h total | share |
+|---|--:|--:|--:|
+| self-play | 17.1 | 85.3 | 39% |
+| **gate** | **26.9** | **134.8** | **61%** |
+| training | 0.2 | 0.8 | 0% |
+| **total** | **44.2** | **220.9** | — |
+
+Budgeted: 59.6 h. **3.7× over**, and **61% of it in the only part that was not
+parallelised.**
+
+#### What was done about it, and why that is inside the boundary
+
+The gate now plays in a spawned pool. This is an **engineering** change, not a
+schedule one: the entry permits changing `workers` by amendment and forbids
+touching the five seeds, and parallelising a sequential loop touches neither.
+Cutting scope while 61% of the cost sat in an unnecessary queue would have been
+the wrong order — and it is the kind of cut that later reads as "we had to reduce
+the experiment" with nobody remembering why.
+
+It is safe because every game's two seeds are already functions of the match seed
+and the game index alone, so games are independent and order-free. Verified
+identical to the serial path at two, three and four workers, on a chunk that does
+not divide the match length, and for a parallel match resumed serially.
+
+**Measuring the speedup found something the engine-only figures had hidden:**
+
+| workers | gate, games/h | self-play, games/h |
+|--:|--:|--:|
+| 1 | 90 | 88 |
+| **4** | **260** (2.87×) | 271 (3.08×) |
+| **6** | not measured | **331** (3.76×) |
+| 8 | 173 (1.91×) | 327 (3.71×) |
+
+**The gate peaks at four workers and loses 33% at eight, while self-play
+saturates at six with eight within 1%.** Six physical cores — and a gate worker
+holds *two* networks, challenger and champion, against self-play's one, so twice
+the resident model memory and BLAS working set per worker. That mechanism is an
+explanation from structure and was **not measured**; the worker counts were.
+
+`LoopConfig` gains `gate_workers` accordingly, because one shared setting would
+have to pick a loser.
+
+Revised projection, at the measured optima:
+
+| | h/seed | h total |
+|---|--:|--:|
+| self-play (6 workers) | 18.1 | 90.6 |
+| gate (4 workers) | 9.2 | 46.2 |
+| training | 0.2 | 0.8 |
+| **total** | **27.5** | **137.6** |
+
+**220.9 h → 137.6 h**, 83 hours recovered without touching scope. Still **2.3×**
+the 59.6 h budgeted.
+
+#### The configuration this measured was not the best one, and that is the entry's own doing
+
+Stated plainly rather than smoothed over.
+
+This entry registered `workers: 8`, and the follow-up measurements show 8 is 33%
+off the gate's optimum. **The shakedown measured throughput in a configuration it
+had itself fixed suboptimally**, so its headline number describes that
+configuration and not the machine's capability.
+
+Further, the three scaling measurements above were made **after the run and
+outside it**, and were not registered. They are cost measurements, which this
+entry permits acting on, and they are reported here rather than folded into the
+artefact — the artefact records what the registered run measured, and rewriting
+it to describe measurements it did not make would be worse than the asymmetry.
+
+#### One instrument observation that must not be read as a result
+
+Generation 1's gate returned **70.0% [48.1%, 85.5%], promoted**. The interval
+spans the 0.55 threshold, so at 20 games this promotion is noise: `run_gate`
+promotes on the point estimate, which is the registered design and is calibrated
+for **400** games, where this entry's own false-promotion table applies. At 20 it
+is not.
+
+Nothing follows from it. It is recorded because a reader scanning the log will
+see "promoted=True" and should know it means the plumbing works, not that a
+network improved.
+
+#### What this entry decided, and what it did not
+
+- **Decided:** the registered run may start; `gate_workers = 4` and
+  `workers = 6`; the gate is parallelised.
+- **Not decided, and requiring an amendment:** the schedule. At 137.6 h against
+  59.6 h budgeted, generations or games per generation must fall, or the budget
+  must rise. **The five seeds are not the lever**, and may only move in an
+  amendment that states the power consequence.
+- **Not touched:** the architecture, the statistical parameters, anything about
+  the game. The anti-circularity count stays at **three**.
+
+#### R8 needs revisiting
+
+Its residual is closed and the answer is bad. R8 dropped to likelihood 1 on the
+strength of engine-only numbers that were off by 4.9× on throughput and, it now
+turns out, wrong about the worker count too. **The correction is to the row's
+reasoning, not only to its numbers**: "measured rather than estimated" is not a
+reason to lower a likelihood when the measurement omits the dominant cost.
+
+#### Follow-ups this entry creates
+
+1. **A schedule amendment**, computed from 137.6 h.
+2. **R8 revised**, with the composed figure and the reasoning correction.
+3. **The gate's saturation mechanism is unmeasured.** Two networks per worker is
+   a plausible explanation and nothing here tests it; a worker holding one
+   network and swapping weights would distinguish them.
+
+
+### EXP-015 — the H3 training run: five seeds against the prior-free floor
+
+**Registered 2026-09-04, before the run.** This is Axis 2's evidence for H3 and
+the largest single piece of compute in the project.
+
+#### Why this entry exists at all
+
+**The run had no registered entry.** It appeared only in the `## Planned` table,
+as *"AZ training run, seed 1, to 1M self-play positions"* — and the plan had
+drifted: what R8 has been budgeting is **5 seeds × 30 generations × 200 games**,
+which is ~150k positions per seed and 750k in total, at a seed count the sketch
+did not mention. The largest thing in the project was the only thing without a
+registration, and the sketch and the budget were not the same experiment.
+
+Registering it now also disposes of the 59.6-hour figure cleanly: that was never
+a commitment, it was an estimate inside R8, and R8 records its correction. This
+entry carries the **measured** cost instead.
+
+#### What H3 asks, and which half this entry answers
+
+H3 has two clauses:
+
+1. *"The learned policy converges to a **stable win-rate across independent
+   seeds**"* — measured as *"per-seed win rate with Wilson 95% CI and variance
+   reported across seeds"*.
+2. *"…and **agrees with the solver's exact verdict** on every member of the
+   pre-declared comparison set"* — 3×3, 5×3, and EXP-006's shipped-5×5 endgame
+   sample at `k ≤ 8`.
+
+**This entry answers clause 1 and produces the artefacts clause 2 will read.**
+The separation is not stylistic; see anti-circularity.
+
+#### The success criterion: the prior-free UCT floor
+
+The reference opponent is **plain UCT with random playouts and no network** —
+`agents/az_agent.py::UCTAgent`, whose docstring already states the rule this
+entry formalises: *"The learned agent must beat this before any result about it
+is reported."* It depends on no training, so a bad run cannot flatter it, and its
+playouts terminate and always yield a decided winner because draws are
+impossible on an odd cell count.
+
+**Primary — equal simulations.** Both agents at **400 simulations per move**,
+**200 games**, seats alternating, per seed. This measures what the *prior* is
+worth, which is what EXP-011, EXP-012 and EXP-013 were all about.
+
+**Criterion: every seed's Wilson 95% interval must lie entirely above 50%.**
+Not a margin — a margin would turn a floor into a strength claim. But "above
+50%" is easier to say than to clear: at 200 games a true **55% gives
+[48.1%, 61.7%] and fails**, while 60% gives [53.1%, 66.5%] and passes. The
+effective bar is therefore around **58%**, which is low without being trivial.
+Recorded because the criterion's wording understates it.
+
+**Stability, made falsifiable.** H3 says "stable across seeds" and its measurement
+column says "variance reported". Reported alone is unfalsifiable, so: **if any of
+the five seeds fails the floor, that is recorded as instability and is not
+averaged away.** The five per-seed rates and their spread go in the artefact
+whatever happens.
+
+**Secondary — equal time.** The same 200 games, with UCT given the simulation
+count it can complete in the network agent's measured per-move wall clock. The
+ratio is measured **before** the match and recorded.
+
+This is the harder bar and it is registered as secondary deliberately, with the
+reason in the open: at 400 simulations the network agent costs ~10.9 s/game while
+prior-free UCT does no forward passes at all, so equal-simulations flatters the
+network by roughly the ratio of those costs. Equal-simulations is the standard
+comparison and answers "is the prior worth anything"; equal-time answers "is the
+network worth what it costs". **Both go in the artefact and the write-up quotes
+both.** Registering only the flattering one is how a floor becomes decoration.
+
+**A reference point, not a criterion.** The generation-0 champion — the
+randomly initialised network, before any training — plays the same
+equal-simulations floor match. It says where the run started. Nothing branches
+on it.
+
+#### What the floor does **not** establish
+
+In the entry rather than in a footnote, because it is the most likely thing to be
+overstated later.
+
+**Beating prior-free UCT is a low bar.** It licenses "the learner learned
+something". It does not license "the learner is good", and no sentence in any
+artefact, note or write-up may convert one into the other. What says how good is
+clause 2's agreement rate against the solver, and that is a **measurement, not a
+gate** — see below.
+
+#### The schedule, and the cost as measured
+
+| | |
+|---|---|
+| variant | shipped **5×5**, `h1` |
+| architecture | `ConvRotationNet`, adr-005 as amended 2026-09-04 |
+| seeds | **5**, run sequentially, one checkpoint root each |
+| generations | 30 |
+| games per generation | 200 |
+| simulations | 400 |
+| gradient steps / batch | 400 / 64 |
+| replay buffer | 20,000, **crossing generations** |
+| gate | every 5 generations, 400 games, threshold 0.55 |
+| workers | self-play **6**, gate **4** |
+
+The worker counts are EXP-014's measured optima and differ by activity: self-play
+saturates at six with eight within 1%, while the gate peaks at four and loses 33%
+at eight.
+
+**Cost, from EXP-014's measurements, not from an estimate:**
+
+| | h/seed | h total |
+|---|--:|--:|
+| self-play | 18.1 | 90.6 |
+| gate | 9.2 | 46.2 |
+| training | 0.2 | 0.8 |
+| floor matches | ~1.6 | ~8 |
+| **total** | **~29** | **≈ 146** |
+
+Machine time, not calendar time. The author's constraint is that the machine runs
+during the day and hibernates at night, which is compatible: EXP-014 verified
+that a **whole suspended process tree — parent, spawned workers and resource
+tracker — resumes to byte-identical weights**, and the loop times with a
+monotonic clock, which pauses with the machine.
+
+A hard stop (a reboot, `wsl --shutdown`, power loss) costs at most one unwritten
+checkpoint: **≈37 minutes** if it lands in a generation's self-play or training,
+**≈5 minutes** inside a gate. About 2% of a seed.
+
+#### Seeds run sequentially, and the first one is a decision point
+
+They are independent, and the machine already saturates at six workers, so two at
+once would only halve each. Sequential also means **the first seed is a
+go/no-go for the remaining 110 hours** rather than a fifth of a result.
+
+**Registered so it is not optional stopping.** After seed 1 completes, its floor
+match is read. If it **fails the floor**, the run stops and this entry reports a
+failure. The check is on the floor alone — a pipeline that does not beat
+prior-free UCT has not learned, and spending 110 more hours to confirm that five
+times is not rigour.
+
+What this explicitly does **not** license: stopping because the result is
+unfavourable in any other respect, looking at clause 2's agreement rate before
+all five seeds are done, or restarting with different hyperparameters. **A
+restart after a floor failure requires a new registered entry**, because
+"retrain until it works" selects on the outcome.
+
+#### Anti-circularity — this is the entry where the leak is closed
+
+Three architecture decisions have been taken against 5×3 solver ground truth
+(EXP-011, EXP-012, EXP-013), over an adoptable choice set of four. That count
+measures how much of Axis 2's *design* is a function of Axis 1's answers.
+
+**This entry adds nothing to it, and the choice of success criterion is why.**
+Under [adr-004](../docs/adr/adr-004-solver-approach.md) R1, neither axis may
+select or terminate the other along the dimension on which they are later
+compared — and H3 *is* the comparison between the solver and the learner on
+solver agreement. So:
+
+- **The run's success criterion is the UCT floor**, which contains no solver
+  information whatsoever.
+- **Solver agreement is H3's measurement**, computed after the run, gating
+  nothing. Neither the stopping rule, the gate, nor the floor consults it.
+
+Two alternatives were considered and are recorded as **disqualified**, not merely
+weaker:
+
+- **Solver agreement as the success criterion** is the exact circularity R1
+  forbids: it would terminate Axis 2 on the dimension of the comparison, and
+  would make the whole run — not one more architecture decision — a function of
+  Axis 1.
+- **Generation-over-generation strength** is a derivative, not a floor: a run
+  improving from terrible to slightly less terrible passes it. It is also what
+  the gate already measures internally, so it is the training signal read back
+  rather than independent evidence.
+
+#### Dependencies and what this cannot close
+
+**H3 cannot close on this entry alone.** Its comparison set includes EXP-006's
+shipped-5×5 endgame sample at `k ≤ 8`, which has not been run. This entry
+produces the trained agents; the agreement rates are a separate read against
+Axis 1 artefacts satisfying R1 (`termination: exhausted`).
+
+#### Threats to validity
+
+- **The architecture has never trained on its own visit counts.** EXP-011,
+  EXP-012 and EXP-013 all trained on exact solver labels. The head was chosen
+  against clean near-deterministic targets and will now meet noisy
+  non-stationary ones, and EXP-012 registered the risk that the ordering between
+  head architectures can **invert** under that change. If it does, the shipped
+  architecture is wrong in the deployed condition while every measurement behind
+  it reads clean.
+- **The buffer crossing generations is an off-policy assumption**, deliberate and
+  registered: most of what a challenger trains on came from older champions.
+  `refresh_fraction` is reported every generation so it stays legible.
+- **The gate promotes on the point estimate**, which is calibrated for 400 games;
+  EXP-014's 20-game gate promoting at 70% [48.1%, 85.5%] is what that rule looks
+  like when the sample is too small, and is recorded there as not a result.
+- **Five seeds is the registered count and it is not large.** EXP-013 measured
+  the between-arm correlation on this pipeline at −0.108, so pairing buys
+  nothing, and EXP-012 found a five-seed `sd` understating the twelve-seed value
+  by 20%. Any variance claim from five seeds should be read with that in mind.
+- **One machine, one run.** Nothing here separates a property of the learner from
+  a property of this laptop's numerics.
+
+#### Expected result
+
+1. **All five seeds clear the equal-simulations floor.** If the prior is worth
+   nothing after 30 generations, something upstream is wrong, and the first-seed
+   check is there to find it in 29 hours rather than 146.
+2. **The equal-time floor is closer, and may not clear.** UCT gets several times
+   the simulations there, and this design has never measured what that is worth.
+   A failure on the secondary while the primary passes is a legitimate and
+   interesting outcome — it would say the network's advantage does not survive
+   being charged for.
+3. **Between-seed spread is the number to watch**, not the mean. H3's clause 1 is
+   about stability, and the mean of five unstable seeds satisfies nothing.
+
+#### Artefact
+
+`results/exp015-h3-training-5x5.json`, written by `scripts/exp015_h3_run.py`,
+with each seed's own per-generation history at
+`data/az-runs/h3-seed<N>/history.jsonl` and its checkpoint alongside. The floor
+matches are written by the same script. Verdict applied from the artefact by
+`scripts/exp015_analysis.py`. All named before the instrument exists.
+
+#### Amendment (2026-09-10) — a third artefact, and two corrections to this entry's own text
+
+Written while seed 3 is running, with seeds 1 and 2 complete. **Nothing below
+reads a floor result across seeds** — that is refused until all five exist. What
+follows concerns where the run's records live and two statements this entry makes
+about its own instrument.
+
+**1. The per-generation record was not in the repository.**
+
+The Artefact section above names the per-seed history at
+`data/az-runs/h3-seed<N>/history.jsonl`, and `.gitignore:32` ignores
+`data/az-runs/`. So everything this entry promises to report *per generation*
+lived only in untracked scratch: the training curve, the six gate outcomes per
+seed, and `refresh_fraction` — which the threats section commits to reporting
+"every generation so it stays legible", a commitment that cannot be met by a file
+no reader of the repository can open.
+
+The console logs do not cover the gap. Both were reopened with `>` rather than
+`>>` on a resume, so `results/exp015-seed1.log` holds **10** of its 30 generation
+lines and `results/exp015-seed2.log` holds **13**.
+
+**What this does not claim.** No measurement is affected and nothing was lost:
+every floor match is in the JSON artefact, the weights are in the checkpoints,
+and the histories are intact on disk. What was missing is that the repository
+could not show them — which for a portfolio-grade public repo is the whole point
+of writing them down.
+
+**The addition: `results/exp015-histories.json`**, consolidated from the per-seed
+JSONL by `scripts/exp015_analysis.py`. Three properties, because a copy that
+behaves carelessly is worse than no copy:
+
+- **A completed seed's rows are immutable.** If the snapshot and a live file with
+  all 30 generations disagree, the script stops rather than re-syncing. A record
+  that silently adopts whatever is on disk records nothing.
+- **The scan is wider than the artefact.** A seed's artefact entry is written only
+  once its 30 generations finish, so a seed that is running — or one killed
+  halfway — has a history and no entry. Those are precisely the rows worth
+  keeping.
+- **It tolerates a half-written final line**, because the file may be read while a
+  seed is appending to it. Any earlier line failing to parse is a hard error.
+
+**2. The effective bar is 57.0%, not "around 58%".**
+
+The success-criterion section computes the bar as a quotation. `smallest_clearing`
+computes it: at 200 games the smallest clearing count is **114 = 57.0%**, whose
+interval is [50.1%, 63.7%]. One win fewer, 113 = 56.5%, gives [49.6%, 63.2%] and
+fails. The entry's substantive point stands unchanged and is if anything
+understated — "entirely above 50%" is a 57-point bar, not a 50-point one — but the
+number is now computed by `scripts/exp015_analysis.py` rather than asserted, and
+it is pinned by a test so a change to the interval cannot move it silently.
+
+**3. "UCT gets several times the simulations" was wrong: it gets 1.03–1.15×.**
+
+The secondary's justification predicts that at equal time "UCT gets several times
+the simulations", and expected result 2 leans on it to argue the equal-time floor
+is the harder bar and "may not clear". Measured, the ratio is **1.15×** (462
+simulations) on seed 1 and **1.03×** (411) on seed 2.
+
+**Mechanism, and it was foreseeable from this entry's own text.** The entry
+reasons from the network agent costing ~10.9 s/game while prior-free UCT "does no
+forward passes at all", and infers a large ratio. That compares the network's cost
+against zero rather than against what UCT actually does: a random playout runs to
+the end of the game — up to 25 plies of move generation and application — where a
+network evaluation is one forward pass on a static position. The two per-move
+costs land within 15% of each other, so equal-time and equal-simulations are
+nearly the same experiment on this board at this budget.
+
+**Consequences, and they cut against the run, not for it.** The secondary charges
+the network far less for its cost than registered, so a seed clearing the
+equal-time floor establishes correspondingly less. It stays secondary and stays
+reported; the write-up must quote the measured ratio beside it and may not repeat
+the "several times" framing. A design that genuinely charges for compute would
+have to equalise something other than wall-clock per move, and that would be a new
+entry, not a reinterpretation of this one.
+
+**A second-order effect, recorded now so it is not discovered in the Result.** The
+ratio is measured per seed against whatever the machine is doing at the time, so
+UCT's budget differs seed to seed (411 and 462 so far). The equal-time arm is
+therefore not a constant-difficulty bar and its rates are not strictly comparable
+between seeds. The primary is unaffected: both agents there are pinned to 400
+simulations.
+
+**What this amendment does not change.** No criterion, no schedule, no decision
+rule, no stopping rule, and no seed count. It adds one tracked artefact and
+corrects two descriptive statements. The floor is still read per seed on the
+Wilson interval at equal simulations, and solver agreement still gates nothing.
+
+#### Result (2026-09-16) — four of five clear, and the spread is not sampling noise
+
+Five runs of `scripts/exp015_h3_run.py`, one seed per invocation, 2026-09-05 to
+2026-09-16. **135.0 h of machine time**, artefact
+[`exp015-h3-training-5x5.json`](../results/exp015-h3-training-5x5.json),
+per-generation histories
+[`exp015-histories.json`](../results/exp015-histories.json), logs
+`exp015-seed<N>.log`. Every interval below is recomputed from the win counts by
+`scripts/exp015_analysis.py`, which also refuses to combine seeds until all five
+exist and cross-checks each recomputation against what the run stored.
+
+#### The primary: the equal-simulations floor
+
+Champion against prior-free UCT, both at 400 simulations, 200 games, seats
+alternating.
+
+| seed | wins | rate | Wilson 95% | seats (first/second) | verdict |
+|--:|--:|--:|:--|--:|:--|
+| 1 | 128/200 | 64.0% | [57.1%, 70.3%] | 91/37 | CLEARS |
+| 2 | 152/200 | 76.0% | [69.6%, 81.4%] | 97/55 | CLEARS |
+| 3 | 126/200 | 63.0% | [56.1%, 69.4%] | 89/37 | CLEARS |
+| **4** | **112/200** | **56.0%** | **[49.1%, 62.7%]** | 75/37 | **fails** |
+| 5 | 124/200 | 62.0% | [55.1%, 68.4%] | 90/34 | CLEARS |
+
+> **INSTABILITY RECORDED. H3's clause 1 is not satisfied.** The criterion is
+> per-seed — every Wilson interval entirely above 50% — and seed 4's includes it.
+> The registration's falsifiability clause says a failing seed is recorded as
+> instability and never averaged away, so that is what this entry reports.
+
+**The mean is 64.2% and it is not the result.** It is in the artefact because the
+entry promised the five rates and their spread whatever happened, and it is the
+number most likely to be quoted in place of the verdict. Nothing in this run
+licenses "the learner beats prior-free UCT at 64%".
+
+**Seed 4 missed by two games.** The bar at 200 games is 114 wins — computed, not
+quoted; the registration's "around 58%" is 57.0% — and seed 4 returned 112. That
+is recorded and it changes nothing: a pre-registered rule that bends for a
+two-game miss is not a rule, and the same two games of noise would equally have
+carried a genuinely unstable seed over the line. The fragility is the argument
+for reporting all five rates, not for reinterpreting one.
+
+#### The spread is a measurement, not one unlucky seed
+
+This is the part that gives H3's clause 1 more than a shrug. The clause's
+measurement column said "variance reported", and reported alone cannot be wrong.
+
+| | |
+|---|--:|
+| rates | 64.0%, 76.0%, 63.0%, 56.0%, 62.0% |
+| mean, sd | 64.2%, **7.3%** |
+| range | 56.0% – 76.0% |
+| sd expected from sampling alone at the pooled rate | **3.4%** |
+| homogeneity χ² (4 df, 0.05 critical 9.488) | **18.52** |
+
+**The seeds differ by more than the 200-game samples can explain.** Observed
+spread is 2.2× the binomial expectation and the homogeneity test rejects a single
+underlying rate. So the failure is not "one seed drew badly": training runs that
+differ only in seed end up at genuinely different strengths, and 56% and 76% are
+both things this pipeline produces.
+
+**What the χ² does not do.** It gates nothing — the registered criterion is
+per-seed precisely because a homogeneity test can pass while a seed sits below
+50%. It also names no cause: nothing here separates seed-dependent training
+dynamics from seed-dependent self-play data, and with five seeds nothing could.
+
+#### The secondary, and a defect that costs it one of its five points
+
+UCT receives the simulation count it can complete in the network agent's measured
+per-move wall clock. Reported, gating nothing.
+
+| seed | UCT sims | wins | rate | Wilson 95% | verdict |
+|--:|--:|--:|--:|:--|:--|
+| 1 | 462 | 121/200 | 60.5% | [53.6%, 67.0%] | CLEARS |
+| 2 | 411 | 147/200 | 73.5% | [67.0%, 79.1%] | CLEARS |
+| 3 | 470 | 111/200 | 55.5% | [48.6%, 62.2%] | fails |
+| 4 | 425 | 106/200 | 53.0% | [46.1%, 59.8%] | fails |
+| 5 | **400** | 124/200 | 62.0% | [55.1%, 68.4%] | **not a measurement — see below** |
+
+**Seed 5's secondary is a byte-for-byte duplicate of its own primary.** The
+measured ratio was **0.98** — the network came out *cheaper* per move than plain
+UCT — and `equal_time_simulations` clamps with `max(SIMULATIONS, ...)`, so UCT
+was given 400. With the same match seed and the same simulation count, the match
+replayed identically: 124/200, seats 90/34, every field equal.
+
+The clamp itself is defensible (never hand UCT *fewer* simulations than the
+primary). What is not defensible is that the arm then reports as an independent
+result that "clears". **The honest count is 2 of 4**, not 3 of 5. The instrument
+should have detected `ratio <= 1` and recorded the arm as inapplicable, with the
+reason — that at this budget the network is not the expensive agent — which is
+itself the finding.
+
+This is the second consequence of the same mistaken forecast the 2026-09-10
+amendment corrects. The entry predicted UCT would get "several times" the
+simulations at equal time; measured across five seeds it got **0.98× to 1.17×**,
+and on one seed it got nothing at all. The secondary was registered as the harder
+bar and it is barely a different bar.
+
+#### The reference: generation 0
+
+| seed | 1 | 2 | 3 | 4 | 5 |
+|---|--:|--:|--:|--:|--:|
+| rate | 12.5% | 13.5% | 6.0% | 11.0% | **3.0%** |
+
+All five fail, none close. **The untrained prior is much worse than no prior** —
+a randomly initialised network does not merely fail to help, it lands **36.5 to
+47 points below the 50% an even match would give**. The obvious mechanism is
+that an unformed prior steers PUCT away from what plain UCT would have explored,
+but that is an inference from one number and is **not measured here**.
+
+Two things this is good for and one it is not: it shows the floor is not
+trivially passable, and it bounds what training moved — **45 to 62.5 points** per
+seed, from the generation-0 rate to the trained one. It says nothing about how
+good the trained agent is, since a terrible starting point is not evidence about
+the destination.
+
+#### Training, and what it does not explain
+
+| seed | policy loss | best | value loss | promotions | champion |
+|--:|:--|:--|:--|--:|:--|
+| 1 | 5.204 → 3.879 | 3.734 @ 24 | 0.485 → 0.444 | 5/6 | gen 24 |
+| 2 | 5.128 → 3.777 | 3.768 @ 27 | 0.613 → 0.440 | 5/6 | gen 29 |
+| 3 | 5.162 → 3.735 | 3.719 @ 28 | 0.547 → 0.435 | 5/6 | gen 24 |
+| 4 | 5.052 → 3.868 | 3.751 @ 24 | 0.585 → 0.420 | **4/6** | gen 24 |
+| 5 | 5.148 → 3.838 | 3.823 @ 28 | 0.495 → 0.427 | 5/6 | gen 29 |
+
+Gate trajectories, `+` promoted:
+
+```
+seed 1  g4:87.8%+  g9:59.8%+  g14:61.5%+  g19:60.2%+  g24:55.8%+  g29:54.8%-
+seed 2  g4:91.8%+  g9:70.2%+  g14:61.3%+  g19:57.0%+  g24:53.8%-  g29:63.2%+
+seed 3  g4:91.8%+  g9:84.5%+  g14:61.8%+  g19:60.5%+  g24:58.0%+  g29:49.8%-
+seed 4  g4:90.0%+  g9:72.8%+  g14:60.0%+  g19:48.5%-  g24:63.2%+  g29:49.5%-
+seed 5  g4:91.8%+  g9:74.0%+  g14:68.2%+  g19:57.2%+  g24:49.8%-  g29:64.2%+
+```
+
+**Improvement decays into the threshold.** The three early gates average **75.1%**
+and the three late ones **56.4%**, with 6 of 15 late gates below the 55% line
+against 0 of 15 early. By generation 19 the challenger is winning close matches,
+which is what a run approaching the capacity of its budget looks like — and it is
+also what a run whose gate has stopped discriminating looks like. This entry
+cannot tell those apart.
+
+**A correlation that is reported and not explained.** Seed 4 has the fewest
+promotions (4 of 6) and the lowest floor rate, which is the story one wants. It
+does not survive the other rows: seeds 1 and 3 also froze their champion at
+generation 24 and landed at 64.0% and 63.0%, while seeds 2 and 5 both carried
+generation 29 champions and landed 14 points apart. At five seeds, with one
+failure, no such relationship is identifiable, and fitting one to this table
+would be reading the outcome backwards.
+
+**The gate's own discipline, as registered.** 30 gates at 400 games promoting on
+a 55% point estimate promote an exactly-equal challenger 2.55% of the time, so
+there is a **54.0% chance of at least one false promotion across the run**. That
+is a coin flip on whether some champion in this table was promoted on noise. It
+never touches the floor, which is read on an interval and against an opponent the
+gate never sees — but it does mean "champion" in the table above is a weaker label
+than it looks.
+
+#### Cost
+
+**135.0 h of machine time, 27.0 h per seed** (124.5 h training, 10.5 h floor
+matches), against the **≈146 h** this entry projected from EXP-014. The
+projection was 8% high — the first cost estimate in this project to land, and it
+landed because it was built from a measured decomposition rather than from a
+composed rate. Eleven calendar days, with the machine hibernating overnight; no
+resume cost a generation.
+
+#### Predictions, scored
+
+1. **"All five seeds clear the equal-simulations floor" — FAILED.** Four did.
+   The registration added "if the prior is worth nothing after 30 generations,
+   something upstream is wrong", which is *not* what happened: seed 4's prior is
+   worth something, just not reliably enough to clear a 57% bar.
+2. **"The equal-time floor is closer, and may not clear" — held, for the wrong
+   reason.** It did fail twice. But the prediction's mechanism — UCT getting
+   several times the simulations — is wrong: measured, UCT got **0.98× to
+   1.17×**. The arm is close to the primary because the two agents cost nearly
+   the same per move, not because the network is being charged heavily for its
+   compute.
+3. **"Between-seed spread is the number to watch, not the mean" — held, and it
+   is the entry's most useful line.** The spread is what carries the verdict.
+
+#### What this establishes
+
+**That the learner learned something on four of five seeds, and that it does not
+do so reliably.** Nothing more. Three boundaries, stated here because they are
+what a reader will be tempted to cross:
+
+- **Not "the learner is good".** Prior-free UCT with random playouts is a low
+  bar by construction. How good the learner is comes from H3's clause 2.
+- **H3 cannot be closed.** Clause 2 — agreement with the solver's exact verdict
+  on the pre-declared comparison set — needs EXP-006's shipped-5×5 endgame sample
+  at `k ≤ 8`, which has not been run. This entry produces the trained agents that
+  read will consume; it computes no agreement rate and consults no solver output,
+  which is what keeps adr-004 R1 intact.
+- **One machine, one run.** Nothing separates a property of the learner from a
+  property of this laptop's numerics.
+
+And one boundary in the other direction: **the seat splits are not evidence for
+H1.** They are large and consistent (75–97 wins as first against 34–55 as second)
+and they are confounded, because the two seats are held by different agents. H1
+is measured in Phase 5 under a matched protocol.
+
+#### What follows
+
+- **R6 has materialised** — "AZ training unstable or non-convergent", scored 2×2
+  at registration. One seed in five failing a floor, with the between-seed spread
+  rejecting homogeneity, is that risk biting. The row needs the measured numbers
+  and a revised likelihood.
+- **The instrument defect is recorded, not repaired.** Fixing
+  `equal_time_simulations` to record `ratio <= 1` as inapplicable is a change to a
+  finished instrument; it belongs to whatever entry next runs an equal-time arm,
+  and this entry's secondary must be quoted as 2 of 4 until then.
+- **No restart.** Retraining with different hyperparameters to convert seed 4
+  requires a new registered entry, as this one states. The instability is the
+  result.
+
+
 ## Planned
 
 Sketched in Phase 0 so the phases have targets. IDs are allocated on
 registration, not here.
+
+> **Gate before you register.** From 2026-09-18, no Phase 5 or Phase 6
+> experiment below is registered until its eight measurement-gate answers are
+> written into its entry — see [`docs/measurement-gates.md`](../docs/measurement-gates.md).
+> A gate answered "not applicable" says why in one line; a gate that cannot be
+> answered is itself the finding, and the experiment is not run until it is.
+>
+> Two of the planned rows already fail a gate as sketched, and the file says so
+> with the arithmetic: **H1's "20 seeds × 1000 games"** resolves ±3.42% at
+> EXP-015's measured between-seed `sd`, so it cannot see a 2-point first-player
+> advantage, and "20 seeds" is ambiguous between 540 h and 57 h of compute. **The
+> joker-less variant** is an equivalence claim and needs a margin declared in
+> advance, which a superiority test cannot supply afterwards.
 
 | Phase | Experiment | Hypothesis |
 |---|---|---|

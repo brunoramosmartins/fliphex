@@ -1,0 +1,34 @@
+
+  === EXP-010 — deduplicated MCTS expansion, 5x3-h2 ===
+  ground truth V5 51192b4d403ac1cb… (exhausted)
+  layers 5..14, 300/layer, seed 17
+  budgets (100, 400, 1600), primary 400
+  interpreter pypy 3.11.15
+
+    t=5   floor   3.0%  alias  55.1%  A  24.3%  B  43.7%  C  46.3%     392.8s  (11091 draws)
+    t=6   floor  85.0%  alias  43.1%  A  93.0%  B  92.3%  C  94.3%     282.5s  (300 draws)
+    t=7   floor   4.7%  alias  42.7%  A  27.3%  B  38.3%  C  44.0%     215.5s  (1972 draws)
+    t=8   floor  64.5%  alias  31.7%  A  86.7%  B  89.7%  C  92.7%     157.9s  (301 draws)
+    t=9   floor   8.2%  alias  29.6%  A  39.3%  B  48.7%  C  45.0%     114.3s  (968 draws)
+    t=10  floor  55.6%  alias  21.7%  A  90.7%  B  91.0%  C  89.3%      69.6s  (310 draws)
+    t=11  floor  19.8%  alias  19.5%  A  81.0%  B  86.0%  C  85.7%      48.6s  (557 draws)
+    t=12  floor  52.6%  alias  14.7%  A  99.3%  B  99.7%  C  99.7%      29.9s  (320 draws)
+    t=13  floor  45.2%  alias  10.6%  A 100.0%  B 100.0%  C 100.0%      19.8s  (527 draws)
+    t=14  floor  76.2%  alias   6.2%  A 100.0%  B 100.0%  C 100.0%       9.9s  (366 draws)
+
+    pooled at the primary budget (400):
+      random floor .........  41.5%
+      exact ceiling ........ 100.0%  (by construction)
+      action         .......  74.2%
+      position       .......  78.9%
+      multiplicity   .......  79.7%
+      B - A ................ +4.77 pts  [+3.47, +6.06]  discordant 399
+      detectable at 80% ....  1.86 pts
+      aliased mass .........  27.5%
+      tree overhead (B/A) .. +19.6%  (no network here)
+      falsifier fired ...... False
+
+    elapsed .............. 1,360.2s
+
+    artefact -> results/exp010-mcts-dedup-5x3-h2.json
+

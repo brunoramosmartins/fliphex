@@ -1,0 +1,1757 @@
+{
+  "experiment": "EXP-015",
+  "what": "Per-generation training records, consolidated from data/az-runs/h3-seed<N>/history.jsonl, which is gitignored. Written by scripts/exp015_analysis.py. Rows of a completed seed are immutable.",
+  "generations": 30,
+  "seeds": {
+    "1": [
+      {
+        "generation": 0,
+        "samples": 5000,
+        "buffer": 5000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.20435270190239,
+        "value_loss": 0.48513955015689136,
+        "gated": false,
+        "seconds": 2020.5436647100141
+      },
+      {
+        "generation": 1,
+        "samples": 5000,
+        "buffer": 10000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.1141044819355015,
+        "value_loss": 0.43432795878499747,
+        "gated": false,
+        "seconds": 1938.1707358910353
+      },
+      {
+        "generation": 2,
+        "samples": 5000,
+        "buffer": 15000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.101878772974015,
+        "value_loss": 0.4637573542445898,
+        "gated": false,
+        "seconds": 1941.3281025440083
+      },
+      {
+        "generation": 3,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.091281214952469,
+        "value_loss": 0.4519261270016432,
+        "gated": false,
+        "seconds": 1958.9028777880012
+      },
+      {
+        "generation": 4,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.067658627033234,
+        "value_loss": 0.4708913325890899,
+        "gated": true,
+        "gate_win_rate": 0.8775,
+        "gate_ci": [
+          0.8417306493136648,
+          0.9060873070335763
+        ],
+        "gate_as_first": 191,
+        "gate_as_second": 160,
+        "promoted": true,
+        "seconds": 6963.085312982032
+      },
+      {
+        "generation": 5,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.048216255903244,
+        "value_loss": 0.5426423612609506,
+        "gated": false,
+        "seconds": 1919.6674374199938
+      },
+      {
+        "generation": 6,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.001632833480835,
+        "value_loss": 0.5549256752431393,
+        "gated": false,
+        "seconds": 1891.046996360994
+      },
+      {
+        "generation": 7,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.931489639282226,
+        "value_loss": 0.5833649492263794,
+        "gated": false,
+        "seconds": 1911.145333854016
+      },
+      {
+        "generation": 8,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.834931876659393,
+        "value_loss": 0.5788260262459517,
+        "gated": false,
+        "seconds": 1917.409770764003
+      },
+      {
+        "generation": 9,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.81633691906929,
+        "value_loss": 0.575682709030807,
+        "gated": true,
+        "gate_win_rate": 0.5975,
+        "gate_ci": [
+          0.5487332989658665,
+          0.6444117361171958
+        ],
+        "gate_as_first": 156,
+        "gate_as_second": 83,
+        "promoted": true,
+        "seconds": 6890.6750206400175
+      },
+      {
+        "generation": 10,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.753076918125153,
+        "value_loss": 0.5217748505622148,
+        "gated": false,
+        "seconds": 1938.8279216580559
+      },
+      {
+        "generation": 11,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.6859922909736635,
+        "value_loss": 0.4781956175714731,
+        "gated": false,
+        "seconds": 1922.0020386939868
+      },
+      {
+        "generation": 12,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.572486727237702,
+        "value_loss": 0.45695884138345716,
+        "gated": false,
+        "seconds": 1935.679585868027
+      },
+      {
+        "generation": 13,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.456447243690491,
+        "value_loss": 0.4511346162855625,
+        "gated": false,
+        "seconds": 1935.5483920010738
+      },
+      {
+        "generation": 14,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.4371461087465285,
+        "value_loss": 0.46308504104614256,
+        "gated": true,
+        "gate_win_rate": 0.615,
+        "gate_ci": [
+          0.5664344525867856,
+          0.6613776400752879
+        ],
+        "gate_as_first": 146,
+        "gate_as_second": 100,
+        "promoted": true,
+        "seconds": 6902.8372940199915
+      },
+      {
+        "generation": 15,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.331804147362709,
+        "value_loss": 0.4593001237884164,
+        "gated": false,
+        "seconds": 1957.718728292035
+      },
+      {
+        "generation": 16,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.202109058499336,
+        "value_loss": 0.4803013106063008,
+        "gated": false,
+        "seconds": 1938.6338454840006
+      },
+      {
+        "generation": 17,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.020567457675934,
+        "value_loss": 0.4525606108829379,
+        "gated": false,
+        "seconds": 1963.5746748819947
+      },
+      {
+        "generation": 18,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.810063387155533,
+        "value_loss": 0.4682853455469012,
+        "gated": false,
+        "seconds": 1952.8393991909688
+      },
+      {
+        "generation": 19,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.8101587742567062,
+        "value_loss": 0.45741308737546205,
+        "gated": true,
+        "gate_win_rate": 0.6025,
+        "gate_ci": [
+          0.5537843145893452,
+          0.6492655940877204
+        ],
+        "gate_as_first": 147,
+        "gate_as_second": 94,
+        "promoted": true,
+        "seconds": 6961.43469634396
+      },
+      {
+        "generation": 20,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.8022941899299623,
+        "value_loss": 0.45066605612635613,
+        "gated": false,
+        "seconds": 1935.7451360350242
+      },
+      {
+        "generation": 21,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.7614782744646074,
+        "value_loss": 0.4592639061436057,
+        "gated": false,
+        "seconds": 1945.3278840139974
+      },
+      {
+        "generation": 22,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.7767444068193434,
+        "value_loss": 0.436464741230011,
+        "gated": false,
+        "seconds": 1879.968656173
+      },
+      {
+        "generation": 23,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.738148317337036,
+        "value_loss": 0.46172216642647984,
+        "gated": false,
+        "seconds": 1809.421601427
+      },
+      {
+        "generation": 24,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.7336910742521288,
+        "value_loss": 0.47142793715000153,
+        "gated": true,
+        "gate_win_rate": 0.5575,
+        "gate_ci": [
+          0.5085070928349432,
+          0.6053989534960934
+        ],
+        "gate_as_first": 149,
+        "gate_as_second": 74,
+        "promoted": true,
+        "seconds": 6560.459549021999
+      },
+      {
+        "generation": 25,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.8007001543045043,
+        "value_loss": 0.45194084502756593,
+        "gated": false,
+        "seconds": 2031.0412565000006
+      },
+      {
+        "generation": 26,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.856592763066292,
+        "value_loss": 0.4498317896947265,
+        "gated": false,
+        "seconds": 2030.2012254600013
+      },
+      {
+        "generation": 27,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.8905957561731337,
+        "value_loss": 0.441757718808949,
+        "gated": false,
+        "seconds": 1835.0496875679983
+      },
+      {
+        "generation": 28,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.8608545100688936,
+        "value_loss": 0.42622754015028474,
+        "gated": false,
+        "seconds": 1814.8369861290012
+      },
+      {
+        "generation": 29,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.87946636736393,
+        "value_loss": 0.4438913618400693,
+        "gated": true,
+        "gate_win_rate": 0.5475,
+        "gate_ci": [
+          0.4985002204356925,
+          0.5955960787073378
+        ],
+        "gate_as_first": 143,
+        "gate_as_second": 76,
+        "promoted": false,
+        "seconds": 6844.810472323003
+      }
+    ],
+    "2": [
+      {
+        "generation": 0,
+        "samples": 5000,
+        "buffer": 5000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.127740762233734,
+        "value_loss": 0.6134045617282391,
+        "gated": false,
+        "seconds": 1803.6410329409991
+      },
+      {
+        "generation": 1,
+        "samples": 5000,
+        "buffer": 10000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.030370576381683,
+        "value_loss": 0.4778295908868313,
+        "gated": false,
+        "seconds": 1796.8422304979977
+      },
+      {
+        "generation": 2,
+        "samples": 5000,
+        "buffer": 15000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.004167562723159,
+        "value_loss": 0.46615621864795687,
+        "gated": false,
+        "seconds": 1806.1347563139934
+      },
+      {
+        "generation": 3,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.994090517759323,
+        "value_loss": 0.4842034129053354,
+        "gated": false,
+        "seconds": 1860.366821702999
+      },
+      {
+        "generation": 4,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.005271322727204,
+        "value_loss": 0.5084758433699608,
+        "gated": true,
+        "gate_win_rate": 0.9175,
+        "gate_ci": [
+          0.8864024616066086,
+          0.940654483492658
+        ],
+        "gate_as_first": 186,
+        "gate_as_second": 181,
+        "promoted": true,
+        "seconds": 6780.602019587997
+      },
+      {
+        "generation": 5,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.999703801870346,
+        "value_loss": 0.5364101595431566,
+        "gated": false,
+        "seconds": 1813.6495133989956
+      },
+      {
+        "generation": 6,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.989321867227554,
+        "value_loss": 0.5542567396908998,
+        "gated": false,
+        "seconds": 1808.538245799995
+      },
+      {
+        "generation": 7,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.935587916374207,
+        "value_loss": 0.5511258355528116,
+        "gated": false,
+        "seconds": 1808.9008902619971
+      },
+      {
+        "generation": 8,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.84779427409172,
+        "value_loss": 0.5485045641660691,
+        "gated": false,
+        "seconds": 1891.1481940779995
+      },
+      {
+        "generation": 9,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.846341817378998,
+        "value_loss": 0.5601061978936195,
+        "gated": true,
+        "gate_win_rate": 0.7025,
+        "gate_ci": [
+          0.6559441809772917,
+          0.7452031995798376
+        ],
+        "gate_as_first": 154,
+        "gate_as_second": 127,
+        "promoted": true,
+        "seconds": 7039.385044229995
+      },
+      {
+        "generation": 10,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.775146744251251,
+        "value_loss": 0.5258585051819682,
+        "gated": false,
+        "seconds": 1826.1540292059944
+      },
+      {
+        "generation": 11,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.652704389095306,
+        "value_loss": 0.5042814619839191,
+        "gated": false,
+        "seconds": 1933.7752573629987
+      },
+      {
+        "generation": 12,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.515451194047928,
+        "value_loss": 0.5135439199209213,
+        "gated": false,
+        "seconds": 1915.3186044049944
+      },
+      {
+        "generation": 13,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.33445546746254,
+        "value_loss": 0.5037238590046763,
+        "gated": false,
+        "seconds": 1893.496898066005
+      },
+      {
+        "generation": 14,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.321126115918159,
+        "value_loss": 0.48611834693700073,
+        "gated": true,
+        "gate_win_rate": 0.6125,
+        "gate_ci": [
+          0.5639018250228361,
+          0.6589578308422358
+        ],
+        "gate_as_first": 158,
+        "gate_as_second": 87,
+        "promoted": true,
+        "seconds": 6572.477003466003
+      },
+      {
+        "generation": 15,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.281341720819473,
+        "value_loss": 0.48189567409455775,
+        "gated": false,
+        "seconds": 1987.7370120900014
+      },
+      {
+        "generation": 16,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.204712392687798,
+        "value_loss": 0.4437361623719335,
+        "gated": false,
+        "seconds": 2031.145086700999
+      },
+      {
+        "generation": 17,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.141651282906532,
+        "value_loss": 0.43371212523430586,
+        "gated": false,
+        "seconds": 2047.8460595490033
+      },
+      {
+        "generation": 18,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.020794612169266,
+        "value_loss": 0.45044567123055457,
+        "gated": false,
+        "seconds": 2086.4554626949975
+      },
+      {
+        "generation": 19,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.9923133581876753,
+        "value_loss": 0.45173982203006746,
+        "gated": true,
+        "gate_win_rate": 0.57,
+        "gate_ci": [
+          0.521043416119755,
+          0.6176248141962897
+        ],
+        "gate_as_first": 142,
+        "gate_as_second": 86,
+        "promoted": true,
+        "seconds": 1428.000920845
+      },
+      {
+        "generation": 20,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.973173161149025,
+        "value_loss": 0.46433102928102016,
+        "gated": false,
+        "seconds": 1907.967748042
+      },
+      {
+        "generation": 21,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.919165014028549,
+        "value_loss": 0.47070340912789105,
+        "gated": false,
+        "seconds": 1877.0812365359998
+      },
+      {
+        "generation": 22,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.878906394839287,
+        "value_loss": 0.447993301153183,
+        "gated": false,
+        "seconds": 1903.9209360000004
+      },
+      {
+        "generation": 23,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.7781773376464844,
+        "value_loss": 0.44011048790067436,
+        "gated": false,
+        "seconds": 1964.8789182709997
+      },
+      {
+        "generation": 24,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.776541668176651,
+        "value_loss": 0.4533754286542535,
+        "gated": true,
+        "gate_win_rate": 0.5375,
+        "gate_ci": [
+          0.4885129330720267,
+          0.5857736188829973
+        ],
+        "gate_as_first": 140,
+        "gate_as_second": 75,
+        "promoted": false,
+        "seconds": 7114.597665427998
+      },
+      {
+        "generation": 25,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.8053900837898254,
+        "value_loss": 0.47207881178706884,
+        "gated": false,
+        "seconds": 1984.6525137289973
+      },
+      {
+        "generation": 26,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.7832922321558,
+        "value_loss": 0.4713994845375419,
+        "gated": false,
+        "seconds": 1987.1633886070013
+      },
+      {
+        "generation": 27,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.7682077318429945,
+        "value_loss": 0.4492669823765755,
+        "gated": false,
+        "seconds": 1978.285174165998
+      },
+      {
+        "generation": 28,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.8011487036943437,
+        "value_loss": 0.4586490535363555,
+        "gated": false,
+        "seconds": 2115.509749517001
+      },
+      {
+        "generation": 29,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.776622911095619,
+        "value_loss": 0.43951156552881004,
+        "gated": true,
+        "gate_win_rate": 0.6325,
+        "gate_ci": [
+          0.5841997778817278,
+          0.6782793723593568
+        ],
+        "gate_as_first": 151,
+        "gate_as_second": 102,
+        "promoted": true,
+        "seconds": 7722.977247924999
+      }
+    ],
+    "3": [
+      {
+        "generation": 0,
+        "samples": 5000,
+        "buffer": 5000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.1624875366687775,
+        "value_loss": 0.5466012696176767,
+        "gated": false,
+        "seconds": 2007.9538347859998
+      },
+      {
+        "generation": 1,
+        "samples": 5000,
+        "buffer": 10000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.0501899647712705,
+        "value_loss": 0.5397249746322632,
+        "gated": false,
+        "seconds": 2254.945437375005
+      },
+      {
+        "generation": 2,
+        "samples": 5000,
+        "buffer": 15000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.0216829967498775,
+        "value_loss": 0.5398079809546471,
+        "gated": false,
+        "seconds": 2559.875083586994
+      },
+      {
+        "generation": 3,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.022047481536865,
+        "value_loss": 0.5155186445266008,
+        "gated": false,
+        "seconds": 2125.4816973599955
+      },
+      {
+        "generation": 4,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.009503512382508,
+        "value_loss": 0.5368641221150756,
+        "gated": true,
+        "gate_win_rate": 0.9175,
+        "gate_ci": [
+          0.8864024616066086,
+          0.940654483492658
+        ],
+        "gate_as_first": 190,
+        "gate_as_second": 177,
+        "promoted": true,
+        "seconds": 7029.076910404998
+      },
+      {
+        "generation": 5,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.00617884516716,
+        "value_loss": 0.5315236399322748,
+        "gated": false,
+        "seconds": 1929.6203922810091
+      },
+      {
+        "generation": 6,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.982528222799301,
+        "value_loss": 0.5533367441594601,
+        "gated": false,
+        "seconds": 2053.6309425959917
+      },
+      {
+        "generation": 7,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.935587552785873,
+        "value_loss": 0.5985697539150715,
+        "gated": false,
+        "seconds": 2156.9020005710045
+      },
+      {
+        "generation": 8,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.8459414911270144,
+        "value_loss": 0.5966233864426613,
+        "gated": false,
+        "seconds": 2096.3340247489978
+      },
+      {
+        "generation": 9,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.8331197428703305,
+        "value_loss": 0.5832173303514719,
+        "gated": true,
+        "gate_win_rate": 0.845,
+        "gate_ci": [
+          0.8062683334335345,
+          0.8771679445526859
+        ],
+        "gate_as_first": 161,
+        "gate_as_second": 177,
+        "promoted": true,
+        "seconds": 7501.2144330510055
+      },
+      {
+        "generation": 10,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.751372153759003,
+        "value_loss": 0.5440452533215284,
+        "gated": false,
+        "seconds": 2042.7294836869987
+      },
+      {
+        "generation": 11,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.645126099586487,
+        "value_loss": 0.5187031242623925,
+        "gated": false,
+        "seconds": 2062.835984567995
+      },
+      {
+        "generation": 12,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.492879692912101,
+        "value_loss": 0.510323516651988,
+        "gated": false,
+        "seconds": 2061.8141372629907
+      },
+      {
+        "generation": 13,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.330270487070083,
+        "value_loss": 0.5288388060033321,
+        "gated": false,
+        "seconds": 2064.0317701999884
+      },
+      {
+        "generation": 14,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.302762263417244,
+        "value_loss": 0.524636063426733,
+        "gated": true,
+        "gate_win_rate": 0.6175,
+        "gate_ci": [
+          0.5689683892522508,
+          0.6637961402068244
+        ],
+        "gate_as_first": 144,
+        "gate_as_second": 103,
+        "promoted": true,
+        "seconds": 7391.3066360820085
+      },
+      {
+        "generation": 15,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.200346904993057,
+        "value_loss": 0.5312205004692078,
+        "gated": false,
+        "seconds": 2140.0849681819964
+      },
+      {
+        "generation": 16,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.124790480732917,
+        "value_loss": 0.524205746948719,
+        "gated": false,
+        "seconds": 2136.7949490860046
+      },
+      {
+        "generation": 17,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.0018580549955365,
+        "value_loss": 0.5180576657503844,
+        "gated": false,
+        "seconds": 2037.5407618680038
+      },
+      {
+        "generation": 18,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.8751890271902085,
+        "value_loss": 0.5081425695121289,
+        "gated": false,
+        "seconds": 2011.1877648439986
+      },
+      {
+        "generation": 19,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.8354859381914137,
+        "value_loss": 0.5084260799735785,
+        "gated": true,
+        "gate_win_rate": 0.605,
+        "gate_ci": [
+          0.5563117510251911,
+          0.6516905944488758
+        ],
+        "gate_as_first": 145,
+        "gate_as_second": 97,
+        "promoted": true,
+        "seconds": 7542.565985390989
+      },
+      {
+        "generation": 20,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.9020898324251174,
+        "value_loss": 0.46577448152005674,
+        "gated": false,
+        "seconds": 1947.1401288729976
+      },
+      {
+        "generation": 21,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.944459784030914,
+        "value_loss": 0.44618789069354536,
+        "gated": false,
+        "seconds": 1962.3299479720008
+      },
+      {
+        "generation": 22,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.9571820110082627,
+        "value_loss": 0.4520862376689911,
+        "gated": false,
+        "seconds": 1962.012406052003
+      },
+      {
+        "generation": 23,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.966637334227562,
+        "value_loss": 0.4252134783565998,
+        "gated": false,
+        "seconds": 2341.050522837002
+      },
+      {
+        "generation": 24,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.966512687802315,
+        "value_loss": 0.43330077521502974,
+        "gated": true,
+        "gate_win_rate": 0.58,
+        "gate_ci": [
+          0.5310948469671546,
+          0.6273831305368964
+        ],
+        "gate_as_first": 138,
+        "gate_as_second": 94,
+        "promoted": true,
+        "seconds": 7287.877253127997
+      },
+      {
+        "generation": 25,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.903193076252937,
+        "value_loss": 0.41238518327474594,
+        "gated": false,
+        "seconds": 1985.5402423439955
+      },
+      {
+        "generation": 26,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.8604583126306533,
+        "value_loss": 0.4085070690512657,
+        "gated": false,
+        "seconds": 1972.4279433469928
+      },
+      {
+        "generation": 27,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.806355596780777,
+        "value_loss": 0.4144712697714567,
+        "gated": false,
+        "seconds": 2011.2627413640148
+      },
+      {
+        "generation": 28,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.719193760752678,
+        "value_loss": 0.43273963080719113,
+        "gated": false,
+        "seconds": 1992.464943097002
+      },
+      {
+        "generation": 29,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.73488784968853,
+        "value_loss": 0.43452899469062684,
+        "gated": true,
+        "gate_win_rate": 0.4975,
+        "gate_ci": [
+          0.44875800198627125,
+          0.5462895612167272
+        ],
+        "gate_as_first": 133,
+        "gate_as_second": 66,
+        "promoted": false,
+        "seconds": 7899.650141270016
+      }
+    ],
+    "4": [
+      {
+        "generation": 0,
+        "samples": 5000,
+        "buffer": 5000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.051918570995331,
+        "value_loss": 0.585425473973155,
+        "gated": false,
+        "seconds": 1965.30073463
+      },
+      {
+        "generation": 1,
+        "samples": 5000,
+        "buffer": 10000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.976721042394638,
+        "value_loss": 0.5333151653036475,
+        "gated": false,
+        "seconds": 1950.351210223016
+      },
+      {
+        "generation": 2,
+        "samples": 5000,
+        "buffer": 15000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.976683019399643,
+        "value_loss": 0.570622478723526,
+        "gated": false,
+        "seconds": 1949.079886919004
+      },
+      {
+        "generation": 3,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.949865555763244,
+        "value_loss": 0.5381860796734691,
+        "gated": false,
+        "seconds": 1963.7547839760082
+      },
+      {
+        "generation": 4,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.967510912418366,
+        "value_loss": 0.5554278483241797,
+        "gated": true,
+        "gate_win_rate": 0.9,
+        "gate_ci": [
+          0.8666887392099005,
+          0.925701148310355
+        ],
+        "gate_as_first": 190,
+        "gate_as_second": 170,
+        "promoted": true,
+        "seconds": 7595.748140839016
+      },
+      {
+        "generation": 5,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.9879141569137575,
+        "value_loss": 0.5846476280689239,
+        "gated": false,
+        "seconds": 2273.825782436994
+      },
+      {
+        "generation": 6,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.958088917732239,
+        "value_loss": 0.5774285461008549,
+        "gated": false,
+        "seconds": 2054.063976570993
+      },
+      {
+        "generation": 7,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.884567151069641,
+        "value_loss": 0.5441593196988106,
+        "gated": false,
+        "seconds": 1902.6607472949836
+      },
+      {
+        "generation": 8,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.78373321890831,
+        "value_loss": 0.5655504218488931,
+        "gated": false,
+        "seconds": 1896.2837305159774
+      },
+      {
+        "generation": 9,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.785021468400955,
+        "value_loss": 0.5619128771871328,
+        "gated": true,
+        "gate_win_rate": 0.7275,
+        "gate_ci": [
+          0.6818559365326374,
+          0.768815811994508
+        ],
+        "gate_as_first": 157,
+        "gate_as_second": 134,
+        "promoted": true,
+        "seconds": 6765.698847488995
+      },
+      {
+        "generation": 10,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.694247020483017,
+        "value_loss": 0.530153493359685,
+        "gated": false,
+        "seconds": 1945.4466930799827
+      },
+      {
+        "generation": 11,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.569893878698349,
+        "value_loss": 0.5114511868730187,
+        "gated": false,
+        "seconds": 2159.36775239298
+      },
+      {
+        "generation": 12,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.426963502764702,
+        "value_loss": 0.4767107938975096,
+        "gated": false,
+        "seconds": 2064.6783311300096
+      },
+      {
+        "generation": 13,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.248778826594353,
+        "value_loss": 0.47502204962074757,
+        "gated": false,
+        "seconds": 2296.8316358879965
+      },
+      {
+        "generation": 14,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.217446211576462,
+        "value_loss": 0.4625353180617094,
+        "gated": true,
+        "gate_win_rate": 0.6,
+        "gate_ci": [
+          0.5512581652462732,
+          0.6468393066337906
+        ],
+        "gate_as_first": 143,
+        "gate_as_second": 97,
+        "promoted": true,
+        "seconds": 7822.174538727995
+      },
+      {
+        "generation": 15,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.141380714774132,
+        "value_loss": 0.4429950539022684,
+        "gated": false,
+        "seconds": 1960.7421145180124
+      },
+      {
+        "generation": 16,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.061096588373184,
+        "value_loss": 0.4410538687556982,
+        "gated": false,
+        "seconds": 1937.9355800290068
+      },
+      {
+        "generation": 17,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.9365606123209,
+        "value_loss": 0.41139238845556975,
+        "gated": false,
+        "seconds": 2015.0310138580098
+      },
+      {
+        "generation": 18,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.8082019764184953,
+        "value_loss": 0.4379372428916395,
+        "gated": false,
+        "seconds": 1948.3991326270043
+      },
+      {
+        "generation": 19,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.8113408267498015,
+        "value_loss": 0.45013472452759745,
+        "gated": true,
+        "gate_win_rate": 0.485,
+        "gate_ci": [
+          0.4363980471740593,
+          0.5338873320439311
+        ],
+        "gate_as_first": 141,
+        "gate_as_second": 53,
+        "promoted": false,
+        "seconds": 7458.260640583991
+      },
+      {
+        "generation": 20,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.7942394614219666,
+        "value_loss": 0.43658886827528476,
+        "gated": false,
+        "seconds": 2190.3490940670017
+      },
+      {
+        "generation": 21,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.7736702555418016,
+        "value_loss": 0.4586568858847022,
+        "gated": false,
+        "seconds": 2016.9589052880183
+      },
+      {
+        "generation": 22,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.780174155831337,
+        "value_loss": 0.4413341733068228,
+        "gated": false,
+        "seconds": 2051.512067639007
+      },
+      {
+        "generation": 23,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.7674436140060426,
+        "value_loss": 0.43826754771173,
+        "gated": false,
+        "seconds": 1994.092790027993
+      },
+      {
+        "generation": 24,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.751036261320114,
+        "value_loss": 0.4446486634388566,
+        "gated": true,
+        "gate_win_rate": 0.6325,
+        "gate_ci": [
+          0.5841997778817278,
+          0.6782793723593568
+        ],
+        "gate_as_first": 149,
+        "gate_as_second": 104,
+        "promoted": true,
+        "seconds": 7115.684247245983
+      },
+      {
+        "generation": 25,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.852186214923859,
+        "value_loss": 0.452841286547482,
+        "gated": false,
+        "seconds": 2095.0689186480013
+      },
+      {
+        "generation": 26,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.863864971399307,
+        "value_loss": 0.44410190703347324,
+        "gated": false,
+        "seconds": 2177.028589855996
+      },
+      {
+        "generation": 27,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.885118002295494,
+        "value_loss": 0.4280755063518882,
+        "gated": false,
+        "seconds": 2157.2904552700056
+      },
+      {
+        "generation": 28,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.9015576493740083,
+        "value_loss": 0.4324198792502284,
+        "gated": false,
+        "seconds": 2101.722269819991
+      },
+      {
+        "generation": 29,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.868490368127823,
+        "value_loss": 0.4200642261095345,
+        "gated": true,
+        "gate_win_rate": 0.495,
+        "gate_ci": [
+          0.44628359498707637,
+          0.5438115314189205
+        ],
+        "gate_as_first": 123,
+        "gate_as_second": 75,
+        "promoted": false,
+        "seconds": 7757.13696790699
+      }
+    ],
+    "5": [
+      {
+        "generation": 0,
+        "samples": 5000,
+        "buffer": 5000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.148374700546265,
+        "value_loss": 0.49467523612082004,
+        "gated": false,
+        "seconds": 2397.7260126650217
+      },
+      {
+        "generation": 1,
+        "samples": 5000,
+        "buffer": 10000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.064042665958405,
+        "value_loss": 0.4338747387006879,
+        "gated": false,
+        "seconds": 2292.0556131749763
+      },
+      {
+        "generation": 2,
+        "samples": 5000,
+        "buffer": 15000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.020685707330704,
+        "value_loss": 0.42763143945485355,
+        "gated": false,
+        "seconds": 2148.079717888031
+      },
+      {
+        "generation": 3,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.018673886060714,
+        "value_loss": 0.46604023192077876,
+        "gated": false,
+        "seconds": 2075.6673842750024
+      },
+      {
+        "generation": 4,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 5.005337241888046,
+        "value_loss": 0.45444015838205815,
+        "gated": true,
+        "gate_win_rate": 0.9175,
+        "gate_ci": [
+          0.8864024616066086,
+          0.940654483492658
+        ],
+        "gate_as_first": 190,
+        "gate_as_second": 177,
+        "promoted": true,
+        "seconds": 6902.722326661984
+      },
+      {
+        "generation": 5,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.986534997224807,
+        "value_loss": 0.5098827318102122,
+        "gated": false,
+        "seconds": 1944.14378567104
+      },
+      {
+        "generation": 6,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.959436682462692,
+        "value_loss": 0.5409727297723294,
+        "gated": false,
+        "seconds": 1950.4729896539939
+      },
+      {
+        "generation": 7,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.9221799910068516,
+        "value_loss": 0.571471256762743,
+        "gated": false,
+        "seconds": 1872.168096805981
+      },
+      {
+        "generation": 8,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.816707519292831,
+        "value_loss": 0.592519789300859,
+        "gated": false,
+        "seconds": 1875.9262522939825
+      },
+      {
+        "generation": 9,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.815489650964737,
+        "value_loss": 0.5885511808842421,
+        "gated": true,
+        "gate_win_rate": 0.74,
+        "gate_ci": [
+          0.694874880703965,
+          0.7805590518081883
+        ],
+        "gate_as_first": 159,
+        "gate_as_second": 137,
+        "promoted": true,
+        "seconds": 6901.880516196019
+      },
+      {
+        "generation": 10,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.768698679208756,
+        "value_loss": 0.5540778010338545,
+        "gated": false,
+        "seconds": 2145.329741451016
+      },
+      {
+        "generation": 11,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.7213342356681824,
+        "value_loss": 0.5141924101486802,
+        "gated": false,
+        "seconds": 1876.22003514698
+      },
+      {
+        "generation": 12,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.612154724597931,
+        "value_loss": 0.5060747122764587,
+        "gated": false,
+        "seconds": 2091.3487065240042
+      },
+      {
+        "generation": 13,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.49210746049881,
+        "value_loss": 0.48747501213103533,
+        "gated": false,
+        "seconds": 2288.853133498982
+      },
+      {
+        "generation": 14,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.4613147592544555,
+        "value_loss": 0.47245962869375946,
+        "gated": true,
+        "gate_win_rate": 0.6825,
+        "gate_ci": [
+          0.6353288943116709,
+          0.7261989918694457
+        ],
+        "gate_as_first": 168,
+        "gate_as_second": 105,
+        "promoted": true,
+        "seconds": 7699.5984454739955
+      },
+      {
+        "generation": 15,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.3711754727363585,
+        "value_loss": 0.4696883286163211,
+        "gated": false,
+        "seconds": 1915.09682659799
+      },
+      {
+        "generation": 16,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.228808024525643,
+        "value_loss": 0.4543956518173218,
+        "gated": false,
+        "seconds": 2034.423370108998
+      },
+      {
+        "generation": 17,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 4.111280543804169,
+        "value_loss": 0.4652376365289092,
+        "gated": false,
+        "seconds": 2023.434371674026
+      },
+      {
+        "generation": 18,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.9053401517868043,
+        "value_loss": 0.4714959279075265,
+        "gated": false,
+        "seconds": 1905.634496725048
+      },
+      {
+        "generation": 19,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.891771903038025,
+        "value_loss": 0.4792126618698239,
+        "gated": true,
+        "gate_win_rate": 0.5725,
+        "gate_ci": [
+          0.5235544015629189,
+          0.6200662655501273
+        ],
+        "gate_as_first": 144,
+        "gate_as_second": 85,
+        "promoted": true,
+        "seconds": 7526.595050687029
+      },
+      {
+        "generation": 20,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.9224140280485154,
+        "value_loss": 0.4669890926778317,
+        "gated": false,
+        "seconds": 1906.3001367250001
+      },
+      {
+        "generation": 21,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.9297442585229874,
+        "value_loss": 0.46621695954352615,
+        "gated": false,
+        "seconds": 1898.71573583
+      },
+      {
+        "generation": 22,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.917388853430748,
+        "value_loss": 0.46487981505692005,
+        "gated": false,
+        "seconds": 1921.4996876369996
+      },
+      {
+        "generation": 23,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.9072899132966996,
+        "value_loss": 0.4727356467023492,
+        "gated": false,
+        "seconds": 1844.8877882349998
+      },
+      {
+        "generation": 24,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.878761979341507,
+        "value_loss": 0.4557788782939315,
+        "gated": true,
+        "gate_win_rate": 0.4975,
+        "gate_ci": [
+          0.44875800198627125,
+          0.5462895612167272
+        ],
+        "gate_as_first": 127,
+        "gate_as_second": 72,
+        "promoted": false,
+        "seconds": 6543.653620227
+      },
+      {
+        "generation": 25,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.852995877861977,
+        "value_loss": 0.44382780499756336,
+        "gated": false,
+        "seconds": 1849.7390137639995
+      },
+      {
+        "generation": 26,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.8385148471593857,
+        "value_loss": 0.4436398704722524,
+        "gated": false,
+        "seconds": 1866.1031326739976
+      },
+      {
+        "generation": 27,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.8615906441211703,
+        "value_loss": 0.44318001314997674,
+        "gated": false,
+        "seconds": 1869.3061634199985
+      },
+      {
+        "generation": 28,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.8227028501033784,
+        "value_loss": 0.44805371709167957,
+        "gated": false,
+        "seconds": 1870.0084262290002
+      },
+      {
+        "generation": 29,
+        "samples": 5000,
+        "buffer": 20000,
+        "refresh_fraction": 0.25,
+        "policy_loss": 3.83771677672863,
+        "value_loss": 0.4266563946381211,
+        "gated": true,
+        "gate_win_rate": 0.6425,
+        "gate_ci": [
+          0.5943808773044147,
+          0.6879080201246762
+        ],
+        "gate_as_first": 153,
+        "gate_as_second": 104,
+        "promoted": true,
+        "seconds": 6644.236653592001
+      }
+    ]
+  }
+}

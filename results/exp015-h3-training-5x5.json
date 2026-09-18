@@ -1,0 +1,351 @@
+{
+  "experiment": "EXP-015",
+  "registered": "experiments/registry.md",
+  "variant": "5x5-h1",
+  "architecture": "ConvRotationNet",
+  "criterion": "Every seed's Wilson 95% interval against prior-free UCT at equal simulations must lie entirely above 50%. A seed that fails is recorded as instability, never averaged away.",
+  "not_established": "Beating prior-free UCT licenses 'the learner learned something' and nothing more. How good it is comes from H3's solver-agreement clause, which is a measurement and gates nothing here.",
+  "schedule": {
+    "seeds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "generations": 30,
+    "games": 200,
+    "simulations": 400,
+    "steps": 400,
+    "batch_size": 64,
+    "buffer_capacity": 20000,
+    "gate_every": 5,
+    "gate_games": 400,
+    "gate_threshold": 0.55,
+    "workers": 6,
+    "gate_workers": 4,
+    "floor_games": 200
+  },
+  "seeds": {
+    "1": {
+      "seed": 1,
+      "floors": {
+        "equal_simulations": {
+          "label": "equal simulations",
+          "games": 200,
+          "wins": 128,
+          "win_rate": 0.64,
+          "ci": [
+            0.5714139956562682,
+            0.7033091226866021
+          ],
+          "as_first": 91,
+          "as_second": 37,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": true,
+          "seconds": 2397.608047900001
+        },
+        "generation_0": {
+          "label": "generation 0",
+          "games": 200,
+          "wins": 25,
+          "win_rate": 0.125,
+          "ci": [
+            0.0861191515921568,
+            0.1780153528465839
+          ],
+          "as_first": 25,
+          "as_second": 0,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": false,
+          "seconds": 2511.515604152002
+        },
+        "equal_time": {
+          "label": "equal time",
+          "games": 200,
+          "wins": 121,
+          "win_rate": 0.605,
+          "ci": [
+            0.5358822087449843,
+            0.6701601300121683
+          ],
+          "as_first": 86,
+          "as_second": 35,
+          "net_simulations": 400,
+          "uct_simulations": 462,
+          "clears_floor": true,
+          "seconds": 2736.7116252979977
+        }
+      },
+      "training_seconds": 24808.824274802,
+      "generations_run_this_invocation": 8,
+      "history_path": "data/az-runs/h3-seed1/history.jsonl",
+      "equal_time_budget": {
+        "moves_sampled": 25,
+        "net_seconds_per_move": 1.5288685920000717,
+        "uct_seconds_per_move_at_400": 1.324763651999965,
+        "ratio": 1.1540689463301428,
+        "uct_simulations": 462
+      },
+      "seconds_total": 32526.106246651998
+    },
+    "2": {
+      "seed": 2,
+      "floors": {
+        "equal_simulations": {
+          "label": "equal simulations",
+          "games": 200,
+          "wins": 152,
+          "win_rate": 0.76,
+          "ci": [
+            0.69626534544272,
+            0.8139347314797533
+          ],
+          "as_first": 97,
+          "as_second": 55,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": true,
+          "seconds": 2365.4012835520043
+        },
+        "generation_0": {
+          "label": "generation 0",
+          "games": 200,
+          "wins": 27,
+          "win_rate": 0.135,
+          "ci": [
+            0.09446507976920289,
+            0.18929250455117141
+          ],
+          "as_first": 25,
+          "as_second": 2,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": false,
+          "seconds": 2370.1553532889957
+        },
+        "equal_time": {
+          "label": "equal time",
+          "games": 200,
+          "wins": 147,
+          "win_rate": 0.735,
+          "ci": [
+            0.6698229773344888,
+            0.7913193998839003
+          ],
+          "as_first": 93,
+          "as_second": 54,
+          "net_simulations": 400,
+          "uct_simulations": 411,
+          "clears_floor": true,
+          "seconds": 2401.6243541970034
+        }
+      },
+      "training_seconds": 31989.095709866,
+      "generations_run_this_invocation": 11,
+      "history_path": "data/az-runs/h3-seed2/history.jsonl",
+      "equal_time_budget": {
+        "moves_sampled": 25,
+        "net_seconds_per_move": 1.2282612461200915,
+        "uct_seconds_per_move_at_400": 1.1946183372000814,
+        "ratio": 1.028162056342498,
+        "uct_simulations": 411
+      },
+      "seconds_total": 39187.047861111
+    },
+    "3": {
+      "seed": 3,
+      "floors": {
+        "equal_simulations": {
+          "label": "equal simulations",
+          "games": 200,
+          "wins": 126,
+          "win_rate": 0.63,
+          "ci": [
+            0.5612250134987606,
+            0.6938750249624759
+          ],
+          "as_first": 89,
+          "as_second": 37,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": true,
+          "seconds": 2519.8242639160017
+        },
+        "generation_0": {
+          "label": "generation 0",
+          "games": 200,
+          "wins": 12,
+          "win_rate": 0.06,
+          "ci": [
+            0.0346518499012715,
+            0.10193263530685089
+          ],
+          "as_first": 12,
+          "as_second": 0,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": false,
+          "seconds": 2704.427971774974
+        },
+        "equal_time": {
+          "label": "equal time",
+          "games": 200,
+          "wins": 111,
+          "win_rate": 0.555,
+          "ci": [
+            0.4857317563236392,
+            0.6221951830253456
+          ],
+          "as_first": 80,
+          "as_second": 31,
+          "net_simulations": 400,
+          "uct_simulations": 470,
+          "clears_floor": false,
+          "seconds": 2967.9056441290013
+        }
+      },
+      "training_seconds": 94574.725060211,
+      "generations_run_this_invocation": 30,
+      "history_path": "data/az-runs/h3-seed3/history.jsonl",
+      "equal_time_budget": {
+        "moves_sampled": 25,
+        "net_seconds_per_move": 1.52137080488028,
+        "uct_seconds_per_move_at_400": 1.2956540742400102,
+        "ratio": 1.1742106439735223,
+        "uct_simulations": 470
+      },
+      "seconds_total": 102837.524150924
+    },
+    "4": {
+      "seed": 4,
+      "floors": {
+        "equal_simulations": {
+          "label": "equal simulations",
+          "games": 200,
+          "wins": 112,
+          "win_rate": 0.56,
+          "ci": [
+            0.4907154834956251,
+            0.6270229957941764
+          ],
+          "as_first": 75,
+          "as_second": 37,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": false,
+          "seconds": 2533.9556006870116
+        },
+        "generation_0": {
+          "label": "generation 0",
+          "games": 200,
+          "wins": 22,
+          "win_rate": 0.11,
+          "ci": [
+            0.07377190160716048,
+            0.16092798300912986
+          ],
+          "as_first": 21,
+          "as_second": 1,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": false,
+          "seconds": 2626.822669665009
+        },
+        "equal_time": {
+          "label": "equal time",
+          "games": 200,
+          "wins": 106,
+          "win_rate": 0.53,
+          "ci": [
+            0.46091557335361155,
+            0.5979536662912893
+          ],
+          "as_first": 74,
+          "as_second": 32,
+          "net_simulations": 400,
+          "uct_simulations": 425,
+          "clears_floor": false,
+          "seconds": 2607.2462454630004
+        }
+      },
+      "training_seconds": 93589.20000824198,
+      "generations_run_this_invocation": 30,
+      "history_path": "data/az-runs/h3-seed4/history.jsonl",
+      "equal_time_budget": {
+        "moves_sampled": 25,
+        "net_seconds_per_move": 1.3038904393999837,
+        "uct_seconds_per_move_at_400": 1.2266238218802028,
+        "ratio": 1.0629912905175316,
+        "uct_simulations": 425
+      },
+      "seconds_total": 101420.75481216298
+    },
+    "5": {
+      "seed": 5,
+      "floors": {
+        "equal_simulations": {
+          "label": "equal simulations",
+          "games": 200,
+          "wins": 124,
+          "win_rate": 0.62,
+          "ci": [
+            0.5510658951919951,
+            0.6844110633876079
+          ],
+          "as_first": 90,
+          "as_second": 34,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": true,
+          "seconds": 2375.873759820999
+        },
+        "generation_0": {
+          "label": "generation 0",
+          "games": 200,
+          "wins": 6,
+          "win_rate": 0.03,
+          "ci": [
+            0.013820125830748327,
+            0.06389511973247333
+          ],
+          "as_first": 6,
+          "as_second": 0,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": false,
+          "seconds": 2285.512036205
+        },
+        "equal_time": {
+          "label": "equal time",
+          "games": 200,
+          "wins": 124,
+          "win_rate": 0.62,
+          "ci": [
+            0.5510658951919951,
+            0.6844110633876079
+          ],
+          "as_first": 90,
+          "as_second": 34,
+          "net_simulations": 400,
+          "uct_simulations": 400,
+          "clears_floor": true,
+          "seconds": 2354.867292396004
+        }
+      },
+      "training_seconds": 28217.584914901,
+      "generations_run_this_invocation": 10,
+      "history_path": "data/az-runs/h3-seed5/history.jsonl",
+      "equal_time_budget": {
+        "moves_sampled": 25,
+        "net_seconds_per_move": 1.1686667720001425,
+        "uct_seconds_per_move_at_400": 1.1912061081599676,
+        "ratio": 0.9810785589450668,
+        "uct_simulations": 400
+      },
+      "seconds_total": 35292.965432391
+    }
+  }
+}

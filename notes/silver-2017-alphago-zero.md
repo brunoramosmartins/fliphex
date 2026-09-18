@@ -137,7 +137,9 @@ precise reason "search then imitate" beats "imitate `p`": the tree does bounded
 lookahead and evaluates its leaves with the **same network's value head**, so `π`
 aggregates many `v`-estimates into a single, lower-variance, deeper-informed
 target than the raw prior could ever be. This is [ex04](exercises/ex04_alphazero_math.md)
-Q2 (why `π` is the stronger target) and a strong TIL #5 seed.
+**Q1(c)** (why `π` is the stronger target — folded into the loss question when
+ex04 was written, rather than standing alone as Q2) and the seed carried into
+[TIL #5](tils/til-05-alphazero-in-500-lines.md).
 
 ### 2.2 — The loss function
 **Prompt.** Copy the loss `l = (z − v)² − πᵀ log p + c‖θ‖²`. Identify each term

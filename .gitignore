@@ -25,7 +25,17 @@ data/selfplay/
 # reproducible from the run itself — the JSON artefact is the deliverable.
 data/checkpoints/
 results/*.jsonl
+# EXP-006's agreement rows are the exception: which move each champion chose on
+# each position, and whether it kept the win. The JSON artefact holds only the
+# per-k aggregates, so without this the depth gradient can be quoted but never
+# re-derived, and "which positions did all five get wrong" is unanswerable.
+!results/exp006-agreement-5x5.jsonl
+# The ground-truth work file is *not* an exception: exp006_ground_truth.py
+# embeds all 750 position records in its JSON artefact, so tracking the JSONL
+# would store the same rows twice.
+data/ground-truth/*.jsonl
 figures/*.png
 !figures/.gitkeep
 notes/sources/
 refs/
+data/az-runs/

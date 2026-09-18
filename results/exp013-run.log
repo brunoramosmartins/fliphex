@@ -1,0 +1,40 @@
+nohup: ignoring input
+drew train 2000, held out 500
+guard: retraining B_cell seed 0 after the network change, comparing hits element-wise
+guard passed in 694s: 500/500 positions identical, digest aa8690a5eee5
+incumbent rows reused: seeds [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+rotation scale: incumbent sd 0.04354, conv sd 0.09021 -> scale 0.48263
+  V_conv seed 0: search 75.2%  supervised 69.8%  loss 2.4903  (971s)
+  V_conv seed 1: search 75.0%  supervised 67.4%  loss 2.5116  (952s)
+  V_conv seed 2: search 75.6%  supervised 70.2%  loss 2.4971  (949s)
+  V_conv seed 3: search 73.4%  supervised 65.8%  loss 2.4919  (1002s)
+  V_conv seed 4: search 73.4%  supervised 65.6%  loss 2.4921  (872s)
+  V_conv seed 5: search 72.6%  supervised 69.0%  loss 2.5153  (874s)
+  V_conv seed 6: search 73.6%  supervised 66.2%  loss 2.5106  (881s)
+  V_conv seed 7: search 75.8%  supervised 68.0%  loss 2.5247  (899s)
+  V_conv seed 8: search 74.0%  supervised 66.6%  loss 2.5153  (920s)
+  V_conv seed 9: search 73.2%  supervised 66.8%  loss 2.5084  (1014s)
+  V_conv seed 10: search 75.4%  supervised 68.8%  loss 2.5027  (1074s)
+  V_conv seed 11: search 72.8%  supervised 69.2%  loss 2.5215  (1067s)
+head-to-head at seed 0: 200 games, seats alternating
+    match 25/200: conv 15
+    match 50/200: conv 29
+    match 75/200: conv 42
+    match 100/200: conv 55
+    match 125/200: conv 67
+    match 150/200: conv 77
+    match 175/200: conv 93
+    match 200/200: conv 106
+  conv 106/200 = 53.0% [46.1%, 59.8%]
+
+   L_linear 73.2%
+     V_conv 74.2%
+      floor 39.4%
+
+V - L  +0.95%  lower limit -0.06%  vs margin -1.70%
+feasibility  half-width 1.01%, room +0.69%, passable
+wider interval  seed means
+head-to-head  conv 53.0% [46.1%, 59.8%]
+train loss  L 2.4967  V 2.5068  (diagnostic, not a gate)
+VERDICT  ADOPT the convolutional form: non-inferior at the registered margin, at 218x fewer parameters in the component the decision is about. adr-005 is amended again
+written  results/exp013-conv-rotation-5x3-h2.json  (15596.4s)
