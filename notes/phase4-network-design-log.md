@@ -313,11 +313,44 @@ the larger, untested claim.
 
 ## az/selfplay.py — game generation
 
-<!--
-Parallelism model, temperature schedule, and how many games per generation.
-Positions per game is <= 25, which makes the arithmetic for the replay buffer
-unusually clean.
--->
+**Positions per game is exactly 25, not "at most".** The board fills every time —
+25 cells, no passes, no early termination, and draws are impossible on an odd
+count. So a generation of 200 games is **exactly 5,000 samples**, every time, and
+the replay-buffer arithmetic has no slack in it at all: a 20,000 buffer is four
+generations deep, `refresh_fraction` is a flat 0.25, and the expected age of a
+training sample is four generations. Those are closed forms, not averages.
+
+Worth stating because it is the rare place where this game is *easier* to reason
+about than Go or chess, and because the ground-truth generator's own guard checks
+it — a generation that does not produce 5,000 samples is a defect, and the
+instrument raises rather than averaging over it.
+
+**Parallelism is `spawn`, not `fork`**, because torch and `fork` do not coexist
+safely. That has a consequence which cost two debugging sessions: **`spawn`
+re-imports `__main__`**. A harness whose scale lives in module constants gets
+those constants re-executed in a fresh interpreter, so a smaller debugging run is
+silently the full one; and any test of the spawned path has to be a real file
+with an `if __name__ == "__main__":` guard, or the workers re-execute the test.
+A heredoc has no file at all and dies with `FileNotFoundError: '<stdin>'`, once
+per worker, in 21 MB of tracebacks.
+
+**Workers get a network *spec*, not a network.** The first version rebuilt every
+worker's net as `FlipHexNet`, which meant parallel self-play could not drive the
+adopted conditioned head — and the bug was unreachable at `workers = 1`, so no
+test caught it. `net_spec()` serialises the architecture (class, board shape,
+filter count, block count) and `build_net()` reconstructs it; weights travel
+separately. The spec deliberately excludes `rotation_scale`, which is a
+persistent buffer and therefore travels with the weights.
+
+**Temperature.** Self-play samples from the visit counts for the opening plies
+and plays greedily afterwards; evaluation uses `EVALUATION_TEMPERATURE_PLIES = 4`
+for a different reason entirely — not exploration, but to stop two deterministic
+searchers replaying one game 400 times. That trap is its own section below.
+
+**Six workers, measured.** EXP-014 put self-play's optimum at six with eight
+within 1%, on six physical cores. The gate's optimum is four and differs because
+a gate worker holds two networks against self-play's one — the kind of thing that
+is obvious once measured and was assumed identical before.
 
 ## az/replay_buffer.py
 
@@ -576,11 +609,76 @@ two agent classes are thin adapters onto it. Pinned by a test that imports
 
 ## The plain-UCT floor
 
-<!--
-Prior-free UCT with random playouts, as the absolute baseline that depends on no
-trained network. adr-005: the learned agent must beat it before any result is
-reported.
--->
+Prior-free UCT with random playouts: uniform priors, no network, rollouts to the
+end of the game. adr-005 says the learned agent must beat it before any result
+about that agent is reported, and `UCTAgent`'s docstring says the same thing.
+
+**Why this and not "better than the previous generation".** Generation-over-
+generation improvement is a derivative, not a floor — a run going from terrible
+to slightly less terrible passes it — and it is what the evaluator gate already
+measures internally, so it is the training signal read back rather than
+independent evidence. Prior-free UCT depends on no training at all, so a bad run
+cannot flatter it, and its rollouts always terminate with a decided winner
+because draws are impossible on 25 cells.
+
+**It is also the criterion that keeps Axis 2 from being selected by Axis 1.**
+Three architecture decisions had already been taken against 5×3 solver ground
+truth. Under adr-004 R1, neither axis may terminate the other along the dimension
+on which they are later compared — and H3 *is* the solver-versus-learner
+comparison. A floor containing no solver information is what lets the training
+run end without adding to that count.
+
+### "Entirely above 50%" is a 57% bar
+
+The criterion is that the whole Wilson interval sits above 50%, which sounds like
+a coin-flip bar and is not. At 200 games the smallest clearing count is **114 =
+57.0%**; 113 gives [49.6%, 63.2%] and fails. A true 55% agent fails most of the
+time.
+
+Worth stating because the wording invites the opposite reading, and because
+EXP-015's registration guessed "around 58%" rather than computing it. The
+analysis script now computes it and a test pins the count.
+
+### The reference that made the floor credible
+
+The generation-0 champion — the randomly initialised network, before any
+training — plays the same match. Across five seeds it scored **3.0% to 13.5%**.
+
+**An untrained prior is not merely useless, it is far worse than no prior.** It
+lands 36.5 to 47 points below the 50% an even match would give, against an
+opponent identical except for having no network at all. The obvious reading is
+that an unformed prior steers PUCT away from what plain UCT would have explored;
+that is an inference from one number and was not measured.
+
+Two things this buys. It shows the floor is not trivially passable — something
+can score 3% on it. And it bounds what training moved: **45 to 62.5 points** per
+seed, from the generation-0 rate to the trained one.
+
+### The equal-time arm, and a forecast that was wrong by a factor of three
+
+The floor was registered with a secondary arm: the same match with UCT given the
+simulations it can complete in the network agent's measured per-move wall clock.
+The reasoning was that the network costs ~10.9 s/game while prior-free UCT "does
+no forward passes at all", so UCT would get *several times* the simulations and
+equal-time would be the harder bar.
+
+**Measured across five seeds, UCT got 0.98× to 1.17×.**
+
+The error is in comparing the network's cost against zero rather than against
+what UCT actually does. A random playout runs to the end of the game — up to 25
+plies of move generation and application — where a network evaluation is one
+forward pass on a static position. The two per-move costs land within 15% of each
+other, so equal-time and equal-simulations are nearly the same experiment at this
+budget on this board.
+
+Two consequences, both recorded as corrections rather than results. The secondary
+charges the network far less for its compute than intended, so clearing it
+establishes correspondingly less. And on seed 5 the measured ratio fell *below*
+one — the network was the cheaper agent — where `max(SIMULATIONS, ...)` clamped
+UCT to 400 and the match replayed **identically** to the primary, field for
+field. That arm is a duplicate, not a measurement, so the secondary's tally is
+**2 of 4**, not 3 of 5. The instrument should have detected `ratio <= 1` and
+recorded the arm as inapplicable — which is itself the finding.
 
 ## The factored-head independence check — the risk materialised
 
@@ -678,6 +776,121 @@ amendment supposed, so this is *not* why the factored head lost.
 - **Nothing here is evidence about the 5×5.** The measurement is on a 15-cell
   board with 8-tile hands.
 
+## The head ladder, resolved — EXP-012 and EXP-013
+
+adr-005 pre-specified three mitigations in order: (a) rely on MCTS to correct the
+prior, (b) condition rotation on the chosen cell, (c) a flat 1950-logit head.
+EXP-011 killed (a). These two settled the rest.
+
+### EXP-012 — fallback (b) is adopted, by a quarter of a point
+
+8h50 on the 5×3. The registered comparison came back **`D − B = +3.76`
+[+1.78, +5.74]** — an interval straddling the 5-point tolerance, which is not a
+result. A bounded extension to twelve seeds gave **+3.32 [+1.88, +4.75]**, inside
+the tolerance, and (b) was adopted.
+
+**It cleared by 0.25 points**, against a 5-point constant that had changed role —
+from EXP-011's *detection threshold* to an adoption *tolerance* — without being
+rejustified. A margin of 4.7 would have reversed the decision. That is in the ADR
+amendment and in R5, because a decision that close should not be quoted as if it
+were comfortable.
+
+**And the entry's own validity precondition failed, unpassably.** The equivalence
+gate's half-width was **2.43** against a δ of **2.00**: no point estimate,
+however favourable, could have cleared it. The gate could be neither passed nor
+failed on evidence, so every mechanism contrast in that experiment is unresolved.
+
+That produced the rule the project has used since: **δ must exceed the forecast
+half-width, and the room between them is tabulated before the run.** EXP-013's
+forecast then landed to the second decimal — predicted `sd` 1.95, observed 1.94 —
+which is the only reason the same trap did not repeat.
+
+**What (b) does not settle.** The frozen-tower condition put all three candidate
+heads on one shared tower, where they landed at 67.6–68.8% against the factored
+head's own 68.0%: **no head architecture mattered at all** under that condition.
+So what was fixed is the operational risk — the head plays too weakly — and not
+the stated mechanism, which is still unverified. R5's likelihood came down to 2
+rather than 1 for exactly that reason: a remedy that works without an understood
+mechanism gives no model of when it would bite again.
+
+### EXP-013 — the same head, 218× fewer parameters
+
+The adopted parameterisation was the inefficient one: twenty-five unshared
+per-cell rotation maps, **43,290** parameters, where a 1×1 convolution expresses
+the same conditioning in **198**. The convolution shares weights across cells, so
+it sees every cell on every position instead of the 36.7% an unshared map sees.
+
+4h20, twelve seeds, one-sided non-inferiority at δ = 1.7 points:
+**`V_conv − L_linear = +0.95`**, lower limit **−0.06%** against a margin of
+−1.70%. Adopted. On the shipped 5×5 the conditioned head drops from 467,839
+parameters to **347,887** — below the factored head's own 352,495, which is the
+part worth noticing: the *more* expressive head is the smaller one.
+
+**The registered secondary was broken twice over, and was fixed before the run.**
+It read the training loss against *solver* labels rather than non-solver ones,
+and its direction rule contradicted the entry's own prediction 4. Replaced with
+head-to-head play by a dated amendment **before** anything ran. Catching it after
+would have meant either quoting a broken secondary or retrofitting a rule.
+
+### What the ladder cost, and what it bought
+
+Three architecture decisions taken against 5×3 solver ground truth, out of an
+adoptable choice set of four. That count is the measure of how much of Axis 2's
+*design* is a function of Axis 1's answers, and it is why the training run's
+success criterion had to contain no solver information at all.
+
+**None of it was measured on the 5×5 until the run itself**, and no alternative
+head has *ever* been trained on the shipped board. The 3.3-point deficit against
+the flat head is a 5×3 number quoted over a 5×5 design, and it stays that way.
+
+## The pipeline shakedown — EXP-014
+
+Before committing ~146 hours, four checks at toy scale: the loop closes, parallel
+workers drive the adopted head, the gate decides, and a `SIGKILL` mid-gate
+resumes **byte-equal**. 48 minutes. All four pass — on the second attempt.
+
+### C4 failed first, and the defect was real
+
+First run: `1331009c1664` against `325477f94bde`. A checkpoint written *inside* a
+gate carries a generation whose self-play and training have already happened —
+they are baked into the buffer and the challenger it stores. The loop re-entered
+the generation body on resume and replayed both, extending the buffer with the
+same games twice and taking another 400 gradient steps.
+
+**Nothing raises.** The weights simply diverge, invisibly, unless something
+compares them byte for byte against an uninterrupted run.
+
+`tests/test_az_loop.py` could not have caught it: it simulates interruption by
+calling `run` twice, and two probes had already shown that comparison passes on
+broken code. The defect needed a real kill at a real checkpoint boundary — which
+is the argument for the shakedown existing at all.
+
+Two smaller ones surfaced the same way. The mid-gate checkpoint cadence was a
+module constant of 25 against a 20-game gate, so no mid-gate checkpoint would
+ever have been written and the kill would have landed where the path had never
+run — C4 would have tested nothing. And the harness's scale lived in module
+constants while its child is a fresh interpreter under `spawn`, so a smaller
+debugging run would silently have been the full one.
+
+### The cost discovery, which is the actual finding
+
+**145 games/hour composed, 0.21× the engine-only 705.** The budget in R8 said
+59.6 h for five seeds. Reconstructing that number showed the error was compounded
+twice: 42,000 games ÷ 705, where the 42,000 is the run's 30,000 self-play games
+**plus the gate's 12,000**, all priced at the *parallel self-play* rate. The gate
+had never been parallelised — one process, **89 games/hour**, four times the
+per-game cost — and was **61% of a projected 220.9 h**.
+
+Parallelising it brought the projection to 137.6 h. Worker optima differ by
+activity and were measured rather than assumed: self-play saturates at **six**,
+the gate peaks at **four** and loses 33% at eight, because a gate worker holds
+two networks against self-play's one.
+
+**The residual R8 had named was the right worry pointed at the wrong quantity.**
+It said the parallel scaling had been measured engine-only. Scaling was roughly
+right — 3.26× predicted, 3.76× measured. The **per-game cost** was 2.1× worse for
+self-play and 2.7× for the gate. Scaling was fine; cost was not.
+
 ## agents/az_agent.py — and a determinism trap the gate walks into
 
 `AZAgent` (network + PUCT) and `UCTAgent` (uniform prior + random rollouts, the
@@ -709,21 +922,245 @@ that is not a match; **the caller has to introduce diversity deliberately.** Bot
 halves are pinned by tests, one asserting the replay and one asserting the way
 out.
 
+## The training run — EXP-015
+
+Five seeds × 30 generations × 200 games, gate every 5 generations at 400 games,
+buffer of 20,000 crossing generations. **135.0 hours of machine time**, 27.0 per
+seed, over eleven calendar days with the machine hibernating overnight.
+
+**The cost estimate landed.** ≈146 h projected, 135.0 h spent — 8% high, and the
+first cost estimate in this project to come in close. It landed because it was
+built from EXP-014's measured decomposition rather than from a composed rate,
+which is the whole lesson of R8's two compounded errors.
+
+### Four of five seeds clear the floor
+
+| seed | rate | Wilson 95% | verdict |
+|--:|--:|:--|:--|
+| 1 | 64.0% | [57.1%, 70.3%] | clears |
+| 2 | 76.0% | [69.6%, 81.4%] | clears |
+| 3 | 63.0% | [56.1%, 69.4%] | clears |
+| **4** | **56.0%** | **[49.1%, 62.7%]** | **fails** |
+| 5 | 62.0% | [55.1%, 68.4%] | clears |
+
+Seed 4 missed by **two games** — 112 where 114 was needed. That is recorded and
+it changed nothing. A pre-registered rule that bends for a two-game miss is not a
+rule, and the same two games of noise would equally have carried a genuinely
+unstable seed over the line.
+
+**The mean is 64.2% and it is not the result.** It is in the artefact because the
+registration promised the five rates and their spread whatever happened, and it
+is the number most likely to be quoted in place of the verdict.
+
+### The spread is a measurement, not one unlucky seed
+
+This is the part that gives H3's stability clause more than a shrug. The clause's
+measurement column said "variance reported", and reported alone cannot be wrong.
+
+Between-seed `sd` **7.3%** against the **3.4%** the 200-game samples alone would
+produce; homogeneity `χ² = 18.52` on 4 df against a 0.05 critical value of 9.488.
+**A single underlying win rate is rejected.** Runs differing only in seed reach
+genuinely different strengths, and 56% and 76% are both things this pipeline
+produces.
+
+The χ² gates nothing — the criterion is per-seed precisely because a homogeneity
+test can pass while a seed sits below 50% — and it names no cause. Nothing
+separates seed-dependent training dynamics from seed-dependent self-play data,
+and five seeds could not separate them if they tried.
+
+### What the training curves say, and what they do not
+
+Policy loss fell 5.05–5.20 → 3.74–3.88 on every seed; value loss 0.49–0.61 →
+0.42–0.44. **Every seed converged.** R6 is worded "unstable *or* non-convergent"
+and only the first half bit: what varies is the level reached, not whether
+training proceeds. Bundling two failure modes into one risk row cost that
+distinction until the data forced it.
+
+Gate rates decay into the threshold — the three early gates average **75.1%**,
+the three late ones **56.4%**, with 6 of 15 late gates below the 55% line against
+0 of 15 early. That is what a run approaching the capacity of its budget looks
+like. It is also what a run whose gate has stopped discriminating looks like, and
+nothing here separates them.
+
+**A correlation reported and not explained.** Seed 4 has the fewest promotions (4
+of 6) and the lowest floor rate, which is the story one wants. It does not
+survive the other rows: seeds 1 and 3 also froze their champion at generation 24
+and landed at 64.0% and 63.0%, while seeds 2 and 5 both carried generation-29
+champions and landed 14 points apart. At five seeds with one failure, no such
+relationship is identifiable.
+
+**The gate's own discipline is a live suspect and was never tested.** Thirty
+gates promoting on a 55% point estimate at 400 games carry a **54.0%** chance of
+at least one false promotion across the run. A champion promoted on noise would
+present exactly as a weak seed.
+
+### The seat splits, which are not evidence for H1
+
+Large and consistent — 75 to 97 wins as first against 34 to 55 as second. They
+are **confounded**: the two seats are held by different agents, so a seat effect
+cannot be told apart from the champion being stronger than UCT by a different
+amount in one role than the other. H1 is measured in Phase 5 under a matched
+protocol.
+
 ## Training runs and the submission log
 
-<!--
-Every version considered done enough to evaluate gets a row in
-docs/submission-log.md, reproducible from the commit and config named in it.
-H3 needs >= 5 seeds.
--->
+`docs/submission-log.md` carries one row per agent version considered done enough
+to evaluate. Phase 4 produces **five**: the champions of EXP-015's five seeds,
+each reproducible from the commit and the registry entry named in its row.
+
+**The log's original columns do not fit what was measured, and the row is honest
+about that rather than padded.** They read *vs random / vs heuristic / vs
+solver*, which is the protocol built for Axis 1's agents in EXP-008. The Axis 2
+champions were never played against `RandomAgent` or `HeuristicAgent` — their
+registered opponents are prior-free UCT (EXP-015) and exact ground truth
+(EXP-006). Those columns stay empty rather than being filled with a different
+measurement wearing their name.
 
 ## EXP-006 — the third member of H3's comparison set
 
-<!--
-500 shipped-5x5 endgame positions at k <= 8, solved exactly on demand. Registered
-2026-08-05, blocked on Axis 2 until now. It is the member that keeps H3 from
-resting entirely on reduced boards.
--->
+Registered **2026-08-05, before Axis 2 existed**, which is the entry's whole
+point: a comparison set fixed after seeing the learner is not a comparison set.
+It is the member that keeps H3 from resting entirely on reduced boards.
+
+750 positions from the shipped 5×5 at `k ∈ {6, 7, 8}`, solved exactly. 4.39 h.
+**749 proved**, one excluded at the 20,000,000-node budget and recorded rather
+than replaced — replacing it would select the sample on how hard it was to solve.
+The registered stratum is complete: 500 of 500, zero exclusions.
+
+### The measure was vacuous, and nobody noticed for six weeks
+
+Draws are impossible, so every position is a WIN or a LOSS for the mover. **From
+a LOSS, every legal move preserves the value** — the opponent wins whatever is
+played — so the registered measure, "does the chosen move preserve the value",
+scores a hit for free on every lost position.
+
+Measured on the real sample, the lost fractions are **39.2%, 3.6% and 46.1%** at
+`k = 6/7/8`. Under the original rule, **148 of the registered stratum's 500
+positions** would have been automatic hits, and the 0.90 threshold would have
+demanded ~85% real accuracy at one `k` and ~89% at another — one number meaning
+two different things, with the pooled meaning fixed by a mix nobody had measured.
+
+**The mix is structural, not noise.** `t = 25 − k` and the mover alternates with
+`t`, so odd `k` puts the first player on move — and odd `k` is also exactly when
+the mover places one more tile than the opponent before the board fills. Those
+two explanations are **perfectly confounded** on this board: the first player is
+on move precisely when an odd number of cells remain. The swing is not evidence
+for H1, and not for a pure tempo effect either.
+
+The fix, amended in before the run: the denominator is the positions the mover
+**wins**. The threshold stayed at 0.90 and is therefore *stricter* than
+registered — discovering that a measure was inflated is not a licence to re-tune
+the bar to the inflation.
+
+### Verifying the claim instead of asserting it
+
+A 100-position calibration sweep solves every distinct child. Its pre-registered
+check **holds**: on all 26 lost positions, every child is a win for the opponent.
+
+And it caught what the probe behind the amendment had missed — **3 of the 74 won
+positions have no losing move at all**, vacuous for the same reason. The probe
+had found zero in 30 and the amendment said explicitly that "zero is a
+measurement on one `k` at one sample size and not a proof". That sentence is the
+only reason the sweep was registered.
+
+The sweep also gives the floor the rate sits on: the median share of legal moves
+that throw the win away is **78.1%**, so **a random mover agrees on 21.9%** of
+won positions. No agreement rate is quoted without it.
+
+### The result: fourteen points short, on every seed
+
+Agreement is scored by **value preservation** — the chosen move is applied and
+the child solved exactly — never by identity with the solver's move. A won
+position usually has several winning moves, and scoring identity would report
+correct play as an error.
+
+| | rate |
+|---|--:|
+| random mover | 21.9% |
+| raw prior, no search | 53.5% |
+| **champion, 400 simulations** | **75.7%** |
+| required | 90.0% |
+
+All five seeds fail: 74.4% to 77.0%, and the **upper** limit of the best is
+81.1%. Search is worth +22.2 points over the raw prior and the prior +31.6 over
+random, so the learner is emphatically doing something. It is 14 points from the
+standard.
+
+**Why the failure is believed, given that a unanimous result is exactly the shape
+an instrument defect takes.** Across all five seeds and both arms the rate is
+monotone in difficulty — `k = 7` 85.7–89.4%, `k = 6` 69.3–78.2%, `k = 8`
+51.1–62.2% — and a broken scorer does not produce that ordering ten times out of
+ten. Ten rows re-derived from scratch with a fresh solver and a fresh
+transposition table: 10/10 roots re-solve to WIN, 10/10 moves reproduce from the
+recorded seed, 10/10 verdicts confirm. Zero child solves hit the budget. A second
+full run produced a byte-identical artefact.
+
+### Two readings that only exist because the design was adversarial
+
+**The Takizawa gap is real.** The second stratum — uniform over the layer index
+rather than reached by play — was added in 2026-08-07 against Takizawa 2023 §5,
+which gives empirical evidence that an evaluator's systematic errors concentrate
+where play does not go. Four of five seeds score worse off the play distribution.
+And the raw gap **understates** it, because the off-distribution stratum is
+*easier* by composition (more `k = 7`, less `k = 8`): standardising to the
+registered mix moves the gap from **−4.2 to −5.9 points**. The strata are never
+pooled, and seed 5 reversing the sign is reported rather than smoothed.
+
+**The seed spread collapsed.** The same five champions:
+
+| | mean | sd | range |
+|---|--:|--:|--:|
+| solver agreement | 75.7% | **0.9%** | 74.4–77.0% |
+| prior-free UCT floor | 64.2% | **7.3%** | 56.0–76.0% |
+
+Seed 4 — the one that failed the floor, the one whose `χ²` rejected a common
+rate — is ordinary here, 1.2 points below the best. **This does not resolve the
+instability; it says the two measures are measuring different things.** A
+plausible mechanism is that the floor is a whole game where a difference
+compounds over 24 plies, while this is a single decision in a deep endgame, but
+that is an inference from two numbers. What is established is narrower and still
+useful: endgame value agreement is far more stable across training seeds than
+head-to-head strength is, so seed variance is a property of the measurement as
+much as of the learner.
+
+### The threshold, and what it cost to leave underived
+
+**0.90 was pre-declared on 2026-08-05 and never derived.** For a negative verdict
+that would normally be a serious weakness — a bar set by taste can fail a learner
+a justified bar would pass. It does not matter at a 14-point gap, by arithmetic
+rather than by rhetoric. It is recorded because the next entry to use this bar
+may land near it, and then the missing derivation decides the outcome.
+
+### Where this leaves H3
+
+**Both clauses now have negative verdicts.** Clause 1 (stability across seeds) is
+recorded as instability from EXP-015; clause 2 fails on the shipped-5×5 member
+here. H3 is not closed — the 3×3 and 5×3 members remain unread — but no
+combination of the remaining reads converts either verdict.
+
+**What is not established.** That the architecture is wrong, the budget too
+small, or more training would close 14 points: nothing here varies any of those,
+and attributing the gap to one would be a story. That the learner is weak in
+general — it beats prior-free UCT on four seeds of five and a random mover by 54
+points here. And nothing about play away from `k ≤ 8`.
+
+Retraining or re-tuning to move 75.7% toward 90% requires a new registered entry.
+Selecting on this outcome is what the pre-registration exists to prevent.
+
+### The risk register had no row for this
+
+Thirteen risks, every one naming a *cause* that could make the learner weak —
+head architecture, action aliasing, no augmentation, compute, training
+instability — and none naming the outcome. H3's own falsification condition had
+no row. The nearest, R9, is scoped to a 3×3 value disagreement at likelihood 1.
+R6 does not cover it by its own text: a run whose five seeds all landed on 75.7%
+with an `sd` of 0.2% would satisfy R6 completely and still fail H3.
+
+**R14 was added after the fact and the lateness is part of the entry.** What the
+missing row cost was not the result — a pre-registered bar that is missed and
+reported is worth more than one that is met — but the foresight: with no
+pre-declared response to falling short, five causal stories were available to
+reach for afterwards.
 
 ## Lessons Learned
 
