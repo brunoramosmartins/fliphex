@@ -20,7 +20,7 @@ that no Phase 5 work can convert: H3's stability clause (EXP-015) and H3's
 shipped-5×5 agreement member (EXP-006). Phase 5 adds the two remaining
 comparison-set members and writes the verdict; it does not re-run the training.
 
-**The gates are in force.** No experiment below is registered until its eight
+**The gates are in force.** No experiment below is registered until its nine
 measurement-gate answers are written into its registry entry —
 [`docs/measurement-gates.md`](../docs/measurement-gates.md). Two planned
 comparisons already fail a gate as sketched and are re-scoped before they run.

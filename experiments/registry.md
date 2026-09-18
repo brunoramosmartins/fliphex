@@ -4935,7 +4935,7 @@ is measured in Phase 5 under a matched protocol.
 ### EXP-016 — H1's shipped-board arm: the first-player rate under named, imperfect play
 
 **Registered 2026-09-18, before the instrument exists.** The first Phase 5 entry,
-and the first to carry the eight measurement-gate answers required by
+and the first to carry the measurement-gate answers required by
 [`docs/measurement-gates.md`](../docs/measurement-gates.md).
 
 #### What H1 already has, and what this cannot add
@@ -5496,7 +5496,7 @@ Sketched in Phase 0 so the phases have targets. IDs are allocated on
 registration, not here.
 
 > **Gate before you register.** From 2026-09-18, no Phase 5 or Phase 6
-> experiment below is registered until its eight measurement-gate answers are
+> experiment below is registered until its nine measurement-gate answers are
 > written into its entry — see [`docs/measurement-gates.md`](../docs/measurement-gates.md).
 > A gate answered "not applicable" says why in one line; a gate that cannot be
 > answered is itself the finding, and the experiment is not run until it is.
@@ -5542,8 +5542,9 @@ registration, not here.
 > after EXP-006's lost positions (every move preserves a loss) and EXP-016's root
 > coverage. The pattern is worth stating for Phase 6: **before registering a
 > measure, ask what the rules force it to be.** Gate 7 catches an instrument that
-> computes the wrong thing; nothing in the eight gates catches a *quantity* that
-> was never free to vary, and that gap is now three for three.
+> computes the wrong thing; nothing in the first eight caught a *quantity* that
+> was never free to vary — which is why **gate 9 was added the same day**, and why
+> this is the case it is named after.
 >
 > **Win contribution survives** — it is not forced — and so do placement
 > *timing*, cell choice and rotation choice. Each needs a dominance threshold
