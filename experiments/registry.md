@@ -5525,7 +5525,26 @@ registration, not here.
 | 5 | AZ vs solver at matched depth caps | H3 |
 | 5 | Sensitivity: MCTS simulations, `c_puct`, temperature schedule | — |
 | 6 | State-space and game-tree bounds; cross-game comparison table | H4 |
-| 6 | Archetype placement frequency and win contribution | H5 |
+| 6 | Archetype **win contribution** — the frequency half is withdrawn, see below | H5 |
 | 6 | **Tile criticality** — for each archetype, the fraction of solved 5×3 positions whose value changes when that tile is removed from the hand | H5 |
 | 6 | **Mirror-optimality rate** — on solved positions where the Z/2 mirror is a valid game symmetry (both `P3-y` placed), the fraction of optimal moves whose mirror image is also optimal | H5, H6 |
 | 6 | **First-player advantage curve** — fraction of solved positions at each ply `t` won by the player to move, 5×3 | H1 |
+
+> **Withdrawn 2026-09-18 — archetype placement frequency, before any entry was
+> written.** The quantity is forced by the rules and cannot vary: 25 cells, no
+> passing, both hands exhausting exactly, so every game places **each of the 12
+> archetypes twice and the joker once**, for any agent and any strategy. Checked
+> on 500 recorded games from EXP-017 — the count vector is `[2]×12 + [1]` in
+> every one. A frequency analysis would therefore report a constant and read as
+> a finding about the deck.
+>
+> This is the third measure in this project that the game's own structure fixes,
+> after EXP-006's lost positions (every move preserves a loss) and EXP-016's root
+> coverage. The pattern is worth stating for Phase 6: **before registering a
+> measure, ask what the rules force it to be.** Gate 7 catches an instrument that
+> computes the wrong thing; nothing in the eight gates catches a *quantity* that
+> was never free to vary, and that gap is now three for three.
+>
+> **Win contribution survives** — it is not forced — and so do placement
+> *timing*, cell choice and rotation choice. Each needs a dominance threshold
+> declared before looking. See `docs/research.md`, H5.
