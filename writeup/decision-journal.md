@@ -9,6 +9,98 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-09-18 — Phase 5 closing: four verdicts, one exit criterion that cannot be met, and a ninth gate
+
+The phase opened and closed the same day, so this entry is contemporaneous.
+Everything below was decided today.
+
+### Four verdicts, and the shape of them is the result
+
+| | |
+|---|---|
+| **H1** | supported on every board where perfect play is computable; not decidable on the shipped 5×5 |
+| **H2** | supported on the reduced boards; out of reach by construction on the shipped one |
+| **H3** | **rejected**, on both clauses independently |
+| **H5** | **true by construction on the measure it names**, and therefore evidence of nothing |
+
+Two positive, one negative, one empty. The negative is the most informative of
+the four — a bar fixed in August, an agent measured in September, 14 points
+short — and the empty one was caught before it became a figure in a write-up.
+
+**H1 and H2 needed no new computation.** Both rest on four exhaustive solves that
+Phase 3 delivered, and the Phase 5 work was reading them honestly: stating the
+adr-010 verification coverage rather than saying "V0–V6 passed" flat, and
+recording that H1's registered self-play arm **was not performed as written**.
+
+**H3 cost nothing because of one word in its own statement.** The clause says
+agreement on *"every member"* of the comparison set. The shipped-5×5 member
+already fails. So reading the 3×3 and 5×3 members cannot change the verdict —
+which also settles whether to train networks for them: no.
+
+That happens to be moot twice over. The champions are **shape-locked to the
+5×5** — `ConvRotationNet` flattens 32 × 25 into a 25-logit head, so a 5×3 raises
+a shape error — and the only reduced-board networks this project has were trained
+**supervised on solver labels** (EXP-011/012/013), which adr-004 R1 forbids for
+the comparison H3 *is*. Neither fact was known when the comparison set was
+pre-declared in August 2026, and neither is a defect: the set was fixed before
+Axis 2 existed, which is what made it a comparison set.
+
+### The exit criterion that cannot be met, recorded rather than edited away
+
+> *"Solver and AZ agree on the 3×3 game value."*
+
+**Not met, and unreachable with any artefact this project has** — for the two
+structural reasons above. Recorded as unmet with the demonstration attached,
+which is the same treatment Phase 4's superseded criteria got. **No work is
+scheduled to satisfy it**, because satisfying it would mean training self-play
+networks on a board whose verdict is already decided by a different member.
+
+The other two criteria: *"every hypothesis has a documented verdict"* is met for
+the four this phase owns, with H4 and H6 belonging to Phase 6 by the roadmap's own
+assignment; *"where solver and AZ disagree, the disagreement is analysed"* is met
+on the only comparison that exists, in EXP-006's Result.
+
+### Scope calls
+
+**`stats/` is dropped.** The roadmap asked for a central module — Wilson, paired
+bootstrap, McNemar, Bonferroni. Four phases produced every one of those inline,
+and in at least one place the duplication is **deliberate and load-bearing**: an
+analysis script that checks a gate must not import the gate's own implementation,
+and `tests/test_exp015_analysis.py` asserts the two agree rather than sharing
+code. A central module would undo that on purpose. Dropped with the reason, not
+carried for a fifth phase.
+
+**`figures/` is carried to Phase 6 as an explicit task.** Four verdicts are
+written and not one canonical figure exists. It replaced the notebook
+deliverables at the phase open and then went the same way they did, which is the
+pattern that decision was meant to break.
+
+**`scripts/eval_joker_impact.py` and `eval_az_vs_solver.py` are dropped**, both
+because the phase showed they have nothing to compute: H2 needed no new run, and
+AZ-vs-solver at matched depth caps is unreachable on any board where both exist.
+
+**`exercises/ex05` stays unwritten** — the roadmap names the deliverable and
+gives it no exercises block, flagged at the open. **TIL #4** joins the standing
+standby with ex04 and TILs #2, #3 and #5.
+
+### Gate 9, added the day the gates were first used
+
+The eight measurement gates were adopted at the Phase 4 close and used for the
+first time today on EXP-016 and EXP-017. They worked — EXP-016 was withdrawn
+before running on a defect the author had not seen — and then **they let the same
+class of defect through a third time** in H5.
+
+Gates 1 and 3 ask whether the design can resolve an effect; gate 7 asks whether
+the instrument computes what it claims. **None asked whether the quantity was
+ever free to move.** Three instances: EXP-006's lost positions (a rule), EXP-016's
+root coverage (a budget), H5's placement frequency (a counting identity). One
+shape — a number that looked like evidence and could not have come out otherwise.
+
+Added as **gate 9**, with a note in the file saying it was added late and why. A
+list that grows without saying why looks designed.
+
+---
+
 ## 2026-09-18 — Phase 5 opened, with the gates in force and the notebooks dropped
 
 **Gate.** Phase 4's deliverables are present except the notebook, and the
