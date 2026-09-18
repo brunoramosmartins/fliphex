@@ -9,6 +9,68 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-09-18 — Phase 6 opened: H6 adopted because nothing else would own it, and two Phase 3 debts called in
+
+Third entry today. Phase 5 opened, closed and shipped in one day, and Phase 6
+opens on the same one.
+
+**The gate check found more than the phase's own carry-overs.** Three Phase 5
+deliverables were never started — `figures/`, TIL #4 and `ex05` — and the
+roadmap marked all three `[~]`, which reads as partial. Nothing existed. The
+marks were corrected to `[ ]` with "not started; carried to Phase 6", because a
+tick that overstates is worse than no tick: it is the only record anyone will
+read later, and the Phase 5 close was already the place where an unmet exit
+criterion got written down honestly. It would be strange to do that for the
+criterion and not for the checkbox.
+
+The heavier finding was outside Phase 5 entirely. **EXP-005 and EXP-007 have
+stood at "registered; 3×3 pilot run" since 2026-08-05.** Their registered rule
+runs on the 5×3 and never has. Three phase closes passed over them because the
+close-mode audit walks the closing phase's checklist, and these belong to Phase
+3. They surface now only because Phase 6's tightened state-space bound needs
+EXP-007's exact reachable closure as an input — which is to say they surfaced by
+luck, when a later phase happened to depend on them. Both are adopted as Phase 6
+tasks. The procedural lesson is that a registry entry in a non-terminal state is
+a debt no phase close is currently responsible for noticing.
+
+**H6 is adopted, and the reason is unflattering.** It had no owning phase at
+all. Phase 6's task list names H4 and H5; Phase 7 is interface, writeup and
+release. H6 was marked *optional / stretch* when the hypotheses locked, and
+"optional" quietly became "unassigned" — the row would have reached the writeup
+as a dash with no explanation. Phase 6 is the last phase that can measure
+anything, so it takes H6. The material is largely already in hand: four
+exhaustive solves across three board configurations and two deck arms, plus the
+planned mirror-optimality row that was already tagged H5 *and* H6. The
+alternative was a formal withdrawal, and withdrawal is the right move for a
+measure the rules have fixed — H5's frequency half — but not for one that was
+simply never scheduled.
+
+**The notebook class is closed.** `notebooks/05` is dropped at the open, with
+the 02, 03 and 04 before it. One notebook exists out of five planned. The Phase
+5 open dropped three of them in favour of scripts under `figures/`, and
+`figures/` then delivered nothing, which is recorded as that phase's failed
+attempt 7. Dropping the fifth is not the interesting half of this decision. The
+interesting half is that `figures/` is now a **named exit criterion** — every
+figure in it regenerates from a tracked artefact — rather than a substitution
+offered in place of something else. Changing an artefact's format does not
+establish a production path for it; only shipping it does.
+
+**H4's wording is not the roadmap's.** The roadmap still says "complexity
+comparable to small Reversi". That was reworded at the Phase 2 lock onto both
+complexity axes, against a corrected reachable bound of ~4.9 × 10¹⁷ — the
+roadmap's original expression carried a `6^25` orientation factor that adr-006
+forbids, since placed tiles are inert. The corrected figure sits *below* Reversi
+6×6's commonly cited ~10²⁰, so the original claim looks false in a direction
+nobody intended when it was written. The locked version in `docs/research.md`
+governs, and this phase measures against it.
+
+**Gate 9 is available from the start**, for the first time. It is also the gate
+this phase most needs: a complexity bound is a quantity the rules constrain by
+construction, and the last measure withdrawn for exactly that reason was H5's
+frequency half, on the day the gate was written.
+
+---
+
 ## 2026-09-18 — Phase 5 closing: four verdicts, one exit criterion that cannot be met, and a ninth gate
 
 The phase opened and closed the same day, so this entry is contemporaneous.
