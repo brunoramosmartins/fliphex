@@ -9,6 +9,97 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-09-18 — Phase 4 closing: three exit criteria unmet, and nineteen days this journal did not record
+
+> **Retrospective entry.** Written at the phase close, not on the days the
+> decisions were made. Everything below is reconstructed from
+> `experiments/registry.md`, the risk register and the artefacts; nothing in it
+> is presented as contemporaneous. The gap it reconstructs is the first item.
+
+**This journal has no entry between 2026-08-30 and today.** Phase 4 opened on
+2026-08-30 and ran nineteen days, in which EXP-011, EXP-012, EXP-013, EXP-014,
+EXP-015 and EXP-006 were all registered and run, adr-005 was amended twice, four
+risk rows were rewritten and one was created. **None of that is in here.**
+
+The decisions were recorded — in registry entries, ADR amendments and risk rows,
+all dated the day they were taken, which is why this entry can be reconstructed
+at all. What was lost is the thing the journal exists for and the ADRs
+deliberately do not carry: *why a decision was live at the time*, including the
+options that were not taken. Two examples that are now unrecoverable in their
+original form: the choice to let the replay buffer cross generations, and the
+choice of equal-simulations as the primary floor with equal-time as secondary.
+Both were live decisions with real alternatives; both survive only as settled
+facts in a registration.
+
+Recorded as a process failure rather than patched. **A backfilled journal is not
+a journal** — writing twelve entries today, dated to September, would produce
+exactly the artefact this project exists to avoid.
+
+**The corrective is a habit, not a document:** the journal entry is written the
+day the decision is taken, before the registry entry that formalises it. Phase 5
+starts with that rule in force.
+
+### All three exit criteria are unmet, and two of them measure something the phase deliberately stopped using
+
+| criterion | status |
+|---|---|
+| "stable to at least 1M self-play positions" | **unmet.** 150,000 positions per seed, 750,000 across five. 15% of the figure per run. |
+| "monotonically improving strength vs `heuristic_agent`" | **not measured.** The gate compares challenger against champion; no run was ever played against the heuristic. |
+| "beats heuristic ≥ 90% and beats the depth-capped solver ≥ 50%" | **not measured.** Neither match was run. |
+| "two independent runs converge to comparable strength" | **unmet, and the failure is the result.** Five runs converged — policy loss fell 5.05–5.20 → 3.74–3.88 on every seed — and did **not** reach comparable strength: 56.0% to 76.0% against the floor, `χ² = 18.52` on 4 df rejecting a common rate. |
+
+**The first three name opponents the phase replaced on purpose.** `heuristic_agent`
+and a depth-capped solver were the Phase 0 sketch of "is it any good". What
+Phase 4 registered instead is **prior-free UCT** — which depends on no training,
+so a bad run cannot flatter it — and **exact solver ground truth** on 750
+positions. Those are stronger opponents and they were chosen for a reason adr-004
+R1 requires: the floor had to contain no solver information, or the training run
+would have terminated Axis 2 on the dimension of H3's own comparison.
+
+So the criteria are not merely unmet; measuring them now would answer a weaker
+question than the one the phase answered. **Unmet-and-superseded**, with the
+substitution registered before the run — not dropped.
+
+The fourth is different. It is unmet on its own terms, it was the right criterion,
+and the failure is reported as the finding: R6 materialised, H3's stability clause
+is not satisfied, and the five rates are in the artefact rather than averaged.
+
+### Deliverables: two diverge, one is missing, four are deferred by choice
+
+**`data/models/az-v*.pt` — diverged, documented.** The checkpoints are at
+`data/az-runs/h3-seed{1..5}/`, which is gitignored. They are 27 hours each and
+are reproduced from the commit, config and seed rather than restored from the
+repository; `docs/submission-log.md` says so in the column meanings. The roadmap's
+path assumed a version series and the phase produced five replicates.
+
+**`notebooks/03_az_training_curves.ipynb` — missing.** Not started. The curves it
+would carry are in `results/exp015-histories.json`, which is tracked precisely so
+they are not trapped in a gitignored run directory, and the design log quotes
+them. **Carried to Phase 5 or dropped — author's call**, and the honest note is
+that Phase 3's notebook deliverable was deferred the same way and also has not
+been written.
+
+**`ex04`, TIL #2, TIL #3, TIL #5 — deferred, deliberately.** All four exist as
+problem sets and skeletons with prompts; the content is first-person and is not
+being ghost-written. The author's decision at this close was explicit: develop the
+project end to end first, study the material afterwards. Recorded so it is a
+choice with a date on it rather than four files that quietly never got written.
+
+### Two roadmap defects found at the close
+
+**`v0.7` is double-booked.** Phase 4's GitHub table names `v0.6-az-mvp` **and**
+`v0.7-az-tuned`; Phase 5's names `v0.7-hypotheses-verdicts`. Both cannot exist.
+
+**And `v0.7-az-tuned` was never earned.** It presupposes a tuning cycle. There was
+none: EXP-015 ran one registered configuration, and the sensitivity sweep over
+simulations, `c_puct` and the temperature schedule is a **Phase 5** task that has
+not run. Tagging "tuned" here would name work that does not exist.
+
+Both are `/project-roadmap revise` items rather than in-place edits. The tag
+proposed for this close is `v0.6-az` alone.
+
+---
+
 ## 2026-08-30 — Two registrations red-teamed before a line of code existed, and three failures that had happened here before
 
 EXP-010 and EXP-011 were registered and then red-teamed the same afternoon. Both
