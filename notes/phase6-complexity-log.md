@@ -202,6 +202,96 @@ opening and the shipped tree's magnitude. Replacing `e_j` with the naive
 
 ## `complexity/branching.py` — legal-move count by turn number
 
+The width of a node is
+
+```
+(cells still empty) × (sum of rotation orbits over the mover's remaining tiles)
+```
+
+The first factor is fixed by the ply: `n − t`, always. The second is not — it
+depends on *which* tiles the mover has spent, and the orbits run from 1 (`P6`,
+`JOKER`) to 6. So there is no single branching factor at ply `t`; there is a
+distribution, and it is closed form like everything else in this phase.
+
+### The weighting is the part that is easy to get wrong
+
+Nodes at ply `t` are not spread evenly over the mover's possible spent sets. A
+prefix that spends a 6-orbit tile was reached by six times as many routes as one
+that spends `P6`, so a spent set `S` carries weight proportional to
+`∏ orbits(S)`. Averaging over spent sets uniformly answers a question about
+*hands*, not about the *tree*.
+
+The gap runs one way at every ply and it widens:
+
+| ply | node-weighted | per spent set | gap |
+|---:|---:|---:|---:|
+| 8 | 628.7 | 682.6 | 8% |
+| 16 | 161.8 | 200.8 | 19% |
+| 24 | 2.9 | 4.5 | 36% |
+
+**The tree's typical node is narrower than the hands alone suggest**, and
+increasingly so as the game goes on, because the weighting favours having spent
+the wide tiles and being left with the narrow ones.
+
+### The identity that makes it checkable
+
+Every node at ply `t` has one child per legal move, so
+
+```
+node-weighted mean branching at t  ==  prefixes(t + 1) / prefixes(t)
+```
+
+exactly, as a ratio of integers. `cross_check()` asserts it on every ply against
+`game_tree.prefixes`, which reaches the same tree by elementary symmetric
+polynomials over the whole hand with no subset enumeration anywhere. And because
+these are ratios rather than averages of products, they **telescope**: the
+product over all plies is the exact game-tree complexity, `4.229 × 10⁵⁸`, with no
+Jensen gap to apologise for.
+
+That identity earned its keep immediately. My first implementation weighted only
+the mover's own spent sets and left out the cell arrangement, the play orders and
+the other player's hand. The **mean was unaffected** — those factors are constant
+across the loop — so every distributional claim still looked right. The node
+count was out by twenty orders of magnitude, and the identity was the only thing
+that said so.
+
+### The shipped board, in full
+
+| ply | mover | min | max | mean | per set | spread |
+|---:|---|---:|---:|---:|---:|---:|
+| 0 | P1 | 1,450 | 1,450 | 1450.0 | 1450.0 | 1.00 |
+| 1 | P2 | 1,368 | 1,368 | 1368.0 | 1368.0 | 1.00 |
+| 8 | P1 | 578 | 867 | 628.7 | 682.6 | 1.50 |
+| 16 | P1 | 90 | 270 | 161.8 | 200.8 | 3.00 |
+| 24 | P1 | 1 | 6 | 2.9 | 4.5 | 6.00 |
+
+The first two plies are **uniform** — neither mover has spent a tile, so there is
+nothing to vary. From then on the spread grows monotonically within each
+player's own plies, reaching 6× at the last ply, where the width is just the
+final tile's orbit.
+
+### Two things the profile settles
+
+**The hump is not a branching effect.** Mean width falls *strictly* at every
+single ply, on both factors at once. So the hump in `state_space.py`'s layer
+profile comes entirely from the `C(n, t)` cell factor, which peaks in the middle
+while the width only shrinks. Worth stating because "the game gets more complex
+in the middlegame" is the natural reading of the state-space chart and it is
+wrong about the branching.
+
+**The spread explains the rollout variance.** The multiplicative skew measured
+in `game_tree.rollout_estimate` — a relative standard deviation of about five —
+is this table compounded over 25 plies. A rollout that keeps drawing 6-orbit
+tiles rides the `max` column; one that spends them early rides the `min`. That
+is why an unbiased estimator still needs ~10⁵ samples for 1%.
+
+### Probes
+
+Dropping the orbit weighting (uniform over spent sets) turns 8 tests red,
+including the direction claim on every board. Dropping the constant scale factor
+— the bug I actually wrote — turns 8 red, all of them `cross_check`, which is
+exactly the test that caught it the first time.
+
 ## `complexity/comparison.py` — the cross-game table
 
 ## EXP-005 and EXP-007 on the 5×3 — the closure the bound depends on
