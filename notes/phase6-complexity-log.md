@@ -33,6 +33,69 @@ exactly that reason.
 
 ## `complexity/state_space.py` — the upper bound, and the reachable one
 
+Three numbers, in decreasing order of size and increasing order of honesty.
+
+| | 3×3 | 5×3 | 5×5 (shipped) |
+|---|---:|---:|---:|
+| orientation-inflated | 7.175 × 10¹² | 8.231 × 10²¹ | **1.389 × 10³⁷** |
+| configuration space | 711,963 | 17,506,580,337 | **488,676,694,181,949,003** |
+| one-step orphans | 23,371 (3.2826%) | 60,009,757 (0.3428%) | 38,814,863,794,591 (**0.0079%**) |
+| reachable bound | 688,592 | 17,446,570,580 | **488,637,879,318,154,412** |
+| peak layer | `t = 5` | `t = 9` | `t = 15` |
+
+The inflated row is kept in the module, under `orientation_inflated()`, because
+"the bound was corrected" is a claim that should come with the discarded figure
+attached. It is the roadmap's original expression, multiplying by `6^25` for
+tile orientations. adr-006 makes placed tiles inert, so nothing downstream can
+read a placed tile's rotation and the rotation is not part of the state. The
+correction is a factor of 2.8 × 10¹⁹.
+
+**The reachable bound needs no run.** A configuration has no predecessor exactly
+when every occupied cell carries the colour of the player who did *not* just
+move — the last cell placed always shows its placer's colour, because a tile's
+own arrows never point at the cell it occupies. That is one colouring in `2^t`,
+so the `2^t` cancels and the orphan count is a closed form. This is the identity
+EXP-005's amendment proved on 2026-08-07, and it is why EXP-007's hundred-hour
+5×3 closure was stopped: the correction it would refine is already in the fourth
+decimal place on the shipped board.
+
+**The correction shrinks by roughly an order of magnitude per board step** —
+3.28% → 0.343% → 0.0079% — because the mass of the space sits at high `t`, where
+`2^t` is enormous. A test asserts the ordering, so the claim is checked rather
+than observed once.
+
+**The profile is a hump, not a funnel**, on all three boards: the peak layer is
+interior and the sizes rise then fall exactly once. That is the shape that says
+the game does not converge, and it is the opposite of checkers.
+
+### On the duplication with `scripts/layer_profile.py`
+
+Both compute the same sum, and that is deliberate. `layer_profile` imports
+nothing from `fliphex` on purpose — adr-010 V1 compares it against the solver's
+own enumerator, and a comparison is only evidence if the two sides are computed
+by different means. Collapsing them into one implementation would delete the
+check. `test_agrees_with_the_independent_layer_profile` asserts they agree, per
+layer, on all three boards, which is Phase 5's lesson 9 applied rather than
+restated.
+
+### The off-by-one, and why it has its own test
+
+The identity calls layer 0 an orphan, because the opening position genuinely has
+no predecessor. It is reachable: it is where the game starts. Without the guard
+the 3×3 reports 23,372 against EXP-005's measured 23,371 — a difference that
+vanishes in a percentage (3.2828% against 3.2826%) and survives in a count. I
+wrote it wrong first, in the EXP-007 amendment, on all three boards, and it was
+the 3×3's recorded count that caught it. `test_the_unguarded_sum_is_exactly_one_too_many`
+pins the size of the mistake so a regression is recognisable rather than merely
+detectable.
+
+### Probes
+
+Both load-bearing tests were checked by breaking the code they guard. Removing
+the `t == 0` guard turns six tests red; swapping the two hand-parity factors in
+`configurations()` turns eight red, including the independence check against
+`layer_profile` and the `2^n` terminal-layer identity.
+
 ## `complexity/game_tree.py` — Monte Carlo estimation via random rollouts
 
 ## `complexity/branching.py` — legal-move count by turn number

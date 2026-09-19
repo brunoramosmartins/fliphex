@@ -39,7 +39,7 @@ three debts Phase 6 opened with dissolve on inspection rather than on compute.
 
 **The surviving reason was H4's bound, and the closed form settles it.** One-step
 orphans are `layer(t)/2^t` summed over layers, computable in under a second on
-any board: **3.2828%** on the 3×3, **0.3428%** on the 5×3, **0.0079%** on the
+any board: **3.2826%** on the 3×3, **0.3428%** on the 5×3, **0.0079%** on the
 shipped 5×5. The fraction falls about two orders of magnitude per board step
 because the mass sits at high `t` where `2^t` is enormous. So the shipped board's
 state-space bound is 4.887 × 10¹⁷ with the correction and 4.887 × 10¹⁷ without
