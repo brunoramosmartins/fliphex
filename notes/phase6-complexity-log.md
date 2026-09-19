@@ -98,6 +98,108 @@ the `t == 0` guard turns six tests red; swapping the two hand-parity factors in
 
 ## `complexity/game_tree.py` — Monte Carlo estimation via random rollouts
 
+**The Monte Carlo estimate is not needed. The count is exact and closed form.**
+
+A move is (empty cell, tile in hand, distinct rotation), and *every* such triple
+is legal — no capture condition, no passing, no position that forbids a move. So
+a complete game is three independent choices made once each: a bijection from
+plies to cells, a bijection from each player's plies to that player's tiles, and
+a rotation per tile from its orbit. Hence
+
+```
+games = n! × d1! × ∏ orbits(hand 1) × d2! × ∏ orbits(hand 2)
+```
+
+| | 3×3 | 5×3 | 5×5 (shipped) |
+|---|---:|---:|---:|
+| opening moves | 180 | 525 | **1,450** |
+| games (exact) | 4.876 × 10¹³ | 1.446 × 10²⁹ | **4.229 × 10⁵⁸** |
+| log₁₀ | 13.69 | 29.16 | **58.63** |
+| effective `b` | 33.2 | 87.9 | 221.3 |
+| Knuth–Moore minimal | 10^7.62 | 10^15.56 | **10^30.49** |
+
+Truncate the sum at `k` plies and the same argument counts the distinct `k`-ply
+prefixes, with the products replaced by **elementary symmetric polynomials** over
+the orbit sizes: choosing `j` tiles in order from a hand contributes
+`j! · e_j(orbits)`. A naive `sum(orbits)^j / j!` would count selections with
+repetition, and a tile cannot be played twice.
+
+The tree is genuinely **unbalanced** — branching depends on which tiles the mover
+has left, and the orbits run from 1 (`P6`, `JOKER`) to 6 — so no single `b^d` is
+exact. The leaf count is exact anyway, because summing over orderings restores
+the symmetry individual nodes break.
+
+### H4's cited figure is wrong, and its own second figure proves it
+
+The locked H4 statement cites **~10⁶¹** for game-tree complexity and **~10³⁰·⁵**
+for the Knuth–Moore minimal tree. The exact count is **10^58.63**, about 240×
+smaller.
+
+The two locked figures are internally inconsistent, and the minimal-tree one is
+the survivor. Recover `b` from 10^30.5 = `b^13` and you get `b = 222`; then
+`b^25 = 10^58.65`, which is the exact answer to two decimals. Whoever derived
+the minimal tree did it correctly from a branching factor and a depth, and the
+full-tree figure does not follow from the same pair.
+
+This is the second wrong number in H4's statement, after the `6^25` orientation
+factor in the state-space expression. The hypothesis is **locked** and is not
+edited: both belong in the verdict row, as deviations recorded against the
+pre-registered text — the same treatment H1's unperformed 20-seed tournament
+received. And the *claim* survives both: FLIPHEX at 10^58.6 is still far beyond
+the weak-solution route that carried checkers at ~10^31.
+
+### The estimator is kept, and it argues against itself
+
+`rollout_estimate()` implements Knuth's 1975 random-path estimator against the
+real engine — walk uniformly from the opening to a full board, multiply the
+legal-move count at every node. It is unbiased: a leaf at depth `d` is reached
+with probability `1 / ∏ b_i` along its own path, so each leaf contributes exactly
+1 in expectation.
+
+It is also nearly useless here, and the numbers say so:
+
+| samples | ratio to exact | relative sd |
+|---:|---:|---:|
+| 100 | 0.67 | 1.86 |
+| 1,000 | 1.14 | 4.82 |
+| 10,000 | 1.05 | 4.04 |
+| 60,000 | **1.02** | 4.00 |
+
+A single rollout's spread is **four times** the quantity it estimates on the 3×3
+and **five times** on the shipped board, because the branching is
+multiplicatively skewed — a mover holding `P6` and the joker has two rotations
+where a mover holding six ordinary tiles has thirty-six, compounded over 25
+plies. The standard error falls as `sd / √n`, so 1% takes on the order of 10⁵
+rollouts. `games()` returns the answer exactly, in microseconds.
+
+I wrote the opposite in the docstring first — that FLIPHEX was "close to
+balanced, so the spread here is small" — and the first run contradicted it. The
+prose was wrong, not the measurement.
+
+So the estimator's status is **verification of the formula, not the
+measurement**: the status EXP-005's hours-long run took when its quantity turned
+out to be a counting identity. This is the second time in one phase that the
+roadmap asked for an expensive estimate of something a closed form already gives
+exactly.
+
+### Verified against the rules, not against itself
+
+Gate 7. The strongest check walks the **5×1** — the smallest board adr-011
+admits, five cells and hands 3 + 2 — to the **last ply**, and compares the leaf
+count against `games()`. Both arms: 51,840 and 311,040, exact. Every other test
+compares the closed form against a prefix or against another closed form; this
+one compares it against `legal_moves` and `apply_move`.
+
+Depth 3 on the 3×3 and 5×3, both arms, was walked once offline — sixteen cases,
+sixteen exact matches — and the values are pinned in `KNOWN`. The suite re-walks
+only to depth 2, because the 5×3's third ply has 95,975,880 leaves.
+
+### Probes
+
+Forcing every rotation orbit to 6 turns 13 tests red, including the 1,450-move
+opening and the shipped tree's magnitude. Replacing `e_j` with the naive
+`sum^j / j!` turns 12 red, including the full-depth 5×1 identity.
+
 ## `complexity/branching.py` — legal-move count by turn number
 
 ## `complexity/comparison.py` — the cross-game table
