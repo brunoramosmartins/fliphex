@@ -187,6 +187,34 @@ Three different mechanisms — a rule, a budget, a counting identity — and one
 shape: **a number that looked like evidence and could not have come out any
 other way.**
 
+#### Amendment (2026-09-18, same day) — ask it of the decision, not only of the measure
+
+A fourth instance, and it is the one that shows where the gate as first written
+stops short. **EXP-007** answered this gate correctly *for its own quantity*: it
+had carried a falsifier since 2026-08-07 saying the transitive closure must not
+collapse onto the one-step identity `layer(t)/2^t`, which is this question asked
+six weeks before the gate existed. The run was started anyway, and it would have
+cost ~100 h per arm.
+
+Nobody asked the same question about **the decision the number would inform**.
+The closure's only surviving use was tightening H4's state-space bound, and the
+one-step correction on the shipped 5×5 is **0.0079%** by closed form — so the
+bound is 4.887 × 10¹⁷ whether the correction is applied or not, at the precision
+a cross-game table spanning 10¹¹–10²⁰ reports. The *quantity* was free to vary.
+The *conclusion* was not.
+
+So the gate asks two things, and the second is new:
+
+1. **Is the quantity free to move?** — as above.
+2. **Is the decision free to move?** Compute the conclusion at the measure's
+   floor and at its ceiling. **Fails if both give the same answer**, which is the
+   same failure condition one level up: the reachable range of the *decision* is
+   a point.
+
+The honest form of the second is cheap and was available before the run: state
+what the bound is with the correction and without it, and see whether anything
+downstream distinguishes them.
+
 #### How to answer it
 
 Compute the measure under two or three nulls in which the thing being studied is

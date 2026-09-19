@@ -21,11 +21,11 @@ Freely editable (append-only in practice).
 | EXP-002 | 2026-08-05 | H1, H2 | 1 | Exhaustive solve of the 5×3, both H2 arms | 15 cells (5 cols × 3), hands 8 + 7, commit `17aac45` (h1, superseded) / h1 re-run `2432572` / crash-resume build (h2) | — | **both arms complete** | **P1 wins in both arms.** V0–V6 pass on both; V1 exact on all 16 layers. Sweeps 30.95 h (h1 re-run) / 34.25 h. **PV audit part 1: 15 of 15 agree, 0 unproven**; part 2 stopped at opening 34/540 on its measured slope and replaced by the layer-to-layer recurrence check (layers 0–3, 515,229 positions, 0 problems). V4/V6 now report coverage — V4 has **no search evidence at `t = 0..5`**; V6 covers `t ≥ 2` only. h1's re-run reproduced its V5 digest `ab2620e1707f983f…` bit-for-bit, discharging the adr-010 2026-08-07 replay. **H2's registered measure is computed: criticality 17.07%**, with 10,258,229,474 cross-arm positions compared and **0 mismatches**. [`5x3-h1.json`](../data/subgame-solutions/5x3-h1.json), [`5x3-h2.json`](../data/subgame-solutions/5x3-h2.json), [`criticality`](../results/exp002-criticality-5x3.json) |
 | EXP-003 | 2026-08-05 | — | 1 | Endgame subtree cost at `k = 3…8` on the 5×5: does searching beat storing? | 25 cells, hands 13 + 12; 200 sampled positions per `k`, with and without TT; commit `4a081d8` | 1 | **complete** | **`k* > 8`.** Median nodes to prove one position: k=5 **480**, k=8 **806,474** — against a `k ≤ 5` database of ~1.2 × 10¹⁵ positions (~150 TB). Rule fires "build no database" at every registered `k`. Prediction `k* ≥ 6` **held**. → adr-012 **Option B**. [`results/exp003.json`](../results/exp003.json), [`results/exp003-tail.json`](../results/exp003-tail.json), analysis `scripts/exp003_analysis.py` |
 | EXP-004 | 2026-08-05 | — | 1 | Real compressibility of a solved layer: raw / block-RLE / block-Zstd / logic-minimized | 5×3-h2, all 16 layers, 4,096-byte blocks | — | **complete (rule moot)** | **2.00 bits/position raw; block-RLE 3.04×, block coder 9.10×**, logic-minimised absent (needs EXP-007's closure). The registered rule chose between adr-012 Options A and C; adr-012 chose **B**, so it is recorded as moot rather than reinterpreted. zlib substituted for zstd (absent), flagged in the artefact. [`exp004-compressibility-5x3.json`](../results/exp004-compressibility-5x3.json) |
-| EXP-005 | 2026-08-05 | — | 1 | Don't-care yield and adr-010 V1 reachability gap, per layer | 5×3, 15 cells, hands 8 + 7 | — | registered; 3×3 pilot run | **The registered rule runs on the 5×3** and has not. The 3×3 pilot returned **3.28%** orphans (23,371 of 711,963) and is superseded on its own terms by EXP-007's exact closure: [`exp005-3x3-h1.json`](../results/exp005-3x3-h1.json), [`exp005-3x3-h2.json`](../results/exp005-3x3-h2.json). |
+| EXP-005 | 2026-08-05 | — | 1 | Don't-care yield and adr-010 V1 reachability gap, per layer | 5×3, 15 cells, hands 8 + 7 | — | **closed form (rule moot)** | **The quantity needs no run**: its own amendment of 2026-08-07 proved it a counting identity, `orphans(t) = layer(t) / 2^t`, so the registered 5×3 figure is **0.3428%** exactly (60,009,758 of 17,506,580,337) and the shipped 5×5's is **0.0079%**. The registered 20% rule is **moot** for the same reason as EXP-004 and EXP-007 — adr-012 chose Option B, so there is no don't-care set to drop. The 3×3 pilot returned **3.28%** (23,371 of 711,963), agreeing with the identity. See the EXP-007 amendment of 2026-09-18. [`exp005-3x3-h1.json`](../results/exp005-3x3-h1.json), [`exp005-3x3-h2.json`](../results/exp005-3x3-h2.json). |
 | EXP-006 | 2026-08-05 | H3 | 1 + 2 | Exact ground truth on the **shipped 5×5**: 500 endgame positions at `k ≤ 8`, solved on demand, as H3's third comparison-set member | 25 cells, hands 13 + 12; `k ∈ {6, 7, 8}`, 500 positions | 2 | registered (blocked on Axis 2) | |
 | EXP-008 | 2026-08-30 | — | 1 | Exact agent strength on the shipped 5×5 with no endgame database | 25 cells, hands 13 + 12; 2M-node budget, `search_below_k = 8`; 250 games per opponent × seat | 5 | **complete** | **Exit criterion NOT met.** vs random **98.0%** [96.4, 98.9] ✅; vs heuristic **61.0%** [56.7, 65.2] ❌. `proved_rate` **32%** — no rate may be quoted without it. Post-hoc control: between two heuristics the **first** seat wins only 40.0%, a property of the greedy agent and **not** an H1 input; it does not baseline the P2 arm (seeds unmatched by seat). [`exp008-agent-strength.json`](../results/exp008-agent-strength.json) |
 | EXP-009 | 2026-08-30 | — | 1 | WIN/LOSS mix per layer: the parity split, measured instead of inferred | 5×3-h1, all 16 layers, exhaustive | — | **complete** | **Uniformity breaks at `t = 5`.** Layers 0–4 are uniform — every one of the 12,841,920 configurations at `t = 4` is a P1 win, every one of the 713,440 at `t = 3` a P2 loss — then the parities converge monotonically to 50/50. Confirms EXP-002's criticality boundary and EXP-004's compression ratios from a third direction, and retires the parity question. 70.8 s. [`exp009-parity-5x3-h1.json`](../results/exp009-parity-5x3-h1.json) |
-| EXP-007 | 2026-08-07 | — | 1 | True reachable closure per layer, and what one-step-back predecessor counting misses | 5×3, 15 cells, hands 8 + 7, both arms | — | registered; 3×3 pilot run | **The registered rule runs on the complete 5×3 only** and has not. The 3×3 pilot is instrument shakedown, not the result: [`exp007-3x3-h1.json`](../results/exp007-3x3-h1.json), [`exp007-3x3-h2.json`](../results/exp007-3x3-h2.json). Row added retrospectively on 2026-08-30 — the experiment was registered in full below but never listed here. |
+| EXP-007 | 2026-08-07 | — | 1 | True reachable closure per layer, and what one-step-back predecessor counting misses | 5×3, 15 cells, hands 8 + 7, both arms | — | **stopped (rule moot, prefix kept)** | **Six layers of the 5×3 `h1` closure, 0.72% of the space, then stopped by decision** — `50.0 → 44.9 → 29.7 → 13.8 → 6.6%` unreachable, matching the 3×3's shape and extrapolating to ~0.7% complete. The registered rule is **moot**: adr-012 chose Option B, so no don't-care set exists to drop or keep, exactly as EXP-004. The surviving reason to finish was H4's bound, and the closed form settles it — one-step orphans are **0.0079% on the shipped 5×5** (3.2828% on the 3×3, 0.3428% on the 5×3), a fourth-decimal correction that cannot move FLIPHEX in a table spanning 10¹¹–10²⁰. Completing both arms was measured at **~100 h each**. [`exp007-5x3-h1.json`](../results/exp007-5x3-h1.json) (`complete: false`), [`exp007-3x3-h1.json`](../results/exp007-3x3-h1.json), [`exp007-3x3-h2.json`](../results/exp007-3x3-h2.json). Row added retrospectively on 2026-08-30 — the experiment was registered in full below but never listed here. |
 | EXP-010 | 2026-08-30 | — | 2 | Deduplicated (by-position) MCTS expansion against the naive by-action tree, with a multiplicity-corrected control | 5×3-**h2** (V5 `51192b4d…`), 3,000 WIN positions stratified over `t = 5..14`, uniform prior + rollout leaves, 3 arms, primary at budget 400 | 17 | **complete** | **`B − A = +4.77` pts** [+3.47, +6.06] at the primary budget; falsifier did not fire; every registered prediction held. **The benefit is prior mass, not visit-splitting** — arm C keeps all 540 children, corrects only the priors, and recovers the whole effect (`B − C = −0.77`, not distinguishable from zero). Concentrated where a decision exists: **+8.9** pts on odd layers (floor 16.2%) against **+0.6** on even (floor 66.8%), with layers 12–14 saturated. Aliased mass **27.5%**, tree overhead **+19.6%** (inference cost absent — no network). 22.7 min. [`exp010-mcts-dedup-5x3-h2.json`](../results/exp010-mcts-dedup-5x3-h2.json) |
 | EXP-011 | 2026-08-30 | — | 2 | Is the factored policy head too costly *in the pipeline*? (risk R5) | 5×3-**h2** (V5 `51192b4d…`), 2,500 WIN positions, 2,000 train / 500 held out, 5 seeds per arm, primary = top-1 optimality after 400 PUCT sims; arms **34** vs **1,170** logits (amended 2026-08-31) | 23 | **complete** | **The rule fires: fallback (b) is to be registered and run.** Flat beats factored **+7.0** pts on the primary metric (73.7% vs 66.8%, floor 39.6%), paired *t* **+6.96** [+4.81, +9.11], between-seed spread **1.5%** — the five seeds of each arm do not overlap. **Search did not close the gap**: the post-search deficit is +7.0 against a +8.0 supervised one, so mitigation (a) did not rescue the factored head (the 1-point ratio is a point estimate with no registered contrast behind it — see the correction). Factored is worse on *training* loss too (2.616 vs 2.375), so this is expressiveness, not generalisation. **Cannot separate independence from capacity** — 34 logits against 1,170, 0.33 M params against 0.88 M — and EXP-012 establishes that **no head-factorisation experiment can**, since relaxing the factorisation *is* adding output width; the claim that (b) would settle it is withdrawn (see the correction). Rotation is inert on only **11.4%** of multi-orbit (cell, tile) pairs, so the ADR's "sizeable share" claim is *not* the reason. Interval reaches +4.81, just under the 5-pt margin — recorded, not repaired. H3's 5×3 member now carries an architecture-selection caveat. [`exp011-factored-head-5x3-h2.json`](../results/exp011-factored-head-5x3-h2.json) |
 | EXP-012 | 2026-09-01 | — | 2 | Fallback (b) — rotation conditioned on cell — and whether the **cell** is what it depends on | 5×3-**h2** (V5 `51192b4d…`), 2,500 WIN positions, 2,000 train / 500 held out, 5 seeds × 5 arms. **B (rot given cell), C (pooled control) and E (rot given tile) are identical in parameters and shape — 373,369 — and differ only in the readout index.** | 29 | **registered; rewritten in full after red-team; not yet run** | |
@@ -1534,6 +1534,92 @@ way — and `check_falsifier()` fails the run when it happens. Recorded here
 because it is the earliest instance in the project of the question the gate was
 later written to ask, and it was asked six weeks before the three failures that
 prompted the gate.
+
+#### Amendment (2026-09-18, same day) — **stopped after six layers**, the rule is moot, and the question was settled in closed form
+
+The 5×3 `h1` run was started and **stopped by decision after 429.8 s and six
+layers**, 0.72% of the configuration space. Nothing here reinterprets the
+registered rule or the measured prefix; this amendment records why the remaining
+~100 hours were not spent.
+
+**What ran, and it is kept.** Six layers, PyPy 3.11.15, artefact
+`results/exp007-5x3-h1.json` with `complete: false` and verdict
+`descriptive-only` — the instrument refused to apply the rule to an incomplete
+run, which is the registered behaviour working as intended.
+
+| layer | total | reachable | unreachable | frac | time |
+|---:|---:|---:|---:|---:|---:|
+| 0 | 1 | 1 | 0 | 0.0% | 0.0 s |
+| 1 | 240 | 120 | 120 | 50.0% | 0.0 s |
+| 2 | 23,520 | 12,960 | 10,560 | 44.9% | 0.0 s |
+| 3 | 713,440 | 501,876 | 211,564 | 29.7% | 0.6 s |
+| 4 | 12,841,920 | 11,069,389 | 1,772,531 | 13.8% | 18.0 s |
+| 5 | 113,008,896 | 105,552,006 | 7,456,890 | 6.6% | 411.3 s |
+
+**The 7.47% in the artefact is not an estimate of the answer.** It is the
+unreachable fraction *over the measured prefix*, and the prefix is the six
+smallest layers. The 3×3 pilot is the guide to the shape: the fraction halves
+per layer from `t = 4` onwards, and 96% of the 5×3's space sits in layers 7–11
+where it is heading below 1%. Extrapolating the halving gives a completed figure
+near **0.7%**, against the one-step closed form of 0.3428%.
+
+**1 — the registered decision rule is moot, and this is not a reinterpretation.**
+adr-012 chose **Option B**, no materialised database. With no database there is
+no don't-care set to drop or keep, so neither branch of *"under 20% → don't-cares
+leave the design; at or above → adr-012 keeps the don't-care path"* names a live
+choice. This is the same status EXP-004 already carries — *"the registered rule
+chose between adr-012 Options A and C; adr-012 chose B, so it is recorded as
+moot rather than reinterpreted"* — and it is recorded the same way, rather than
+being pointed at a different decision after the fact.
+
+**2 — the surviving justification was H4's bound, and the closed form answers
+it.** With adr-012 settled, the only live reason to complete the run was the
+reachability-tightened state-space bound this phase owes H4. The one-step orphan
+count has a closed form, `orphans(t) = layer(t) / 2^t`, proved for EXP-005 and
+computable in under a second on any board:
+
+| board | configurations | one-step orphans | fraction |
+|---|---:|---:|---:|
+| 3×3 | 711,963 | 23,372 | **3.2828%** |
+| 5×3 | 17,506,580,337 | 60,009,758 | **0.3428%** |
+| **5×5 (shipped)** | 488,676,694,181,949,003 | 38,814,863,794,592 | **0.0079%** |
+
+The fraction falls by roughly two orders of magnitude per board step, because
+the mass concentrates at high `t` where `2^t` is enormous. **On the shipped
+board the reachability correction is 0.0079%**, and even at the ~2× ratio the
+5×3 projection suggests between closure and one-step, it stays near 0.016%. The
+corrected bound is 4.887 × 10¹⁷ either way. The cross-game table it must be
+placed in spans 10¹¹ to 5 × 10²⁰; a correction in the fourth decimal place
+cannot move FLIPHEX within it.
+
+**3 — what the run would have cost, measured rather than assumed.** Expansion
+throughput fell from **335,000/s** at layer 4 to **296,000/s** at layer 5 as the
+working set grew — RSS 115 MB to 267 MB, against 628 MB + 452 MB of resident
+bitsets at layers 9–10. Calibrated on layer 5, the remaining layers project to
+**~100 h per arm**, layers 9 and 10 alone accounting for 55 h. Two arms exceed
+eight days. The layer-5 prediction made before it ran was 422 s against 411.3 s
+measured, 3% high, so the projection is calibrated rather than guessed.
+
+**4 — gate 9 was answered for the design and not for the run, and that is the
+finding.** The amendment above answers *"what is this quantity free to be?"* for
+the closure as a measure, and correctly: the falsifier guards against it
+collapsing onto the one-step identity. Nobody asked the same question about the
+**decision the number would inform**. The reachable range of the state-space
+bound under this correction is 4.887 × 10¹⁷ to 4.887 × 10¹⁷ at the precision H4
+reports, which is gate 9's failure condition stated exactly — *"fails if the
+reachable range is a point"*. The gate applies to what a measurement is **for**,
+not only to how it is computed, and `docs/measurement-gates.md` is amended to
+say so.
+
+**Status.** EXP-007 is **stopped (rule moot, prefix kept)**. The six measured
+layers stand as recorded and are the first transitive-closure figures on the
+5×3. Completing it is not scheduled: it would buy a fourth-decimal correction to
+a bound whose placement is already decided. If the complete 5×3 closure is ever
+wanted for its own sake, the expansion is parallel over source configurations
+with an OR-reduction of the mark bitsets, which twelve cores would bring to
+roughly 15–20 h per arm — and it needs the serial path kept as a test reference,
+the pattern this project already used for the move-alias partition and the
+closed-form policy normaliser.
 
 ### EXP-006 — exact ground truth on the shipped 5×5, for H3
 

@@ -9,6 +9,60 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-09-18 — EXP-007 stopped after six layers: the closed form answered in a second what the run wanted four days for
+
+Started the 5×3 closure the same day Phase 6 opened, and stopped it 429.8 s in,
+six layers deep, 0.72% of the configuration space. Three things surfaced in that
+window, in the order they mattered.
+
+**The cost estimate I gave was wrong, and wrong in the project's signature way.**
+I extrapolated the 3×3's runtime linearly over *number of configurations* and
+got ~23 h per arm. The closure's work is not per configuration; it is
+`reachable(t−1) × empty cells`, because every marked configuration is expanded
+over every legal move. The 5×3 has more empty cells and larger hands, so the
+branching enters as a multiplier that a count-based extrapolation cannot see.
+Recalibrated on the layer-4 timing: ~89 h. Recalibrated again on layer 5, whose
+prediction came in 3% high at 411.3 s against 422 s forecast: **~100 h per arm**,
+with throughput already degrading from 335k to 296k expansions/s as the bitsets
+grew. This is Phase 4's first lesson — *measure the composed system, not its
+components* — recurring on a phase-6 instrument, which is worth recording
+precisely because the lesson was already written down.
+
+**The registered decision rule was dead before the run started.** EXP-007's rule
+chooses whether don't-cares stay in the adr-012 design. adr-012 chose **Option
+B**: no materialised database. There is no don't-care set to drop or keep. This
+is the identical status EXP-004 already carries, recorded there as "rule moot"
+rather than repointed at some other decision — and EXP-005's rule is moot for
+the same reason, which also retires it, since its quantity was proved a counting
+identity in August and its 5×3 figure is 0.3428% by closed form. Two of the
+three debts Phase 6 opened with dissolve on inspection rather than on compute.
+
+**The surviving reason was H4's bound, and the closed form settles it.** One-step
+orphans are `layer(t)/2^t` summed over layers, computable in under a second on
+any board: **3.2828%** on the 3×3, **0.3428%** on the 5×3, **0.0079%** on the
+shipped 5×5. The fraction falls about two orders of magnitude per board step
+because the mass sits at high `t` where `2^t` is enormous. So the shipped board's
+state-space bound is 4.887 × 10¹⁷ with the correction and 4.887 × 10¹⁷ without
+it, at the precision a table spanning 10¹¹ to 5 × 10²⁰ reports.
+
+**That is the finding, and it is about the gates rather than about FLIPHEX.**
+Gate 9 was answered for EXP-007 this morning, correctly: the entry has carried a
+falsifier since 2026-08-07 saying the closure must not collapse onto the one-step
+identity, which is the gate's question asked six weeks before the gate existed.
+And the run was started anyway. The gate was applied to the *measure* and not to
+the *decision the measure would inform*. The quantity was free to vary; the
+conclusion was not. `docs/measurement-gates.md` is amended to ask both, and the
+second question is cheap: compute the conclusion at the measure's floor and at
+its ceiling, and check that they differ.
+
+The six measured layers are kept. They are the first transitive-closure figures
+on the 5×3 and they match the 3×3's shape, halving per layer from `t = 4`. The
+artefact records `complete: false` and the instrument refused to apply the rule
+to a partial run, which is the registration working as designed. Completing it
+is not scheduled.
+
+---
+
 ## 2026-09-18 — Phase 6 opened: H6 adopted because nothing else would own it, and two Phase 3 debts called in
 
 Third entry today. Phase 5 opened, closed and shipped in one day, and Phase 6
