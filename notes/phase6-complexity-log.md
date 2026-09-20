@@ -878,228 +878,114 @@ and two of them have answers that differ from what the question expects:
 
 ## Lessons Learned
 
-### 1. Complexity analysis should search for structure before it searches for samples
+1. **Complexity analysis should search for structure before relying on samples.**
+   Several Phase 6 quantities that initially appeared to require enumeration had exact or closed-form solutions. The orphan count, game-tree size, and branching identities could be derived directly from the game's combinatorial structure. The general lesson is to establish what can be known analytically before allocating compute to estimate it.
 
-Phase 6 began with Monte Carlo estimates in the roadmap, but the game-tree quantity turned out to have an exact closed form. Because every legal move is a choice of empty cell, unused tile, and distinct rotation, the complete tree can be counted directly through permutations and elementary symmetric polynomials.
+2. **An unbiased estimator can still be the wrong instrument.**
+   The random rollout estimator for game-tree size was unbiased, but its variance made it practically useless at the required precision. Unbiasedness establishes correctness of the estimator, not suitability for the measurement.
 
-The same happened with the reachable state-space correction: the orphan count follows from a closed-form identity.
+3. **The distribution of branching matters more than a single average branching factor.**
+   FLIPHEX does not have one representative branching factor. Branching depends strongly on the spent-tile configuration and declines through the game. Node-weighted and uniformly weighted averages diverge substantially at later plies. Reporting only one average would hide the structure that determines actual search cost.
 
-The important lesson was methodological. Simulation is useful for validating a derivation, but it should not be the first tool used to estimate a quantity that the rules may already determine exactly.
+4. **Independent implementation paths are stronger than repeated checks of the same computation.**
+   The layer-profile analysis was cross-checked with an independently implemented script rather than only validating the original enumerator against itself. That check has passed from the first run, which is what a standing guarantee looks like rather than a discovery. The route that actually caught something was the same principle applied to branching: the prefix-ratio identity reaches the tree by a different derivation, and it was the only thing that exposed a node count wrong by twenty orders of magnitude.
 
-### 2. An unbiased estimator can still be the wrong instrument
+5. **A count can look correct in percentages while being wrong in absolute terms.**
+   The branching analysis initially omitted constant factors from the node count. The resulting percentage-level quantities looked plausible and the mean branching factor was unaffected, while the absolute node count was wrong by roughly twenty orders of magnitude. Ratios are not sufficient evidence when the underlying count is itself a reported result.
 
-The random-rollout estimator was correct and unbiased. It was also extremely inefficient for this game.
+6. **A literature table is an evidence structure, not a collection of numbers.**
+   Numerical comparison required provenance, definitions, and compatibility checks before values could be used. Several published or reproduced figures could not be safely transferred into the comparison table because their definitions or sources were insufficiently reliable. The table therefore records the boundary of the evidence rather than forcing every cell to contain a number.
 
-Its relative standard deviation was approximately four to five times the quantity being estimated, making roughly 10⁵ rollouts necessary for 1% precision. The exact formula returns the same quantity in microseconds.
+7. **Not every registered experiment needs to be run; some experimental debt dissolves by inspection.**
+   EXP-005 did not require the planned computation because the registered quantity followed exactly from the closed-form orphan identity. Likewise, part of the inherited EXP-007 debt was rendered moot by adr-012, which had already selected Option B and therefore eliminated the need for the corresponding materialized-database path. A registered experiment should be executed when it resolves an open question, not merely because its identifier exists.
 
-This separated two properties that are easy to conflate: an estimator can be statistically valid while being computationally inferior to an exact derivation.
+8. **A lesson is not learned until it changes the next experiment.**
+   EXP-007 reproduced a Phase 4 failure despite the relevant lesson already being explicitly documented: estimating compute by extrapolating configuration counts instead of measuring the composed workload. The first estimate suggested roughly 23 hours per arm. Recalibrating on layer 4's measured time raised that to roughly 89 hours per arm, and recalibrating again on layer 5's raised it to approximately 100. Both figures are totals for the complete closure, not per-layer costs — the next layer alone was projected at about one hour. The important failure was therefore not the arithmetic itself, but the failure to apply an already-known experimental principle.
 
-### 3. The distribution of branching matters more than the average branching factor
+9. **A measurement gate must be answered for the decision, not only for the measurement.**
+   Gate 9 was initially treated as asking whether the registered quantity could vary. That is only half of the question. The relevant question is whether plausible variation in that quantity could change the decision the experiment was intended to inform. For EXP-007, the bounds changed the measured quantity but did not change the conclusion relevant to H4. A gate that does not connect measurement uncertainty to decision sensitivity can pass while leaving the decision effectively unchanged.
 
-Phase 6 showed that FLIPHEX does not have a single meaningful branching factor.
+10. **Experimental debt needs an explicit owner and a terminal state.**
+    EXP-005 and EXP-007 remained non-terminal across three phase closes because the close-mode audit inspected the current phase's checklist, while the unresolved registry entries belonged to an earlier phase. The same ownership problem appeared in H6: an “optional” hypothesis had no phase responsible for bringing it to a terminal state. Optional work without an owner is not merely deferred work; it is unassigned experimental debt.
 
-The width of a node depends on the rotation orbits of the tiles remaining in the mover's hand. More importantly, nodes are not uniformly distributed over possible spent sets: sets reached through high-orbit tiles occur through more play sequences and therefore receive greater weight.
+11. **A hypothesis can survive a test that cannot falsify the claim it was written to carry.**
+    H6 survived every permitted perturbation, but the project's own ADRs restricted the design space so strongly that the test could not exercise several of the mechanisms named by the hypothesis. The result is therefore not evidence of robustness against those perturbations. More generally, a passing experiment is only informative when the experiment had a reachable path to failure.
 
-The node-weighted mean and the uniformly weighted hand-level mean diverged increasingly toward the end of the game. Treating the game as `b^d` would therefore discard a structural property of its tree.
-
-### 4. A cross-check is strongest when it reaches the same quantity through a different path
-
-Several of the Phase 6 identities were deliberately implemented twice.
-
-The independent layer-profile implementation does not import the solver's implementation. The branching calculation cross-checks against the ratio of exact prefix counts. The game-tree formula is checked against actual engine traversal on the smallest admissible board.
-
-This was not duplication for its own sake. The independent route was part of the evidence.
-
-I had already learned in earlier phases that duplicated calculations can be useful when they are deliberately independent. Phase 6 gave that principle a concrete role in the complexity analysis.
-
-### 5. A count can look correct at the level of percentages while still being wrong
-
-The orphan calculation initially included layer 0 incorrectly.
-
-On 3×3, that changed the count from 23,371 to 23,372 while changing the reported percentage only from 3.2826% to 3.2828%.
-
-The count-level comparison exposed the error; the percentage would have hidden it.
-
-The test therefore pins the exact size of the off-by-one rather than merely asserting that two percentages agree.
-
-### 6. A literature table is an evidence structure, not a collection of numbers
-
-The cross-game comparison changed after the sources were inspected.
-
-Some published or reproduced figures were inconsistent, some were estimates rather than exact counts, one state-space figure was impossible under a trivial combinatorial ceiling, and the available Allis OCR was unusable for numerical extraction.
-
-The response was not to fill the missing cells with the most plausible numbers. Cells were graded by provenance and left absent when the evidence was insufficient.
-
-That made the table shorter, but also made its epistemic status explicit.
-
-### 7. A measure can be free to vary and still be worthless
-
-H5's surviving win-contribution measure was withdrawn before registration. For the twelve archetypes the reason is exactly the one that killed the frequency half — it is a constant. The joker is the case that taught me something new.
-
-Every archetype is played once by the winner and once by the loser. The apparent 100% “win rate given archetype X was played by the winner” is therefore a tautology. The joker is even more direct: because only P1 holds it, “the joker was played by the winner” is equivalent to “P1 won.”
-
-The phase therefore exposed a useful distinction: a quantity does not have to be constant to be uninformative. It can vary perfectly well while merely restating an outcome already known.
-
-### 8. Controlling for a null can reveal a real pattern without making that pattern causal
-
-Placement timing showed a strong raw relationship with rotation-orbit size, and after controlling for the orbit-based null there remained a substantial residual correlation with arrow count.
-
-That residual was not registered as a game-level finding because the only ordered-game database available came from an agent whose objective was itself based on net flips.
-
-The residual therefore described the behaviour of that objective, not necessarily a property of FLIPHEX.
-
-The lesson was to distinguish an observed residual from a causal or game-intrinsic explanation.
-
-### 9. A hypothesis can be narrower than the claim it appears to test
-
-H4 illustrates this particularly clearly.
-
-The exact 5×5 game-tree complexity is `10^58.63`, not the locked `~10^61`, and Othello's documented `10^58` weak-solution result places FLIPHEX much closer to an already crossed computational frontier than the original wording suggested.
-
-The state-space clause and the game-tree clause therefore require separate readings. A broad statement such as “out of reach” can conceal materially different relationships on different complexity axes.
-
-The correct response was not to rewrite the locked hypothesis after seeing the numbers, but to record exactly where the pre-registered wording agrees with and diverges from the evidence.
-
-### 10. Robustness cannot be demonstrated against perturbations the design forbids
-
-H6 was supported across every perturbation available in the project, but the available perturbation set could not falsify the hypothesis.
-
-Board parity is fixed by adr-011. The chiral anchor is protected by adr-009. The only deck-level variation exposed by `Variant` is the arm swap, which is already H2.
-
-Thus the experiment tested robustness only within the legal design lattice defined by the ADRs.
-
-This is narrower than demonstrating robustness to arbitrary design perturbations. The hypothesis survived its available test, but the available test was itself constrained by earlier design decisions.
-
-### 11. An experiment should be able to reach the boundary that would falsify its claim
-
-H6 exposed the same planning issue that appeared in the solver/AlphaZero comparison during Phase 5, but from another direction.
-
-The experiment did not fail because the result was wrong. It failed to expose the design to the class of perturbation that could have contradicted it.
-
-A robustness hypothesis is only strongly informative when the allowed perturbation set contains plausible failure modes.
-
-### 12. Reproducibility has to include the evidence dependencies, not only the code
-
-The provenance checks in `comparison.py` revealed that the local source copies were gitignored even though the verification depended on them.
-
-That would have made the repository pass locally while failing to reproduce on a fresh clone or in CI.
-
-The fix was to make the tracked bibliography the authoritative dependency and treat local source copies as optional. When a local source is absent, the check reports that the quote was not opened rather than silently passing.
-
-The same principle later shaped the figure manifest: an artifact is not reproducible merely because its generating code is present; its data and source dependencies must also be available.
-
-### 13. Rendering is part of verification when prose and data share an artifact
-
-The figure generation caught three errors that source inspection had not: an annotation obscured the values it described, H5 rendered Markdown syntax literally, and a hardcoded count disagreed with the number of plotted rows.
-
-These were not mathematical errors. They were evidence-presentation errors.
-
-The useful lesson was that figures should be treated as executable outputs with their own verification, rather than as passive presentation generated after the analysis is finished.
-
-### 14. I learned to ask whether a hypothesis is falsifiable within the project I actually built
-
-The most important lesson of Phase 6 was not a complexity number.
-
-Several hypotheses were written against a conceptual version of the project: H5 assumed archetype-level variation that the deck construction removes; H6 assumed perturbations that the ADRs forbid; the solver/AlphaZero comparison assumed agents that the architecture cannot run across boards.
-
-The phase forced me to compare the hypotheses not only with the rules of the game, but with the actual experimental degrees of freedom the repository permits.
-
-A hypothesis can be perfectly reasonable in the abstract and still be poorly matched to the system built to test it.
+12. **A full verdict table does not mean the hypotheses were well posed.**
+    Phase 6 produced a complete verdict table, but several hypotheses exposed a different problem: the locked test was not capable of doing what the hypothesis appeared to ask. Administrative closure and epistemic closure are different things. A hypothesis can have a verdict, supporting artifacts, and passing tests while still requiring qualification because its experimental boundary was narrower than its claim.
 
 ## Failed Attempts
 
-### 1. Using Monte Carlo as the primary game-tree estimate
+### EXP-007 — Full 5×3 layer expansion
 
-The roadmap initially called for Monte Carlo estimation of the game tree.
+The initial cost estimate extrapolated execution time from the number of configurations in each layer. The estimate was approximately 23 hours per arm, but this treated configuration count as a proxy for expansion work.
 
-The implementation produced an unbiased estimate, but the exact combinatorial count was later derived. At 60,000 samples the estimate was still approximately 2% from the exact value, with a relative standard deviation of about **4.00 — four times the quantity being estimated**, not 4%.
+The experiment was stopped after 429.8 seconds. At that point, the observed workload showed that expansion cost was driven by reachable states multiplied by their available successors, not by the number of configurations alone. Recalibrating on layer 4's measured time produced approximately 89 hours per arm, and recalibrating again on layer 5's produced approximately 100 — both totals for the complete closure rather than per-layer costs. The original plan was therefore out by more than a factor of four.
 
-The Monte Carlo implementation was retained as a verification instrument rather than used as the primary measurement.
+This was a recurrence of a Phase 4 failure for which the methodological lesson was already documented. The failure was therefore not only an inaccurate estimate; it demonstrated that documenting a lesson does not guarantee that the experimental process has incorporated it.
 
-### 2. Treating the game as having a single branching factor
+### Gate 9 — Measurement validity without decision sensitivity
 
-The initial complexity framing invited a `b^d` interpretation.
+Gate 9 was applied to EXP-007 by asking whether the registered quantity could vary. That question was answered, but it was insufficient.
 
-The engine showed that branching depends on the remaining tile orbits and therefore varies substantially by node and ply. A single average branching factor loses the distribution that produces the actual tree.
+The corrected and uncorrected bounds both led to the same H4 decision at the relevant precision. The measurement therefore had uncertainty, but that uncertainty was not decision-informative. The gate had been answered at the level of the quantity rather than at the level of the decision the quantity was supposed to support.
 
-The exact tree count was retained instead of replacing the distribution with one scalar.
+The measurement-gate procedure was subsequently extended to ask both whether the measure can vary and whether plausible variation can change the associated decision.
 
-### 3. Uniformly averaging over spent tile sets
+### EXP-005 / inherited debt — Compute replaced by inspection
 
-The first branching implementation averaged over possible spent sets without weighting them by the number of play sequences that reach them.
+Two pieces of inherited experimental debt were resolved without running the originally anticipated computation.
 
-The resulting means looked plausible because the omitted factors were constant within the calculation. However, the node count was wrong by approximately twenty orders of magnitude.
+EXP-005's registered 5×3 orphan quantity followed directly from the closed-form identity already established for the orphan count, so enumeration would not have added evidence.
 
-The prefix-ratio identity exposed the error and was added as a cross-check.
+A separate inherited dependency was also rendered moot by adr-012, which had already selected Option B and therefore eliminated the need for the materialized-database path. The important distinction is between an experiment that has not been run and an experiment whose unresolved question no longer exists.
 
-### 4. Counting layer 0 as an unreachable orphan
+### Registry debt — Non-terminal entries surviving phase closure
 
-The first implementation applied the orphan identity without excluding the initial state.
+EXP-005 and EXP-007 remained in the registry without a terminal state through three phase closes. The close procedure checked the active phase's checklist, but the entries belonged to an earlier phase and therefore escaped the local closure audit.
 
-That produced exactly one extra orphan on all three boards. The discrepancy was visible in the 3×3 count against EXP-005, although it was almost invisible in the percentage.
+The failure exposed an ownership gap: a registry entry that is neither complete nor explicitly withdrawn has no mechanism guaranteeing that a future phase will rediscover it.
 
-The `t == 0` guard was corrected and the exact one-count error was pinned by a regression test.
+The closure process was therefore changed to treat non-terminal registry state as experimental debt that must have an explicit owner, rather than as a problem belonging implicitly to whichever phase happens to encounter it later.
 
-### 5. Using the original orientation-inflated state-space figure
+### H6 — Optional became unassigned
 
-The roadmap's original state-space expression multiplied by `6^25`, treating tile orientation as part of the state.
+H6 remained marked as optional, but no phase was explicitly responsible for resolving it. As a result, “optional” functioned operationally as “unassigned.”
 
-adr-006 had already established that placed tiles are inert, so orientation cannot affect future play. The corrected configuration space therefore removes that factor, reducing the figure by approximately `2.8 × 10^19`.
+The problem was not that the hypothesis was optional. The problem was the absence of a terminal-state owner. A hypothesis can be optional and still require an explicit decision about whether it will be tested, withdrawn, or carried forward.
 
-The inflated quantity remains in the implementation only as a documented discarded figure.
+### H6 — The perturbation set could not falsify the hypothesis
 
-### 6. Trusting the locked H4 game-tree number
+The H6 test technically survived all permitted perturbations, but the project's ADRs constrained the legal design space so that several perturbations named by the hypothesis were unavailable.
 
-The H4 statement contained `~10^61` for game-tree complexity.
+The board-size family preserves odd parity, while the 4×4 case is excluded by adr-011. The named tile perturbation is also constrained by adr-009, and the remaining permitted deck/first-player variants either reduce to H2 or amount to relabeling. Consequently, the test could not exercise the full mechanism described by H6.
 
-The exact count is `10^58.63`, and the independently registered minimal-tree figure implies a branching factor that reproduces approximately the same exact magnitude. The locked hypothesis was not edited after the discovery; the discrepancy was retained as part of the verdict evidence.
+The result was therefore not evidence that the hypothesis was robust under those perturbations. It was evidence that the hypothesis had been formulated against a broader design space than the project actually permitted.
 
-### 7. Treating the published cross-game figures as interchangeable
+### H5 — Replacement measure remained structurally uninformative
 
-The initial comparison required resolving figures from several literature sources.
+H5 lost two measures two days apart, for two different reasons. The frequency measure was withdrawn on 2026-09-18 because the count vector is `[2]×12 + [1]` in every game: each archetype is played twice regardless of who wins. Its named replacement, win contribution, was withdrawn on 2026-09-20 because every archetype is played once by the winner and once by the loser, so the rate is 100% for all twelve.
 
-The source review found inconsistent secondary reproductions, missing primary support, and an Allis OCR that could not reliably preserve exponents. Rather than silently choose between conflicting values, unsupported cells were left absent and graded by provenance.
+Timing was a third quantity examined, never a registered replacement for either. It genuinely varies, but its residual association with arrow count is confounded by the behavior of the SolverAgent used to generate the games: its pre-solver is itself based on a greedy net-flip heuristic.
 
-### 8. Relying on an ignored local source directory
+The observed correlation therefore cannot be interpreted as a game-intrinsic effect. A stronger experiment would require ordered games from an agent with an objective independent of net flips, together with an orbit-aware null model. Those ordered games were not retained in the existing AlphaZero buffers.
 
-`comparison.py` initially depended on `notes/sources/`, but that directory was gitignored.
+The failed attempt illustrates a broader distinction: a variable can have substantial empirical variation and still fail to provide an informative causal or mechanistic measurement.
 
-The verification therefore depended on files unavailable to a fresh clone or CI environment. The implementation was changed so the tracked bibliography is authoritative and local source copies are optional.
+### Random rollout tree-size estimator
 
-### 9. Treating H5 win contribution as an informative archetype statistic
+The random rollout estimator was unbiased but had extremely high variance. Its relative standard deviation was approximately 4 on 3×3 and approximately 5 on the shipped board, implying on the order of 10^5 samples for 1% relative precision.
 
-The surviving H5 measure initially appeared to avoid the invariance problem of the withdrawn frequency half.
+The exact game-tree formula could instead be evaluated in microseconds. The estimator was therefore abandoned as the primary instrument rather than optimized further.
 
-It did not. Every archetype is played once by the winner and once by the loser, while the joker is held only by P1. The resulting “contribution” either becomes 100% for every archetype or reproduces the first-player split for the joker.
+### Branching-count implementation
 
-The H5 measure was therefore withdrawn before registration.
+The first branching implementation omitted constant factors associated with cell arrangements, play orders, and opponent hands. This did not affect the mean branching factor, which made the intermediate output appear plausible, but it made the absolute node count incorrect by roughly twenty orders of magnitude.
 
-### 10. Using the available EXP-017 games to infer intrinsic tile effects
+An independent derivation exposed the discrepancy. The implementation was corrected before the branching results were used.
 
-The EXP-017 database contained ordered games, making placement timing and other tile-level quantities measurable.
+### Literature comparison
 
-However, the games were generated by `SolverAgent`, whose pre-solver phase uses the greedy net-flip heuristic. The observed relationship between tile properties and placement timing therefore reflects the agent's objective.
+Several external values initially appeared suitable for direct comparison but failed provenance or consistency checks. In particular, a commonly repeated 6×6 Reversi state-space figure is incompatible with the basic 3^36 upper bound, and secondary reproductions of the Allis table disagreed on multiple rows.
 
-The data were not used to register a game-intrinsic tile-effect hypothesis.
-
-### 11. Treating the H6 perturbation set as broader than the engine permits
-
-The locked H6 example proposed removing `P3-y`, but adr-009 explicitly requires `P6` and `P3-y` as anchors.
-
-Likewise, adr-011 excludes even-sized boards because the rules do not define a tie-break for draws.
-
-The planned perturbation space was therefore narrower than the hypothesis wording implied. No unsupported deck variant was introduced merely to make the hypothesis testable.
-
-### 12. Treating the reduced-board solver/AZ comparison as available evidence
-
-The intended reduced-board comparison could not be performed with the existing AlphaZero champions.
-
-The 5×5 architecture failed on the reduced-board input shape, while the reduced-board networks had been supervised on solver labels and therefore did not satisfy adr-004 R1 for the intended comparison.
-
-The comparison remained an unreachable criterion rather than being replaced with a procedurally different experiment after the fact.
-
-### 13. Treating figures as finished once the plotting code existed
-
-The first Phase 5 figure deliverable had been an empty directory. Phase 6 added explicit source manifests, generation checks, and seven figures.
-
-Rendering then exposed three additional defects that source inspection had missed. The figure pipeline was therefore not considered complete merely because the plotting scripts ran.
+Rather than filling the comparison table with uncertain values, unsupported cells were left absent and the provenance requirements were made executable through `self_check()`. The failure was therefore in the attempted use of the literature as a numerical lookup table; the corrected approach treated each value as an evidence item requiring a definition and traceable source.
