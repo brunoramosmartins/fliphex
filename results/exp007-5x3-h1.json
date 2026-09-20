@@ -1,0 +1,87 @@
+{
+  "experiment": "EXP-007",
+  "variant": "5x3-h1",
+  "board": [
+    5,
+    3
+  ],
+  "cells": 15,
+  "hands": [
+    [
+      "P6",
+      "P3-y",
+      "P1",
+      "P2-adj",
+      "P2-skip",
+      "P2-opp",
+      "P3-fan",
+      "JOKER"
+    ],
+    [
+      "P6",
+      "P3-y",
+      "P1",
+      "P2-adj",
+      "P2-skip",
+      "P2-opp",
+      "P3-fan"
+    ]
+  ],
+  "measured": "transitive reachable closure from the opening position",
+  "complete": false,
+  "configurations_total": 17506580337,
+  "configurations_measured": 126588017,
+  "unreachable": 9451665,
+  "unreachable_fraction": 0.07466477,
+  "threshold": 0.2,
+  "layers": [
+    {
+      "layer": 0,
+      "total": 1,
+      "reachable": 1,
+      "unreachable": 0,
+      "unreachable_fraction": 0.0
+    },
+    {
+      "layer": 1,
+      "total": 240,
+      "reachable": 120,
+      "unreachable": 120,
+      "unreachable_fraction": 0.5
+    },
+    {
+      "layer": 2,
+      "total": 23520,
+      "reachable": 12960,
+      "unreachable": 10560,
+      "unreachable_fraction": 0.44898
+    },
+    {
+      "layer": 3,
+      "total": 713440,
+      "reachable": 501876,
+      "unreachable": 211564,
+      "unreachable_fraction": 0.296541
+    },
+    {
+      "layer": 4,
+      "total": 12841920,
+      "reachable": 11069389,
+      "unreachable": 1772531,
+      "unreachable_fraction": 0.138027
+    },
+    {
+      "layer": 5,
+      "total": 113008896,
+      "reachable": 105552006,
+      "unreachable": 7456890,
+      "unreachable_fraction": 0.065985
+    }
+  ],
+  "v1_problems": [],
+  "falsifier": [],
+  "verdict": "descriptive-only",
+  "verdict_reason": "the run did not finish every layer; the rule runs on the complete design only",
+  "interpreter": "pypy 3.11.15",
+  "seconds": 429.8418029570166
+}

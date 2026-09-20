@@ -9,6 +9,196 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-09-20 — Phase 6 closing: every quantity it set out to estimate was a closed form, and the last three verdicts went in
+
+The phase opened to estimate four things — state space, reachable correction,
+game tree, branching distribution — and **not one of them needed a run**. Each
+is a closed form, each verified against the engine's own move generator rather
+than against itself. That is the phase's single largest fact and it is not a
+happy accident: it is what a deck of fixed composition on a board whose hands
+exhaust exactly *does* to the counting, and nothing in the Phase 0 plan noticed
+that the structure was that rigid.
+
+**Two decisions taken today that were not in the plan.**
+`scripts/analyze_archetype_usage.py` is **dropped**. Both quantities it would
+compute are fixed by the rules: placement frequency is `[2]×12 + [1]` in every
+game, and each archetype is played once by the winner and once by the loser in
+all 5,000 EXP-017 games. A script that computes a constant is not an analysis.
+And H5's second half, **win contribution, is withdrawn** — registered as the
+surviving measure when the frequency half fell on 2026-09-18, and gone two days
+later for the same reason the first half went. Worse than vacuous for the
+joker: only P1 holds it, so "the joker was played by the winner" is "P1 won",
+and the count is 2,712/2,288 — EXP-017's first-player split under another name.
+An **alias**, which is a fourth instance of gate 9 and the first one where the
+quantity varied but measured something already named.
+
+**Two published figures refused, and the refusals are the table's most useful
+cells.** 6×6 Reversi's commonly cited ~10²⁰ state space is **666× above its own
+`3^36` ceiling**, which holds before any legality constraint — so the comparison
+uses the ceiling and grades the figure `refuted`. Every cell of van den Herik
+Table 1 is graded `absent`, because the reproductions this project could reach
+disagree by one to two in the exponent and none resolves to the text.
+`complexity/comparison.py` carries provenance per cell rather than per table for
+exactly this: nine cells are empty with a stated reason, and an empty cell that
+says why is worth more than an interpolated one.
+
+**H4's clause 2 is the phase's real finding, and it cost nothing to make.** The
+locked ~10⁶¹ is **236× high**, and it is visible with no new measurement at all:
+the same hypothesis locks a Knuth–Moore figure of ~10³⁰·⁵, and the two are
+mutually inconsistent. Recover `b` from `10^30.5 = b^13` and the full tree comes
+out at `10^58.65` — the exact answer, to two decimals, from the hypothesis's own
+other number. The statement is **not edited**; hypotheses are locked at
+`v0.3-hypotheses` and this is recorded as a deviation.
+
+**`figures/` shipped, and the clause is what made it ship.** Phase 5 planned the
+directory as a substitute for three dropped notebooks and produced nothing —
+that phase's failed attempt 7. Phase 6 made it a named exit criterion with a
+clause attached: *every figure regenerates from a tracked artefact.* The clause
+is enforced by `tests/test_figures.py`, not trusted, and it caught a real
+defect — `results/*.jsonl`, `data/` and `notes/sources/` are all gitignored, and
+a figure drawn from any of them renders on this machine and nowhere else. Seven
+figures, one per hypothesis with a verdict plus one support panel.
+
+**Carried to Phase 7, for the second time:**
+`exercises/ex05_complexity_analysis.md` and **TIL #4**, both carried out of
+Phase 5 and both untouched here. They are author-written material and the phase
+produced no hours for them. Phase 7 already owns the TIL pipeline
+(*"Polish and publish TILs #1–#5"*), so #4 lands in a phase that was going to
+open that file anyway; the exercise does not, and is carried explicitly rather
+than dropped.
+
+**Two registry index rows are stale, found in this sweep and not caused by this
+phase.** EXP-006 and EXP-012 both ran — their artefacts are on disk and
+`docs/research.md` quotes results from both — but their index rows still read
+*"registered (blocked on Axis 2)"* and *"registered … not yet run"* with empty
+Result columns. The detail entries below them are current. Recorded here rather
+than backfilled silently, since a retrospective edit to an index that dates
+itself would erase the fact that the rows went stale at all.
+
+The verdict table now has **no empty row**. That is worth stating plainly and
+worth not over-reading: three of the six verdicts are *structural* — H4's
+bounds, H5 entirely, H6's scope — which means the game's rules answered them and
+no experiment could have. A table with no gaps is not the same as a set of
+hypotheses that were all well posed.
+
+---
+
+## 2026-09-18 — EXP-007 stopped after six layers: the closed form answered in a second what the run wanted four days for
+
+Started the 5×3 closure the same day Phase 6 opened, and stopped it 429.8 s in,
+six layers deep, 0.72% of the configuration space. Three things surfaced in that
+window, in the order they mattered.
+
+**The cost estimate I gave was wrong, and wrong in the project's signature way.**
+I extrapolated the 3×3's runtime linearly over *number of configurations* and
+got ~23 h per arm. The closure's work is not per configuration; it is
+`reachable(t−1) × empty cells`, because every marked configuration is expanded
+over every legal move. The 5×3 has more empty cells and larger hands, so the
+branching enters as a multiplier that a count-based extrapolation cannot see.
+Recalibrated on the layer-4 timing: ~89 h. Recalibrated again on layer 5, whose
+prediction came in 3% high at 411.3 s against 422 s forecast: **~100 h per arm**,
+with throughput already degrading from 335k to 296k expansions/s as the bitsets
+grew. This is Phase 4's first lesson — *measure the composed system, not its
+components* — recurring on a phase-6 instrument, which is worth recording
+precisely because the lesson was already written down.
+
+**The registered decision rule was dead before the run started.** EXP-007's rule
+chooses whether don't-cares stay in the adr-012 design. adr-012 chose **Option
+B**: no materialised database. There is no don't-care set to drop or keep. This
+is the identical status EXP-004 already carries, recorded there as "rule moot"
+rather than repointed at some other decision — and EXP-005's rule is moot for
+the same reason, which also retires it, since its quantity was proved a counting
+identity in August and its 5×3 figure is 0.3428% by closed form. Two of the
+three debts Phase 6 opened with dissolve on inspection rather than on compute.
+
+**The surviving reason was H4's bound, and the closed form settles it.** One-step
+orphans are `layer(t)/2^t` summed over layers, computable in under a second on
+any board: **3.2826%** on the 3×3, **0.3428%** on the 5×3, **0.0079%** on the
+shipped 5×5. The fraction falls about two orders of magnitude per board step
+because the mass sits at high `t` where `2^t` is enormous. So the shipped board's
+state-space bound is 4.887 × 10¹⁷ with the correction and 4.887 × 10¹⁷ without
+it, at the precision a table spanning 10¹¹ to 5 × 10²⁰ reports.
+
+**That is the finding, and it is about the gates rather than about FLIPHEX.**
+Gate 9 was answered for EXP-007 this morning, correctly: the entry has carried a
+falsifier since 2026-08-07 saying the closure must not collapse onto the one-step
+identity, which is the gate's question asked six weeks before the gate existed.
+And the run was started anyway. The gate was applied to the *measure* and not to
+the *decision the measure would inform*. The quantity was free to vary; the
+conclusion was not. `docs/measurement-gates.md` is amended to ask both, and the
+second question is cheap: compute the conclusion at the measure's floor and at
+its ceiling, and check that they differ.
+
+The six measured layers are kept. They are the first transitive-closure figures
+on the 5×3 and they match the 3×3's shape, halving per layer from `t = 4`. The
+artefact records `complete: false` and the instrument refused to apply the rule
+to a partial run, which is the registration working as designed. Completing it
+is not scheduled.
+
+---
+
+## 2026-09-18 — Phase 6 opened: H6 adopted because nothing else would own it, and two Phase 3 debts called in
+
+Third entry today. Phase 5 opened, closed and shipped in one day, and Phase 6
+opens on the same one.
+
+**The gate check found more than the phase's own carry-overs.** Three Phase 5
+deliverables were never started — `figures/`, TIL #4 and `ex05` — and the
+roadmap marked all three `[~]`, which reads as partial. Nothing existed. The
+marks were corrected to `[ ]` with "not started; carried to Phase 6", because a
+tick that overstates is worse than no tick: it is the only record anyone will
+read later, and the Phase 5 close was already the place where an unmet exit
+criterion got written down honestly. It would be strange to do that for the
+criterion and not for the checkbox.
+
+The heavier finding was outside Phase 5 entirely. **EXP-005 and EXP-007 have
+stood at "registered; 3×3 pilot run" since 2026-08-05.** Their registered rule
+runs on the 5×3 and never has. Three phase closes passed over them because the
+close-mode audit walks the closing phase's checklist, and these belong to Phase
+3. They surface now only because Phase 6's tightened state-space bound needs
+EXP-007's exact reachable closure as an input — which is to say they surfaced by
+luck, when a later phase happened to depend on them. Both are adopted as Phase 6
+tasks. The procedural lesson is that a registry entry in a non-terminal state is
+a debt no phase close is currently responsible for noticing.
+
+**H6 is adopted, and the reason is unflattering.** It had no owning phase at
+all. Phase 6's task list names H4 and H5; Phase 7 is interface, writeup and
+release. H6 was marked *optional / stretch* when the hypotheses locked, and
+"optional" quietly became "unassigned" — the row would have reached the writeup
+as a dash with no explanation. Phase 6 is the last phase that can measure
+anything, so it takes H6. The material is largely already in hand: four
+exhaustive solves across three board configurations and two deck arms, plus the
+planned mirror-optimality row that was already tagged H5 *and* H6. The
+alternative was a formal withdrawal, and withdrawal is the right move for a
+measure the rules have fixed — H5's frequency half — but not for one that was
+simply never scheduled.
+
+**The notebook class is closed.** `notebooks/05` is dropped at the open, with
+the 02, 03 and 04 before it. One notebook exists out of five planned. The Phase
+5 open dropped three of them in favour of scripts under `figures/`, and
+`figures/` then delivered nothing, which is recorded as that phase's failed
+attempt 7. Dropping the fifth is not the interesting half of this decision. The
+interesting half is that `figures/` is now a **named exit criterion** — every
+figure in it regenerates from a tracked artefact — rather than a substitution
+offered in place of something else. Changing an artefact's format does not
+establish a production path for it; only shipping it does.
+
+**H4's wording is not the roadmap's.** The roadmap still says "complexity
+comparable to small Reversi". That was reworded at the Phase 2 lock onto both
+complexity axes, against a corrected reachable bound of ~4.9 × 10¹⁷ — the
+roadmap's original expression carried a `6^25` orientation factor that adr-006
+forbids, since placed tiles are inert. The corrected figure sits *below* Reversi
+6×6's commonly cited ~10²⁰, so the original claim looks false in a direction
+nobody intended when it was written. The locked version in `docs/research.md`
+governs, and this phase measures against it.
+
+**Gate 9 is available from the start**, for the first time. It is also the gate
+this phase most needs: a complexity bound is a quantity the rules constrain by
+construction, and the last measure withdrawn for exactly that reason was H5's
+frequency half, on the day the gate was written.
+
+---
+
 ## 2026-09-18 — Phase 5 closing: four verdicts, one exit criterion that cannot be met, and a ninth gate
 
 The phase opened and closed the same day, so this entry is contemporaneous.
