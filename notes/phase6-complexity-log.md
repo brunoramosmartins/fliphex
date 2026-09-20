@@ -294,6 +294,132 @@ exactly the test that caught it the first time.
 
 ## `complexity/comparison.py` — the cross-game table
 
+Scouted before writing, which was the right order: the literature search changed
+the module's design rather than filling a form it had already decided.
+
+### The definitions are Allis's, not van den Herik's
+
+The terms originate in the 1994 thesis, §1.5 and §6.2, and the ingested copy has
+them. Both are quoted verbatim in the module and `self_check()` confirms the
+quotes against the file.
+
+**State-space complexity** is "the number of legal game positions reachable from
+the initial position of the game", and Allis adds, of symmetry, "We refrain from
+such a refinement." So the headline figure is the **reachability-corrected
+4.886 × 10¹⁷**, and adr-008's Z/2 mirror is *not* quotiented out. There is a
+tension worth recording: Allis's *definition* is the reachable set, but his
+*computed numbers* are invariant-consistent supersets refined by Monte Carlo
+legality sampling — the uncorrected quantity. At 0.0079% apart it changes
+nothing here. On another game it would.
+
+**Game-tree complexity** is Definition 6.4: the solution search tree of the
+initial position, at the minimal full-width depth that determines the value. He
+writes "number of nodes" and then counts *leaves* in both worked examples — 600
+grandchildren for the chess sketch, "9! = 362880 terminal nodes" for tic-tac-toe.
+We report leaves, and carry the node total beside it; they differ by 1.399× on
+the shipped board.
+
+### Why our exact count belongs in the same column
+
+**FLIPHEX's solution depth is exactly 25**, and the argument is written into the
+module because everything rests on it. At most 25, because the board is then
+full. Not less: at ply 24 one cell is empty and the mover holds one tile, and
+that tile's rotation decides which neighbours flip and therefore the final colour
+count, which *is* the outcome. A depth-24 full-width search leaves it
+undetermined.
+
+So the exact figure is not a different quantity from the literature's — it is the
+same quantity, computed instead of sampled. The asymmetry runs one way, and
+**Connect Four is the proof**: Allis and Schaeffer both cite 10¹⁴ where the exact
+enumeration is 4.53 × 10¹², a factor of 22.
+
+### The table
+
+| game | state space | game tree | grade | solved |
+|---|---:|---:|---|---|
+| FLIPHEX 3×3 | 10^5.84 | 10^13.69 | exact | unsolved (solved here) |
+| FLIPHEX 5×3 | 10^10.24 | 10^29.16 | exact | unsolved (solved here) |
+| Nine Men's Morris | 10^11.00 | — | verified | strongly solved |
+| Awari | 10^12.00 | — | verified | strongly solved |
+| Connect Four | 10^12.66 | — | reported | weakly solved |
+| **FLIPHEX 5×5** | **10^17.69** | **10^58.63** | **exact** | **unsolved** |
+| Checkers 8×8 | 10^20.70 | — | verified | weakly solved |
+| Othello 8×8 | 10^28.00 | 10^58.00 | verified | weakly solved |
+| Chess | 10^45.00 | — | verified | unsolved |
+| Reversi 6×6 | — | — | **refuted** | strongly solved |
+| Hex 11×11 | — | — | absent | ultra-weakly solved |
+
+### Two findings against the literature
+
+**The 6×6 Reversi state space of ~10²⁰ is impossible.** `3^36 = 1.501 × 10¹⁷`
+bounds it before any legality constraint is applied, so the repeated claim
+overshoots by **666×**, and no primary source for it was found. `comparison.py`
+computes the ceiling rather than asserting it. This matters directly: H4's
+original Phase 0 wording was "complexity comparable to small Reversi", and the
+figure that phrase was presumably anchored to does not exist. What *is* real
+about 6×6 Reversi is the effort — Feinstein weakly solved it in 1993, second
+player 20–16, in about a week and a half on a workstation of that era. That is a
+far better comparison for our 5×3 than any 10^x.
+
+**Connect Four's 10¹⁴ is 22× the exact count.** Tromp's enumeration gives
+4,531,985,219,092, independently confirmed. The estimate is cited by both Allis
+and Schaeffer. It is the cleanest available demonstration that these table cells
+are estimates, which is why the module grades every cell instead of just filling
+it.
+
+### What the table refuses to say
+
+**van den Herik et al. (2002) Table 1 is not reproduced.** It is the canonical
+cross-game table and the right thing to cite — but two secondary reproductions of
+it disagree by one to two in the exponent on four separate rows (Connect Four,
+checkers, chess, Go), and that is not rounding. Those cells are graded `absent`
+with the disagreement recorded. Closing them means opening the PDF. Until then
+the table is short and true rather than long and borrowed.
+
+Nine cells are empty, each with a reason, printable with `--gaps`.
+
+### Provenance is executable
+
+Every `verified` figure carries a quote, and `self_check()` **opens the cited
+file and looks for it**. A citation that stops resolving fails a check instead of
+sitting in a docstring being decoration. Breaking one quote string turns two
+tests red.
+
+**But `notes/sources/` is gitignored**, and I had the check depending on it —
+which would have failed on a fresh clone and in CI, and is the self-containment
+rule this project already has. Fixed: the **bibliography** is what is cited and
+it is tracked and complete on its own; the local text is an *extra*. Where it is
+present the quote is opened, where it is absent the check reports itself as
+unperformed rather than passing silently. Simulated by parking the directory: 27
+pass, 1 skips with the reason, and the CLI prints "6 quotes were NOT opened".
+
+### The Allis OCR is unusable for numbers
+
+**Zero** `<sup>` tags in that ingest, against 33 in Takizawa and 20 in Schaeffer.
+The exponents were dropped: `3^ = 19,683`, `approximately 10"`, and line 1706 is
+an entire table row reading `10*|10*|10»|10*|10*|10«|10'|10»|10"`. The prose and
+all the definitions are intact, which is what we use it for. Every Allis-derived
+*figure* in the table is taken from Takizawa or Schaeffer quoting him. Recorded
+in a caveat file beside the source.
+
+### One finding the H4 verdict will have to answer
+
+**Othello 8×8's game tree is 10^58.00 and it was weakly solved in 2023.**
+FLIPHEX's is 10^58.63 — a factor of four, not an order of magnitude.
+
+H4 says the shipped board "is out of reach on both complexity axes", with the
+game-tree clause reading "beyond the weak-solution route that carried checkers".
+Read against checkers alone, the clause holds. Read against what has actually
+been weakly solved, FLIPHEX sits just past a frontier that was crossed three
+years before the hypothesis was written — and Takizawa, who crossed it, is in
+this repo and was read in Phase 2.
+
+The state-space clause is in better shape: 10^17.69 does exceed every
+**strongly** solved game in the table (10^11, 10^12, 10^12.66), which is what
+that clause actually claims. A test asserts it.
+
+This is not resolved here. It belongs in the verdict, with both numbers.
+
 ## EXP-005 and EXP-007 on the 5×3 — the closure the bound depends on
 
 ## H4 — where FLIPHEX lands on both axes
