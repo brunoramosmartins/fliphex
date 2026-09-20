@@ -181,11 +181,20 @@ three times out of three.
 |---|---|---|
 | **EXP-006** | Draws are impossible, so from a lost position *every* legal move preserves the value. The agreement rate was floored by the sample's loss fraction — measured at **39.2 / 3.6 / 46.1%** at `k = 6/7/8`, handing out **148 of 500** positions before the learner moved. | Caught by reasoning, two days before the run |
 | **EXP-016** | 400 simulations over a root that deduplicates to 325 children is **1.23 per child**, so PUCT walked the cell-major move list and visited **10–18** of them. The "measurement" was the enumeration order. | Caught by red-team, same day, before the run |
-| **H5** | 25 cells, no passing, hands exhausting exactly ⟹ every game places each archetype twice and the joker once. Placement frequency is a **constant**, checked at `[2]×12 + [1]` in all 500 games inspected. | Caught at the verdict, after the hypothesis had been locked for two phases |
+| **H5**, frequency | 25 cells, no passing, hands exhausting exactly ⟹ every game places each archetype twice and the joker once. Placement frequency is a **constant**, checked at `[2]×12 + [1]` in all 500 games inspected. | Caught at the verdict, after the hypothesis had been locked for two phases |
+| **H5**, win contribution | The same exhaustion makes each player hold each archetype once, so each is played once by the winner and once by the loser — **5,000 games, zero exceptions**. And the joker, held only by P1, tallies **2,712 / 2,288**: *exactly* the first-player split. Not a constant this time but an **alias** — the measure was a second name for a quantity already reported elsewhere. | Caught two days after the frequency half, in the same hypothesis, by asking the gate a second time |
 
-Three different mechanisms — a rule, a budget, a counting identity — and one
+Four mechanisms — a rule, a budget, a counting identity, and an alias — and one
 shape: **a number that looked like evidence and could not have come out any
-other way.**
+other way.** The fourth adds something the first three did not: a quantity can be
+free to vary and still be worthless, if what it varies *with* is something you
+are already measuring. Ask what else would move it.
+
+The two H5 rows also carry a procedural lesson. The frequency half was withdrawn
+on 2026-09-18 with a note saying win contribution "survives — it is not forced".
+That sentence was written **without applying the gate to it**, in the same
+paragraph that applied the gate to its sibling. Answering gate 9 for one measure
+is not answering it for the measure you name as the replacement.
 
 #### Amendment (2026-09-18, same day) — ask it of the decision, not only of the measure
 

@@ -5678,7 +5678,7 @@ registration, not here.
 | 5 | AZ vs solver at matched depth caps | H3 |
 | 5 | Sensitivity: MCTS simulations, `c_puct`, temperature schedule | — |
 | 6 | State-space and game-tree bounds; cross-game comparison table | H4 |
-| 6 | Archetype **win contribution** — the frequency half is withdrawn, see below | H5 |
+| 6 | ~~Archetype **win contribution**~~ — **withdrawn 2026-09-20**, forced like the frequency half, see below | H5 |
 | 6 | **Tile criticality** — for each archetype, the fraction of solved 5×3 positions whose value changes when that tile is removed from the hand | H5 |
 | 6 | **Mirror-optimality rate** — on solved positions where the Z/2 mirror is a valid game symmetry (both `P3-y` placed), the fraction of optimal moves whose mirror image is also optimal | H5, H6 |
 | 6 | **First-player advantage curve** — fraction of solved positions at each ply `t` won by the player to move, 5×3 | H1 |
@@ -5707,6 +5707,50 @@ registration, not here.
 > Recorded here rather than left implicit, because "this planned row produced no
 > registry entry" should be a statement in the registry and not an absence from
 > it. The verdict is in [`docs/research.md`](../docs/research.md), H4.
+
+> **Withdrawn 2026-09-20 — archetype win contribution, before any entry was
+> written.** The surviving half of H5's locked test is forced by the same
+> mechanism as the half withdrawn two days earlier, and the demonstration is the
+> same 5,000 EXP-017 games. Both hands exhaust exactly and each player holds each
+> of the 12 archetypes once, so **every archetype is played exactly once by the
+> winner and exactly once by the loser, in every game — 5,000 games, zero
+> exceptions.** "Win rate given archetype X was played by the winner" is 100% for
+> all twelve, for any agent and any strategy.
+>
+> **The joker is worse.** Only P1 holds it, so "the joker was played by the
+> winner" *is* "P1 won", and the tally comes out at **2,712 / 2,288** — exactly
+> EXP-017's first-player split, to the game. A joker win-contribution figure is
+> the first-player advantage wearing a different label, and would have been read
+> as evidence about the deck.
+>
+> **Three unforced alternatives were considered and none is registered**, because
+> each is confounded rather than merely unrun:
+>
+> - **Placement timing** varies genuinely — mean ply from **5.11** (`P5`) to
+>   **22.80** (joker) — but a uniform-random null stratifies it almost entirely
+>   by **rotation-orbit size**: orbit 6 → 9.7, orbit 3 → 13.7, orbit 2 → 16.1,
+>   orbit 1 → 19.0, with all eight orbit-6 tiles inside 9.58–9.87. A uniform
+>   mover picks a 6-orbit tile six times as often as a 1-orbit one, so most of
+>   the spread is the deck's rotation symmetry, not its design.
+> - **Net of that null** the residual is large and monotone in arrow count
+>   (`r = −0.855` over 13 tiles; `P6` −8.56 plies, `P5` −4.73, `P1` +6.59). It is
+>   still not usable: the only ordered-game database this project holds is
+>   EXP-017's, played by `SolverAgent`, whose pre-solver phase **is** the greedy
+>   net-flip heuristic. A flip-maximiser plays many-arrowed tiles early and
+>   avoids them late, because late their arrows land on its own pieces. The
+>   residual is a prediction of the agent's objective.
+> - **Cell choice and rotation choice** inherit the same agent confound and have
+>   no null computed.
+>
+> **What a registrable entry would need**, recorded so the gap is a statement
+> rather than an absence: an ordered-game database from an agent whose objective
+> is not net flips, plus the orbit null above as the comparison. The EXP-015
+> champions cannot supply it — `data/az-runs/*/buffer.pkl` stores sampled
+> positions, not ordered games. No run is scheduled.
+>
+> This is the **fourth** measure the game's own structure fixes, after EXP-006's
+> lost positions, EXP-016's root coverage and H5's placement frequency, and the
+> second in H5 alone. The verdict is in [`docs/research.md`](../docs/research.md).
 
 > **Withdrawn 2026-09-18 — archetype placement frequency, before any entry was
 > written.** The quantity is forced by the rules and cannot vary: 25 cells, no

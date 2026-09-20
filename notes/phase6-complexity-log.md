@@ -426,6 +426,78 @@ This is not resolved here. It belongs in the verdict, with both numbers.
 
 ## H5 — win contribution per archetype
 
+**Withdrawn 2026-09-20, before any entry was written. The surviving half of the
+locked test is forced by the same mechanism as the half withdrawn two days
+earlier.**
+
+### The demonstration
+
+Both hands exhaust exactly, and each player holds each of the 12 archetypes
+once. So every archetype is played **once by the winner and once by the loser,
+in every game**. Checked on EXP-017's 5,000 recorded games: **zero exceptions**.
+"Win rate given archetype X was played by the winner" is 100% for all twelve, for
+any agent and any strategy.
+
+**The joker is worse than vacuous — it is an alias.** Only P1 holds it, so "the
+joker was played by the winner" *is* "P1 won". The tally comes out at
+**2,712 / 2,288**, which is exactly EXP-017's first-player split, game for game.
+A joker win-contribution figure would have been the first-player advantage under
+a different label, and would have been read as evidence about the deck.
+
+That is a failure shape the first three gate-9 instances did not have. EXP-006's
+denominator, EXP-016's root coverage and H5's frequency were all **constants**.
+This one is free to vary — it just varies with something already measured and
+reported elsewhere. A quantity can be unforced and still be worthless.
+
+### Three unforced alternatives, and why none is registered
+
+**Placement timing varies genuinely**: mean ply runs from **5.11** (`P5`) to
+**22.80** (joker). But a uniform-random null stratifies it almost entirely by
+**rotation-orbit size** — a uniform mover picks a 6-orbit tile six times as often
+as a 1-orbit one:
+
+| orbit | null mean ply | tiles |
+|---:|---:|---|
+| 6 | 9.58 – 9.87 | eight of them, inside a 0.3-ply band |
+| 3 | 13.61, 13.81 | `P2-opp`, `P4-opp` |
+| 2 | 16.07 | `P3-tri` |
+| 1 | 19.02, 19.10 | `P6`, `JOKER` |
+
+Most of the raw spread is the deck's rotation symmetry, not its design.
+
+**Net of that null there is a large residual**, monotone in arrow count —
+`r = −0.855` over 13 tiles, with `P6` at −8.56 plies, `P5` at −4.73 and `P1` at
++6.59. More arrows, played earlier than chance.
+
+**And it is not usable.** The only ordered-game database this project holds is
+EXP-017's, played by `SolverAgent`, whose pre-solver phase *is* the greedy
+net-flip heuristic in `agents/heuristic_agent.py`. A flip-maximiser plays
+many-arrowed tiles early and avoids them late, because late their arrows land on
+its own pieces and score negative. The residual is a prediction of the agent's
+objective, not a finding about the game.
+
+**Cell choice and rotation choice** inherit the same confound and have no null
+computed.
+
+### What a registrable entry would need
+
+An ordered-game database from an agent whose objective is not net flips, plus the
+orbit null above as the comparison. The EXP-015 champions cannot supply it:
+`data/az-runs/*/buffer.pkl` stores sampled positions, not ordered games. No run
+is scheduled, and the gap is recorded as a statement rather than left as an
+absence.
+
+### The procedural lesson, which is the uncomfortable one
+
+The frequency half was withdrawn on 2026-09-18 with a note saying win
+contribution "survives — it is not forced". **I wrote that sentence in the same
+paragraph where I applied the gate to its sibling, without applying it here.**
+Answering gate 9 for one measure is not answering it for the measure you name as
+the replacement. `docs/measurement-gates.md` now says so.
+
+The H5 verdict row in `docs/research.md` carries a dated correction rather than a
+silent rewrite, and H5 is now complete rather than half-open to this phase.
+
 ## H6 — robustness to bounded design perturbation
 
 ## Tile criticality — the reference distribution H2's 17.07% is waiting for
