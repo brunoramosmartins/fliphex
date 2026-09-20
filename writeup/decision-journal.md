@@ -9,6 +9,80 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-09-20 — Phase 6 closing: every quantity it set out to estimate was a closed form, and the last three verdicts went in
+
+The phase opened to estimate four things — state space, reachable correction,
+game tree, branching distribution — and **not one of them needed a run**. Each
+is a closed form, each verified against the engine's own move generator rather
+than against itself. That is the phase's single largest fact and it is not a
+happy accident: it is what a deck of fixed composition on a board whose hands
+exhaust exactly *does* to the counting, and nothing in the Phase 0 plan noticed
+that the structure was that rigid.
+
+**Two decisions taken today that were not in the plan.**
+`scripts/analyze_archetype_usage.py` is **dropped**. Both quantities it would
+compute are fixed by the rules: placement frequency is `[2]×12 + [1]` in every
+game, and each archetype is played once by the winner and once by the loser in
+all 5,000 EXP-017 games. A script that computes a constant is not an analysis.
+And H5's second half, **win contribution, is withdrawn** — registered as the
+surviving measure when the frequency half fell on 2026-09-18, and gone two days
+later for the same reason the first half went. Worse than vacuous for the
+joker: only P1 holds it, so "the joker was played by the winner" is "P1 won",
+and the count is 2,712/2,288 — EXP-017's first-player split under another name.
+An **alias**, which is a fourth instance of gate 9 and the first one where the
+quantity varied but measured something already named.
+
+**Two published figures refused, and the refusals are the table's most useful
+cells.** 6×6 Reversi's commonly cited ~10²⁰ state space is **666× above its own
+`3^36` ceiling**, which holds before any legality constraint — so the comparison
+uses the ceiling and grades the figure `refuted`. Every cell of van den Herik
+Table 1 is graded `absent`, because the reproductions this project could reach
+disagree by one to two in the exponent and none resolves to the text.
+`complexity/comparison.py` carries provenance per cell rather than per table for
+exactly this: nine cells are empty with a stated reason, and an empty cell that
+says why is worth more than an interpolated one.
+
+**H4's clause 2 is the phase's real finding, and it cost nothing to make.** The
+locked ~10⁶¹ is **236× high**, and it is visible with no new measurement at all:
+the same hypothesis locks a Knuth–Moore figure of ~10³⁰·⁵, and the two are
+mutually inconsistent. Recover `b` from `10^30.5 = b^13` and the full tree comes
+out at `10^58.65` — the exact answer, to two decimals, from the hypothesis's own
+other number. The statement is **not edited**; hypotheses are locked at
+`v0.3-hypotheses` and this is recorded as a deviation.
+
+**`figures/` shipped, and the clause is what made it ship.** Phase 5 planned the
+directory as a substitute for three dropped notebooks and produced nothing —
+that phase's failed attempt 7. Phase 6 made it a named exit criterion with a
+clause attached: *every figure regenerates from a tracked artefact.* The clause
+is enforced by `tests/test_figures.py`, not trusted, and it caught a real
+defect — `results/*.jsonl`, `data/` and `notes/sources/` are all gitignored, and
+a figure drawn from any of them renders on this machine and nowhere else. Seven
+figures, one per hypothesis with a verdict plus one support panel.
+
+**Carried to Phase 7, for the second time:**
+`exercises/ex05_complexity_analysis.md` and **TIL #4**, both carried out of
+Phase 5 and both untouched here. They are author-written material and the phase
+produced no hours for them. Phase 7 already owns the TIL pipeline
+(*"Polish and publish TILs #1–#5"*), so #4 lands in a phase that was going to
+open that file anyway; the exercise does not, and is carried explicitly rather
+than dropped.
+
+**Two registry index rows are stale, found in this sweep and not caused by this
+phase.** EXP-006 and EXP-012 both ran — their artefacts are on disk and
+`docs/research.md` quotes results from both — but their index rows still read
+*"registered (blocked on Axis 2)"* and *"registered … not yet run"* with empty
+Result columns. The detail entries below them are current. Recorded here rather
+than backfilled silently, since a retrospective edit to an index that dates
+itself would erase the fact that the rows went stale at all.
+
+The verdict table now has **no empty row**. That is worth stating plainly and
+worth not over-reading: three of the six verdicts are *structural* — H4's
+bounds, H5 entirely, H6's scope — which means the game's rules answered them and
+no experiment could have. A table with no gaps is not the same as a set of
+hypotheses that were all well posed.
+
+---
+
 ## 2026-09-18 — EXP-007 stopped after six layers: the closed form answered in a second what the run wanted four days for
 
 Started the 5×3 closure the same day Phase 6 opened, and stopped it 429.8 s in,
