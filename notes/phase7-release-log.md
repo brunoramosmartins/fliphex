@@ -113,6 +113,53 @@ designed around, not because anything turns on it yet.
 
 56 tests, up from 4.
 
+## The browser build — what WebAssembly costs, measured before designing
+
+**[EXP-018](../experiments/registry.md). Registered retrospectively, which is
+the wrong order and is recorded as such.** The rule here is that an entry exists
+before a run; EXP-003 and EXP-014 are both performance measurements feeding a
+design decision and both were registered first. This one was run first. What the
+entry would have forced is not the measurement but the *threshold* — nobody had
+declared what slowdown would rule the learner out of the browser, and "we will
+see" is precisely what a registration refuses.
+
+**Pyodide costs ~3×, not the order of magnitude assumed.** The same tracked
+instrument — `scripts/bench_engine.py`, pure stdlib — runs natively and
+unmodified inside Emscripten, so the ratio is measured rather than extrapolated
+across a boundary. Six workloads, spread **2.84× to 3.43×**.
+
+| workload | native | pyodide | slowdown |
+|---|---:|---:|---:|
+| `legal_moves` at the opening | 1,558,544/s | 454,579/s | 3.43× |
+| `apply_move` | 89,159/s | 29,987/s | 2.97× |
+| random playout | 110.6 games/s | 33.5 games/s | 3.30× |
+| heuristic game | 29.9 games/s | 10.1 games/s | 2.96× |
+| UCT move, 100 sims | 1.0/s | 0.34/s | 2.93× |
+| 3×3 opening solve | 2.6 s | 7.5 s | 2.84× |
+
+The uniformity is the useful part. Those six stress different things — bit
+manipulation, object construction, dictionary-heavy tree search, recursion — and
+a slowdown that flat says the cost is the interpreter rather than one operation
+hitting a WASM pathology, which means it transfers to code not measured here.
+
+**What it decides.** A heuristic move costs **4 ms** in the browser and a whole
+heuristic game 99 ms, so the planned web v1 has no performance question in it at
+all. The 3×3 opening solve costs **7.5 s once**, after which the transposition
+table carries the rest — a browser can play that board *perfectly* for the price
+of one visible wait. And UCT at the trained 400-simulation budget costs **11.8 s
+per move**, which is not interactive: the learner in a browser needs a smaller
+budget or a worker thread, and a smaller budget makes it a different agent from
+the one EXP-015 measured.
+
+**What it does not decide.** The boot figure — ~1.9 s — is Node loading a package
+from local disk, not a browser over a network, and one of three samples took
+234 s under load. No browser-facing claim may quote it. Network inference is
+unmeasured: only the tree search was timed, and no numpy forward pass exists yet.
+
+The harness that loads Pyodide is deliberately **not** in the repository: it
+needs `npm install` and a Node runtime. The half that must be identical on both
+sides is the half that is tracked.
+
 ## `ui/pygame_ui.py` — the physical palette, on screen
 
 ## `ui/replay_viewer.py` — play back saved games from `data/`

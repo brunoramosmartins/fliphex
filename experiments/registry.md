@@ -34,6 +34,7 @@ Freely editable (append-only in practice).
 | EXP-015 | 2026-09-04 | H3 | 2 | The H3 training run: five seeds against the prior-free UCT floor | Shipped 5×5-`h1`, `ConvRotationNet`, 5 seeds × 30 generations × 200 games, gate every 5 at 400 games | 1–5 | **complete** | **Instability recorded; H3's clause 1 is not satisfied.** Four seeds clear the floor and one does not — seed 4 at **56.0% [49.1%, 62.7%]**, two games short. The five rates are 64.0 / 76.0 / 63.0 / 56.0 / 62.0%, a between-seed `sd` of **7.3%** against the **3.4%** sampling alone predicts, and homogeneity `χ² = 18.52` on 4 df **rejects a common rate**. 135.0 h, against ≈146 h projected. [`exp015-h3-training-5x5.json`](../results/exp015-h3-training-5x5.json) |
 | EXP-016 | 2026-09-18 | H1 | 1 + 2 | H1's shipped-board arm: the first-player rate under named, imperfect play | Shipped 5×5-`h1`. Primary: prior-free UCT self-play, 400 simulations, **20 seeds × 250 = 5,000 games** (20.5 h at a measured 14.77 s/game). Secondary: the five EXP-015 champions, 250 games each | 1–20 | **withdrawn before running** | **Withdrawn 2026-09-18, same day, by red-team.** Prior-free UCT at 400 simulations visits **10–18 of 325** root children (4%) and the coverage is seat-dependent, so the design measured cell-enumeration order. Six further blocking findings, including a seed schedule sharing **975 of 5,000** player seeds. No data collected. Superseded by **EXP-017**. |
 | EXP-017 | 2026-09-18 | H1 | 1 + 2 | H1's shipped-board arm: the first-player rate under exact endgame play | Shipped 5×5-`h1`. `SolverAgent` both seats (`max_nodes` 2M, `search_below_k` 8, heuristic fallback), **5,000 games, one match seed**, 11.0 h single-worker at a measured 7.95 s/game. Diversity from the heuristic's random tie-break; `proved_rate` ~31% | 1 | **complete** | **First player wins 2,712/5,000 = 54.2% [52.9%, 55.6%]**, interval entirely above 50%, under play that is heuristic for ~17 plies and **exact for the last 8** (`proved_rate` **32.0%**, and no rate may be quoted without it). 5,000/5,000 games distinct; ply accounting closes at 125,000 exactly. All three registered predictions held. **Corroborates H1's direction on a board no solver reaches; does not demonstrate it** — H1's evidence is the four exhaustive solves. [`exp017-first-player-5x5.json`](../results/exp017-first-player-5x5.json) |
+| EXP-018 | 2026-09-21 | — | 3 | Engine cost under Pyodide (CPython on WebAssembly) against native CPython, for the browser-build decision | Same tracked instrument both sides — `scripts/bench_engine.py`, pure stdlib, unmodified under Emscripten. Six workloads, 1 s budget each, shipped 5×5 plus the 3×3 solve | — | **complete (registered retrospectively — see the entry)** | **WebAssembly costs ~3×, not the order of magnitude assumed.** Slowdown is 2.84–3.43× across all six workloads: `legal_moves` 3.43×, `apply_move` 2.97×, random playout 3.30×, heuristic game 2.96×, UCT 2.93×, 3×3 solve 2.84×. In the browser a heuristic move costs **4 ms** and a whole heuristic game 99 ms, so the planned web v1 is free; the 3×3 opening solve costs **7.5 s** once; UCT at the trained 400-simulation budget costs **11.8 s per move**, which is not interactive. Pyodide boot ~1.9 s from local disk in node — **not** a browser-over-network figure and not to be quoted as one. |
 
 **Registration basis.** EXP-001 through EXP-005 are registered against the H1/H2
 text at tag `v0.3-hypotheses`. Any post-lock amendment to that text is recorded
@@ -5790,3 +5791,96 @@ registration, not here.
 > **Win contribution survives** — it is not forced — and so do placement
 > *timing*, cell choice and rotation choice. Each needs a dominance threshold
 > declared before looking. See `docs/research.md`, H5.
+
+---
+
+### EXP-018 — what WebAssembly costs this engine
+
+**Registered 2026-09-21, retrospectively — the run came first, and that is the
+wrong order.** This project's rule is that an entry exists before a run, and
+EXP-003 and EXP-014 are the precedent: both are performance measurements feeding
+a design decision, and both were registered first. This one was not. It is
+recorded as backfilled rather than dated to look contemporaneous, and the cost of
+the violation is stated below rather than waved away.
+
+**What the violation actually cost here.** Little, and the reason is worth
+writing down instead of used as an excuse. A registration's work is to fix the
+decision rule before the number is visible, so the number cannot pick the rule.
+The decision this feeds — whether the browser build may carry the solver and the
+learner — has no threshold anyone had declared, so there was none to protect.
+That is itself the finding: **the entry should have been written to force the
+threshold, not to record the measurement.** Gate 1 asks what decision turns on
+the quantity; the honest answer on the day was "we will see", and "we will see"
+is what a registration exists to refuse.
+
+#### Objective
+
+Measure the slowdown of the FLIPHEX engine under Pyodide — CPython compiled to
+WebAssembly — against native CPython, so the browser interface is designed
+against a number. Phase 4's first lesson is *measure the composed system, not its
+components*, and EXP-007 repeated it at a factor of four. A guess of "3–10×
+slower" was on the table; this replaces it.
+
+#### Why one instrument, not two
+
+`scripts/bench_engine.py` is **pure standard library** and imports only
+`fliphex`, `solver` and `az.mcts`. Pyodide runs that file unmodified. Nothing is
+extrapolated across the boundary, because extrapolating a cost across a boundary
+is exactly what this project has now got wrong twice.
+
+The harness that loads Pyodide is **not** in the repository: it needs an `npm
+install` and a Node runtime, and the repo is self-contained by rule. The half
+that must be identical on both sides is the half that is tracked.
+
+#### Configuration
+
+Node 18.19.1, `pyodide@0.26.4`, CPython 3.12.1 on Emscripten, against CPython
+3.12.3 on Linux. Six workloads, 1 s budget each, shipped 5×5 except the solve.
+`az.mcts` is driven directly with uniform priors and random-rollout leaves — the
+prior-free floor — because the *search* is pure stdlib and only the network
+evaluator needs torch.
+
+#### Result
+
+| workload | native | pyodide | slowdown |
+|---|---:|---:|---:|
+| `legal_moves` at the opening | 1,558,544 moves/s | 454,579 moves/s | **3.43×** |
+| `apply_move` | 89,159 moves/s | 29,987 moves/s | **2.97×** |
+| random playout (full game) | 110.6 games/s | 33.5 games/s | **3.30×** |
+| heuristic game (full game) | 29.9 games/s | 10.1 games/s | **2.96×** |
+| UCT move, 100 simulations | 1.0 moves/s | 0.34 moves/s | **2.93×** |
+| 3×3 opening solve | 2.6 s | 7.5 s | **2.84×** |
+
+**The spread is 2.84–3.43× across six workloads that stress different things** —
+bit manipulation, object construction, dictionary-heavy tree search, recursion.
+A slowdown that uniform says the cost is the interpreter itself rather than any
+one operation hitting a WASM pathology, which is the useful form of the answer:
+it transfers to code not measured here.
+
+#### What follows for the browser build
+
+- **A heuristic move costs 4 ms** and a complete heuristic game 99 ms. The
+  planned web v1 — human versus human and human versus heuristic — has no
+  performance question in it at all.
+- **The 3×3 opening solve costs 7.5 s**, once, after which the transposition
+  table makes the rest of the game fast. A browser can play the 3×3 *perfectly*
+  for the price of one visible wait.
+- **UCT at the trained 400-simulation budget costs 11.8 s per move** — linear in
+  simulations, so this is a projection from the 100-simulation measurement and
+  carries that assumption. Not interactive. The learner in a browser needs a
+  smaller budget, a worker thread, or both, and the budget change makes it a
+  *different agent* from the one EXP-015 measured.
+
+#### What this does not establish
+
+Not the boot cost in a browser. The ~1.9 s measured here is Node loading a
+package from local disk; a browser adds a download over a network, and one of
+three samples took 234 s under load on this machine, so even the local figure has
+a tail. **No browser-facing claim may quote it.**
+
+Not the cost of network inference. Only the tree search was measured; a learned
+agent adds a forward pass per simulation on top, and no numpy port exists yet to
+measure.
+
+Not that 3× holds on other hardware, other browsers, or WASM engines other than
+V8. One machine, one runtime.
