@@ -271,6 +271,10 @@ function animateFlips(cells) {
 
 function renderHand() {
   const snapshot = state.snapshot;
+  // Called from `resetSelection`, which runs at times when no game exists yet.
+  // Returning is right; reading through a null snapshot is how the first
+  // version of this page failed to boot at all.
+  if (!snapshot) return;
   const mover = snapshot.to_move;
   const hand = snapshot.hands[mover];
   ui.handTitle.textContent = `${mover === "PURPLE" ? "Purple" : "Green"} — ${hand.length} left`;
@@ -441,13 +445,26 @@ function onUndo() {
 }
 
 async function startGame() {
+  const conv = { dict_converter: Object.fromEntries };
   const [cols, rows] = ui.variant.value.split("x").map(Number);
   state.game = state.py.globals.get("new_game")(cols, rows);
-  state.geometry = state.game.geometry().toJs({ dict_converter: Object.fromEntries });
+  state.geometry = state.game.geometry().toJs(conv);
+
+  // Order matters, and it caught this page out once. `resetSelection` renders
+  // the hand, and rendering the hand reads `state.snapshot` — which is null
+  // until the first `refresh`. The snapshot is therefore taken and installed
+  // before anything that might read it.
+  state.snapshot = state.game.snapshot().toJs(conv);
+  state.selectedTile = null;
+  state.selectedCell = null;
+  state.busy = false;
+
   drawBoard(state.geometry);
-  resetSelection();
-  refresh(state.game.snapshot().toJs({ dict_converter: Object.fromEntries }));
+  refresh(state.snapshot);
   paintArrows([]);
+  clearOverlay();
+  clearMarks();
+  ui.rotationPanel.hidden = true;
   say("");
 }
 

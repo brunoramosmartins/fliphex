@@ -212,12 +212,53 @@ rather than through the benchmark, which is the confirmation worth having.
 Emscripten's working directory is not the filesystem root. It failed with a bare
 `ErrnoError 44` naming nothing. Both sides now use an absolute `/app`.
 
+### It failed on first contact with a browser, and the reason is the point
+
+The page did not boot. The badge read `failed` and no board appeared.
+
+**The server log is what located it.** `payload.json` returned 200 three seconds
+after the page loaded — so Pyodide had started, the bundle had been fetched, and
+the engine had imported. Everything measured above was working. The failure was
+in the part *nothing had tested*: `startGame` called `resetSelection`, which
+renders the hand, which reads `state.snapshot` — still `null` until the first
+`refresh`. A null dereference, on the first line of the first game.
+
+The Python half had 111 tests. The JavaScript half had **none**, and this is the
+second defect to come out of that same gap in one sitting — the first was the
+`BrowserGame` subclass living in a string inside `app.js`. Both are the same
+shape: code that the test suite structurally cannot reach.
+
+**Fixed, and then actually verified.** The snapshot is now installed before
+anything can read it, `renderHand` returns early rather than dereferencing null,
+and the whole page was booted headlessly under jsdom against the real Pyodide
+and the real `index.html` — driven through the DOM the way a person drives it:
+
+```
+ok   the engine boots and the badge reads ready
+ok   25 hexagons drawn, cell names A1 … E5
+ok   13 pieces in purple's hand, each with a glyph
+ok   choosing a piece marks every legal cell
+ok   choosing a cell offers 6 distinct rotations with net values
+ok   hovering a rotation previews it on the board
+ok   the move lands and the heuristic agent replies
+ok   placed tiles show the arrows they fired
+ok   undo takes back both plies and returns to the opening
+ok   switching to the 3x3 redraws 9 cells and deals 5 pieces
+```
+
+That run lives in the scratchpad, not the repository, which is the unresolved
+part: it needs `npm install jsdom pyodide`, and adr-013 clause 7 keeps the Node
+toolchain out. Clause 7 was written about the *benchmark* harness. A test of
+shipped code is a different thing, and the case for bringing it in is now
+concrete rather than hypothetical — it would have caught both defects before
+either reached a browser. **Open decision, not a closed one.**
+
 ### What is not done
 
-No real browser has run this. Node is V8 with local files; a browser adds a
-different cold start and a CDN download, and adr-013 says explicitly that its
-solver rows may not survive that measurement. The page is not linked from
-anywhere until it has been.
+No real browser has run this — jsdom is not a browser and Node is V8 with local
+files. A browser adds a different cold start and a CDN download, and adr-013
+says explicitly that its solver rows may not survive that measurement. The page
+is not linked from anywhere until it has been.
 
 ## `ui/pygame_ui.py` — the physical palette, on screen
 
