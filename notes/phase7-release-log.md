@@ -289,15 +289,69 @@ nothing about which one to fix.
 Also fixed: the `favicon.ico` 404 in the server log. Inline SVG data URI, so the
 page still needs exactly one request beyond its own four files.
 
+### EXP-019 ran, and the falsifier fired for a reason I had not imagined
+
+Ten loads in Chrome 153, five cold and five warm, collected by the page itself.
+
+| | cold | warm |
+|---|--:|--:|
+| median time to playable | 4,293 ms | 3,925 ms |
+| spread (n=5) | 4,218–4,474 | 3,842–4,211 |
+| bytes transferred | 5,775,367 | 300 |
+
+**Ratio 1.09× against a registered 2× floor.** The falsifier says the rules are
+not applied as written, and that is honoured. But its *reason* is wrong, and
+that is the finding: it argued that a run which cannot tell its two conditions
+apart decides nothing. This run separates them by a factor of **19,000** in
+transferred bytes. What collapsed is not the distinction — it is the
+distinction's relevance to time.
+
+I wrote the falsifier using a time ratio as a proxy for condition separation,
+and measured the conditions separately in the same instrument, and did not
+notice the two could disagree. A pre-registered falsifier that fires for a
+reason its author had not imagined is worth more than one that never fires.
+
+**Boot is compute-bound.** The `runtime` step costs 3,881 ms cold and 3,458 ms
+warm; the 423 ms difference *is* the download. So **10% of a cold boot is
+transfer and 90% is WASM compilation and Python start** — and rule 2's
+byte-counting indicator was designed around a bottleneck that does not exist.
+
+**Three of four registered predictions are wrong.** Warm was predicted under 3 s
+(it is 3.9); cold was predicted transfer-dominated (it is 10%); the page's own
+bytes were predicted under 1% of the transfer (3.7%, because the runtime is
+5.78 MB compressed rather than the 14 MB I read off disk, and
+`python -m http.server` gzips nothing). The fourth is unrun.
+
+### What follows
+
+**No progress indicator.** Cold is 4.3 s against a 10 s limit, and not a near
+miss.
+
+**The split render is built — and it is a judgement made after seeing the
+data**, recorded as such in the registry rather than presented as the plan
+working. Rule 1's only input was ever the warm number, which is well measured
+inside one cell; the collapse invalidates the comparison *between* cells. A
+reader who thinks the falsifier should have stopped rule 1 as well is reading
+the text as written, and the text was written badly.
+
+It is also worth less than it looked: it cannot make the page playable sooner,
+because Python must finish either way. It replaces 3.9 s of blank space with
+3.9 s of visible board. That is the standard remedy for a wait, not a speed-up,
+and must not be written up as one.
+
 ### What is not done
 
-No real browser has run this — jsdom is not a browser and Node is V8 with local
-files. **EXP-019 exists precisely to close that**, and until it does the page is
-not linked from anywhere.
+**One browser, one machine.** Chrome 153 on Windows x64 — one cell pair, not the
+table. The second browser and the phone are unrun, and the phone is now the
+interesting case precisely because boot is compute-bound.
 
-The split render is deliberately **not** built yet. Building it before measuring
-would be optimising against an unmeasured baseline, which is the habit gate 1
-exists to break; EXP-019's first rule decides whether it is needed at all.
+**The ~235 s stall did not appear** in ten browser loads, against roughly one in
+five under Node on WSL2. Evidence that it belongs to the Node path, not proof:
+ten loads cannot rule out a one-in-twenty event.
+
+**The 3.4 s runtime step was not profiled.** Whether it is wasm compilation,
+stdlib unpacking or interpreter start is unknown, so anything trying to shorten
+it would be guessing.
 
 ## `ui/pygame_ui.py` — the physical palette, on screen
 
