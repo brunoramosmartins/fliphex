@@ -48,3 +48,7 @@ figures/*.png
 notes/sources/
 refs/
 data/az-runs/
+
+# Node, for web/ tests only. The page itself needs no build step.
+web/node_modules/
+web/package-lock.json

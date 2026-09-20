@@ -182,6 +182,47 @@ cold CDN, a phone — clause 8's first cut is still free but clause 4's solver r
 may not survive. The measurement is cheap once the page exists, and is owed
 before the page is linked from anywhere.
 
+## Amendment, 2026-09-21 — clause 7 splits: a measurement harness stays out, a test of shipped code comes in
+
+Clause 7 kept the Node toolchain outside the repository, on the grounds that it
+needs `npm install` and the repository is self-contained. That was written about
+the **Pyodide benchmark harness**, and for that it still holds: EXP-018's runner
+is not tracked, and the half that must be identical on both sides —
+`scripts/bench_engine.py` — is.
+
+A **test of shipped code** is a different thing, and the case turned concrete
+rather than hypothetical. The JavaScript half of this interface had no automated
+check of any kind, and two defects came out of that gap in one sitting: a
+`GameSession` subclass living inside a Python string in `app.js`, and a null
+dereference in `startGame` that stopped the page booting at all. Both were in
+code the Python suite structurally could not reach. Neither was caught by
+1,164 passing tests, because none of them could see the file.
+
+**So `web/package.json` and `web/test/` are tracked**, with `jsdom` and
+`pyodide` as dev dependencies and `web/node_modules/` ignored.
+
+Three things bound it:
+
+- **It is not part of `pytest`.** `cd web && npm test` is its own command. A
+  Python contributor who never installs Node loses nothing but this check.
+- **It does not touch the page's delivery.** The published artifact is still
+  four static files and a CDN. Nothing in `npm` is a build step.
+- **`web/app.js` is imported unmodified.** The only seam is
+  `globalThis.FLIPHEX_PYODIDE_URL`, read before the CDN is chosen, so the test
+  can point at a local package. A test that rewrites its subject is testing
+  something else, and the first version of this harness did exactly that.
+
+`web/package-lock.json` is **not** tracked. The one version that must agree with
+the page is `pyodide`, pinned exactly in `package.json` because `app.js` loads
+that same version from the CDN; jsdom's minor version is not load-bearing.
+
+**What it cannot do, stated so nobody mistakes a green run for a working page.**
+jsdom implements the DOM, not a browser: no rendering, no layout, no CSS. It
+catches a wrong selector, an unwired handler, a state machine in the wrong
+order. It cannot see an overlapping hexagon, an unreadable colour or a broken
+phone layout, and it is not a substitute for EXP-019, which still needs a real
+browser.
+
 ## Amendment, 2026-09-21 — the deployed page carries no agent stronger than the heuristic
 
 **Author's decision, not a measurement.** Clause 4 shipped the solver seats to

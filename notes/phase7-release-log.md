@@ -246,12 +246,25 @@ ok   undo takes back both plies and returns to the opening
 ok   switching to the 3x3 redraws 9 cells and deals 5 pieces
 ```
 
-That run lives in the scratchpad, not the repository, which is the unresolved
-part: it needs `npm install jsdom pyodide`, and adr-013 clause 7 keeps the Node
-toolchain out. Clause 7 was written about the *benchmark* harness. A test of
-shipped code is a different thing, and the case for bringing it in is now
-concrete rather than hypothetical — it would have caught both defects before
-either reached a browser. **Open decision, not a closed one.**
+**That check is now in the repository** — `web/package.json` and
+`web/test/page.test.mjs`, run with `cd web && npm test`, 30 checks. adr-013
+clause 7 was amended to split the two cases it had conflated: the *benchmark*
+harness stays outside, because the half that must be identical on both sides is
+`scripts/bench_engine.py` and that is tracked; a *test of shipped code* comes
+in, because the alternative is the only visible half of the product having no
+automated check at all.
+
+Three bounds on it. It is **not** part of `pytest` — a Python contributor who
+never installs Node loses only this check. It touches nothing in delivery: the
+published artifact is still four static files and a CDN. And `web/app.js` is
+imported **unmodified**, the only seam being `globalThis.FLIPHEX_PYODIDE_URL`,
+read before the CDN is chosen. The scratchpad version had rewritten the source
+with a regular expression, which is testing something else.
+
+It found a failure on its first tracked run, and **the failure was in the test**:
+it asserted `aria-pressed` on a button that `renderHand` had already replaced,
+and reported a page defect that did not exist. Fixed with the reason written
+beside it, because a test that cries wolf is worse than no test.
 
 ### The browser cost is registered before it is measured — [EXP-019](../experiments/registry.md)
 

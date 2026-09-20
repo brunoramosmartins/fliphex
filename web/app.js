@@ -11,7 +11,13 @@
  * picture that looks slightly off.
  */
 
-const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/";
+/* The CDN, unless something overrides it before this module loads. The
+ * override exists for `web/test/page.test.mjs`, which points it at a local
+ * pyodide package so the suite needs no network — and so that the test can
+ * import this file *unmodified*. A test that rewrites its subject is testing
+ * something else. */
+const PYODIDE =
+  globalThis.FLIPHEX_PYODIDE_URL ?? "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/";
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 /* Where the engine is unpacked inside the WebAssembly filesystem. */
@@ -577,3 +583,7 @@ ui.undo.addEventListener("click", onUndo);
 ui.cancel.addEventListener("click", resetSelection);
 
 boot();
+
+/* Exported for `web/test/page.test.mjs`, which drives the page through the DOM.
+ * Harmless in a browser: this is already a module, and nothing imports it. */
+export { boot, onCellClick, onTileClick, onUndo, playMove, startGame, state, ui };
