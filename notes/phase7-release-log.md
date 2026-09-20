@@ -339,6 +339,30 @@ because Python must finish either way. It replaces 3.9 s of blank space with
 3.9 s of visible board. That is the standard remedy for a wait, not a speed-up,
 and must not be written up as one.
 
+### The split render, built
+
+`scripts/build_web.py` now also emits **`web/geometry.json`** — 8 KB, three
+boards, generated from `ui.session.layout`. The page fetches it first, draws the
+board, and only then starts Pyodide. A fifth mark, `board`, sits between
+`chrome` and `runtime`, so the next measurement can report time-to-board
+separately from time-to-playable.
+
+The board is drawn **inert**: visible, dimmed, `pointer-events: none`, with the
+boot strip beneath it saying *"This board is real; it is not playable until the
+engine starts."* When Python is ready the dimming lifts and the strip goes.
+
+**The one thing this could have broken is the one thing that is tested.**
+adr-013 forbids a second geometry, and drawing before Python starts means the
+page reads cell centres from a file rather than from the engine — exactly one
+chance to diverge. `tests/test_build_web.py` asserts the file equals
+`layout()` for every board, that every option in the page's own `<select>` has
+geometry, and that the file is generated rather than edited. The jsdom suite
+asserts the ordering that makes it a split render at all: `board` before
+`runtime`, and the draw costing under a fifth of the runtime it precedes.
+
+It buys a visible board during a ~3.9 s wait. It does not make the page
+playable sooner, and the code says so where someone changing it will read it.
+
 ### What is not done
 
 **One browser, one machine.** Chrome 153 on Windows x64 — one cell pair, not the

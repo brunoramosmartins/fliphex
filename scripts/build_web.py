@@ -29,9 +29,22 @@ import ast
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# Run as `python scripts/build_web.py`, so sys.path[0] is scripts/ rather than
+# the repository root. The convention the other scripts here use.
+sys.path.insert(0, str(ROOT))
+
 OUT = ROOT / "web" / "payload.json"
+
+#: The boards the page's selector offers, and the file it reads them from
+#: *before* Pyodide starts. EXP-019 measured boot at ~3.9 s and found it
+#: compute-bound, so the board can be drawn from this in ~100 ms and made live
+#: later — the split render adr-013 asked for and EXP-019's rule 1 decided.
+GEOMETRY_OUT = ROOT / "web" / "geometry.json"
+PAGE_BOARDS = ((5, 5), (5, 3), (3, 3))
 
 #: Packages shipped whole. All three are pure standard library — the property
 #: adr-013 rests on, and the one :func:`verify` re-checks on every build.
@@ -174,6 +187,29 @@ def build() -> dict[str, str]:
     return payload
 
 
+def geometry() -> dict[str, Any]:
+    """Cell centres per board, generated from the engine.
+
+    The page must not invent a second geometry (adr-013), and drawing before
+    Python starts would otherwise force exactly that. This writes what
+    :func:`ui.session.layout` returns, so the early board and the live board are
+    the same numbers — and ``tests/test_build_web.py`` asserts that rather than
+    trusting it.
+    """
+    from fliphex.variant import Variant
+    from ui.session import layout
+
+    return {
+        f"{cols}x{rows}": {
+            "n_cols": cols,
+            "n_rows": rows,
+            "n_cells": cols * rows,
+            "cells": layout(Variant(cols, rows).board()),
+        }
+        for cols, rows in PAGE_BOARDS
+    }
+
+
 def rendered(payload: dict[str, str]) -> str:
     """Serialised deterministically, so ``--check`` compares content not order."""
     return json.dumps(payload, sort_keys=True, indent=1, ensure_ascii=False) + "\n"
@@ -190,16 +226,26 @@ def main(argv: list[str] | None = None) -> int:
     text = rendered(payload)
     total = sum(len(s) for s in payload.values())
 
+    shapes = json.dumps(geometry(), sort_keys=True, indent=1) + "\n"
+
     if args.check:
-        if not OUT.exists() or OUT.read_text() != text:
-            print("  web/payload.json is stale — run python scripts/build_web.py")
+        stale = [
+            path.name
+            for path, wanted in ((OUT, text), (GEOMETRY_OUT, shapes))
+            if not path.exists() or path.read_text() != wanted
+        ]
+        if stale:
+            print(f"  stale: {', '.join(stale)} — run python scripts/build_web.py")
             return 1
         print(f"  payload current — {len(payload)} modules, {total:,} bytes")
+        print(f"  geometry current — {len(geometry())} boards")
         return 0
 
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(text)
+    GEOMETRY_OUT.write_text(shapes)
     print(f"  wrote {OUT.relative_to(ROOT)} — {len(payload)} modules, {total:,} bytes")
+    print(f"  wrote {GEOMETRY_OUT.relative_to(ROOT)} — {len(geometry())} boards")
     return 0
 
 

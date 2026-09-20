@@ -41,15 +41,18 @@
 <main>
   <section class="board-pane">
     <div id="board-wrap" class="board-wrap">
-      <div id="boot" class="boot">
-        <div class="spinner" aria-hidden="true"></div>
-        <p id="boot-text">Starting the rules engine&hellip;</p>
-        <p class="boot-note">
-          This page runs the project&rsquo;s actual Python engine, compiled to
-          WebAssembly. The rules are never reimplemented in JavaScript.
-        </p>
-      </div>
       <svg id="board" role="img" aria-label="FLIPHEX board" hidden></svg>
+      <div id="boot" class="boot" role="status">
+        <div class="spinner" aria-hidden="true"></div>
+        <div>
+          <p id="boot-text">Starting the rules engine&hellip;</p>
+          <p class="boot-note">
+            This board is real; it is not playable until the engine starts. The
+            page runs the project&rsquo;s actual Python, compiled to WebAssembly
+            &mdash; the rules are never reimplemented in JavaScript.
+          </p>
+        </div>
+      </div>
     </div>
 
     <div class="scoreline" id="scoreline" hidden>

@@ -65,6 +65,7 @@ async function until(condition, timeoutMs) {
 
 const html = readFileSync(`${WEB}/index.html`, "utf8");
 const payload = readFileSync(`${WEB}/payload.json`, "utf8");
+const shapes = readFileSync(`${WEB}/geometry.json`, "utf8");
 
 const dom = new JSDOM(html, { url: "http://localhost/", pretendToBeVisual: true });
 const { window } = dom;
@@ -72,10 +73,13 @@ const { window } = dom;
 /* The page makes exactly one request. If it ever makes another, this throws
  * rather than quietly returning undefined — a second fetch would be a change
  * worth noticing. */
+const SERVED = { "payload.json": payload, "geometry.json": shapes };
+const fetched = [];
+
 window.fetch = async (url) => {
-  if (String(url).endsWith("payload.json")) {
-    return { json: async () => JSON.parse(payload) };
-  }
+  const name = String(url).split("/").pop();
+  fetched.push(name);
+  if (name in SERVED) return { json: async () => JSON.parse(SERVED[name]) };
   throw new Error(`the page fetched something unexpected: ${url}`);
 };
 
@@ -145,14 +149,42 @@ check(`the engine boots — badge reads "${page.ui.badge.textContent}"`, true);
 // -- EXP-019's instrumentation -------------------------------------------------
 
 const marks = window.fliphexMarks;
-check("boot marks are exposed for EXP-019", Array.isArray(marks) && marks.length === 4);
+check("boot marks are exposed for EXP-019", Array.isArray(marks) && marks.length === 5);
 check(
-  "the four marks are in order and cumulative",
-  Array.isArray(marks) &&
-    marks.map((m) => m.mark).join(",") === "chrome,runtime,engine,playable" &&
-    marks.every((m, i) => i === 0 || m.totalMs >= marks[i - 1].totalMs),
+  "the marks are cumulative, never going backwards",
+  Array.isArray(marks) && marks.every((m, i) => i === 0 || m.totalMs >= marks[i - 1].totalMs),
 );
 check("the solver probe is available but not run", typeof window.fliphexBench === "function");
+
+// -- the split render (EXP-019 rule 1) -----------------------------------------
+
+check(
+  "the geometry is fetched before the payload",
+  fetched.indexOf("geometry.json") !== -1 &&
+    fetched.indexOf("geometry.json") < fetched.indexOf("payload.json"),
+  `fetch order: ${fetched.join(", ")}`,
+);
+const markNames = marks.map((m) => m.mark);
+equal(
+  "the board is marked between the chrome and the runtime",
+  markNames.join(","),
+  "chrome,board,runtime,engine,playable",
+);
+check(
+  "the board was drawn before Python started",
+  marks[1].totalMs < marks[2].totalMs,
+  `board at ${marks[1].totalMs} ms, runtime at ${marks[2].totalMs} ms`,
+);
+check(
+  "drawing the board costs far less than the runtime it precedes",
+  marks[1].deltaMs * 5 < marks[2].deltaMs,
+  `board ${marks[1].deltaMs} ms vs runtime ${marks[2].deltaMs} ms`,
+);
+check(
+  "the board is live once the engine is ready, not inert",
+  !page.ui.boardWrap.classList.contains("inert"),
+);
+check("the boot strip is hidden once playable", page.ui.boot.hidden);
 
 const collected = page.readRuns();
 equal("this load was collected for EXP-019", collected.length, 1);

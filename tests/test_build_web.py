@@ -120,3 +120,62 @@ def test_build_refuses_rather_than_writing_a_broken_bundle(monkeypatch):
     monkeypatch.setattr(build_web, "sources", lambda: {"x.py": "import pandas\n"})
     with pytest.raises(SystemExit, match="BUNDLE REFUSED"):
         build_web.build()
+
+
+# -- the static geometry the page draws before Python starts -------------------
+
+
+def test_the_committed_geometry_is_current():
+    assert build_web.GEOMETRY_OUT.exists(), "run python scripts/build_web.py"
+    wanted = json.dumps(build_web.geometry(), sort_keys=True, indent=1) + "\n"
+    assert build_web.GEOMETRY_OUT.read_text() == wanted, (
+        "web/geometry.json is stale — run python scripts/build_web.py"
+    )
+
+
+def test_the_early_board_and_the_live_board_are_the_same_numbers():
+    """The clause the split render could have broken.
+
+    adr-013 forbids a second geometry. Drawing before Python starts means the
+    page reads cell centres from a file rather than from the engine, so the two
+    have exactly one chance to diverge — and this is it.
+    """
+    from fliphex.variant import Variant
+    from ui.session import layout
+
+    shapes = json.loads(build_web.GEOMETRY_OUT.read_text())
+    for cols, rows in build_web.PAGE_BOARDS:
+        live = layout(Variant(cols, rows).board())
+        early = shapes[f"{cols}x{rows}"]["cells"]
+        assert early == json.loads(json.dumps(live)), f"{cols}x{rows} drifted"
+
+
+def test_every_board_in_the_selector_has_geometry():
+    """A board the page can choose but cannot draw would fail at boot."""
+    import re
+
+    html = (ROOT / "web" / "index.html").read_text()
+    block = html.split('id="variant"')[1].split("</select>")[0]
+    offered = set(re.findall(r'value="(\d+x\d+)"', block))
+    shapes = json.loads(build_web.GEOMETRY_OUT.read_text())
+    assert offered, "no board options found in the selector"
+    assert offered <= set(shapes), f"no geometry for {offered - set(shapes)}"
+
+
+def test_the_geometry_carries_its_board_shape():
+    shapes = json.loads(build_web.GEOMETRY_OUT.read_text())
+    for key, board in shapes.items():
+        cols, rows = (int(n) for n in key.split("x"))
+        assert (board["n_cols"], board["n_rows"]) == (cols, rows)
+        assert board["n_cells"] == cols * rows == len(board["cells"])
+
+
+def test_the_geometry_stays_small_enough_to_precede_the_runtime():
+    """It is fetched before Pyodide, so it has to be cheap or it defeats itself."""
+    assert build_web.GEOMETRY_OUT.stat().st_size < 32_000
+
+
+def test_check_reports_a_stale_geometry(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(build_web, "GEOMETRY_OUT", tmp_path / "absent.json")
+    assert build_web.main(["--check"]) == 1
+    assert "stale" in capsys.readouterr().out
