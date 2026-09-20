@@ -718,7 +718,72 @@ is the author's call and not a refactor.
 
 ## `exercises/ex05_complexity_analysis.md` — carried from Phases 5 and 6
 
+Carried from Phase 5, carried again from Phase 6, written here. The delay turned
+out to work in the exercise's favour: by now every quantity it asks for is
+computed, checked and recorded, so no answer has to be estimated and each one is
+markable against an artefact in this repository. That makes the problems harder,
+not easier — a wrong answer is wrong against a number, not against a textbook.
+
+**Four of the roadmap's five statements needed correcting**, and they are kept
+visible in a callout rather than silently patched, the way ex03's three were.
+
+1. **The cell alphabet has four symbols and the game has three.** "empty,
+   purple, green, joker" treats the joker as a cell state. It is a tile in P1's
+   hand and shows its owner's colour once placed; nothing on the board ever
+   reads as "joker".
+2. **`× 6 orientations` is wrong by 2.8 × 10¹⁹**, per adr-003 and adr-006. This
+   one is also in H4's *locked* text, where it could not be corrected and had to
+   be answered in the verdict instead — so the exercise asks the reader to
+   rediscover it rather than being told.
+3. **Q3 asks for a Monte Carlo estimate of a closed form.** The game tree is
+   exactly 4.229 × 10⁵⁸, in microseconds.
+4. **Q4's "decreases monotonically after some peak" has no peak.** Mean
+   branching falls strictly from ply 0 on both factors at once; the hump belongs
+   to the layer profile, which is a different curve. Telling those two apart is
+   now the point of Q4 rather than an aside.
+
+**A sixth question was added**, because Phase 7 produced one the roadmap could
+not have asked. The solver seat can sit on a forward search or on a completed
+retrograde sweep, and those are different kinds of knowledge — so Q6 asks for
+Allis's three grades applied to this project's own artefacts, why a sweep yields
+a *strong* solution where an exhausted forward search yields only a *weak* one,
+and what the `*` in the comparison table is doing that the grade column was not.
+It closes on the honest version of the headline: the 5×3 database is 4.1 GB,
+gitignored, and absent from a clone. Q6.4 also asks the reader to generalise the
+self-comparison regression this phase found and fixed, which is the only
+exercise question in the set that is really about testing.
+
+The answers are left open, like ex02's. There is no phase owner for them and
+there was never going to be one; what the repository owes is the problem set.
+
 ## TIL #4 — retrograde analysis, when backwards beats forwards
+
+`tils/til-04-retrograde-analysis-backwards-vs-forwards.md`. A **skeleton with
+prompts**, like #2, #3 and #5 — the content is first person and is deliberately
+not ghost-written.
+
+The piece has one structural problem and it is also its best feature: **the
+title states a direction and this project measured the opposite on its own main
+board.** EXP-003's medians are 480 nodes to prove a 5×5 position at `k = 5` and
+806,474 at `k = 8`, under a second either way, against a 150 TB database. The
+skeleton opens by telling the author not to write around that.
+
+The section the piece exists for is the one Takizawa supplied: **the answer is
+an interval, not a crossover.** Two cuts with different justifications —
+enumerable above (storage), solvable below (search) — and backwards wins strictly
+between them. On the shipped board the cuts do not meet, so the interval is
+empty and adr-012 Option B is closed by arithmetic rather than by sampled
+medians. That reframing is what EXP-003 got wrong the first time by looking for a
+single `k*`, and it is more transferable than any number in the piece.
+
+Two boundaries are written into the skeleton so the TIL series does not repeat
+itself. **The 580× speedup is TIL #6 and gets one sentence and a link** — it is a
+different lesson about what an exhaustive sweep pays for. And the EXP-005
+counting identity is marked *optional, cut it if #6 already made that point*.
+The one piece of Phase 7 material it does carry is the cost of knowing, measured
+on a full 5×3 game through the window: peak resident 3.0 GB, worst move 4.9 s,
+4.1 GB read across sixteen plies. "Solved" became something you can lose a game
+to, and the price of perfect play turned out to be memory bandwidth.
 
 ## TILs #1–#6 — polish and publish
 
