@@ -500,6 +500,70 @@ silent rewrite, and H5 is now complete rather than half-open to this phase.
 
 ## H6 — robustness to bounded design perturbation
 
+**Supported on every perturbation that exists, and the perturbation set cannot
+falsify it.** Decided without a single new computation.
+
+### The board-size family holds its own mechanism constant
+
+Three points named: 3×3 → 5×3 → 5×5. Four exact solves, all returning **P1** at
+`termination: exhausted`; the shipped board is not decidable and contributes only
+EXP-017's corroborative 54.2%.
+
+But **adr-011 requires every reduced board to have an odd cell count and gives P1
+the extra tile**, so P1 moves last on every legal board including the shipped one.
+The structural feature that most plausibly *causes* the advantage is held constant
+by construction across the whole family.
+
+EXP-009 makes that concrete on the 5×3-`h1`: **every one of the 12,841,920
+configurations at `t = 4` is a P1 win**, and every one of the 713,440 at `t = 3` a
+P2 loss. An early-game advantage that is total rather than positional is what a
+structural cause looks like.
+
+And the one board that *would* have perturbed the structure — the **4×4**, even
+cells, and a 180° automorphism rather than the mirror — **is withdrawn by
+adr-011**, because an even board admits draws and the rules define no tie-break.
+
+### The named deck swap was forbidden five days before the lock
+
+H6's example is "removing the chiral `P3-y`". `P3-y` is one of adr-009's two
+**anchors**, and clause 1 reads *"Always include `P6` and `P3-y`"* — kept
+precisely **because** it is the sole chiral tile.
+
+**adr-009 was ratified 2026-07-31. The hypotheses locked 2026-08-05.**
+
+Beyond that example there is no lever. `Variant` carries `n_cols`, `n_rows`,
+`arm` and `first`; `archetypes_for` is deterministic in capacity. So the only
+deck perturbation the engine admits is the `arm` swap — **which is H2**. And
+`first` merely selects which colour moves first, which with identical decks
+(`OPEN-2`, resolved 2026-07-29) is a relabelling.
+
+### The joker half has no sign to preserve
+
+H2 found the root value unchanged on both boards and both arms. The joker effect
+on the game value is exactly **zero** — not positive, not negative — so "holds
+its sign" is not a statement that can be true or false of it.
+
+### What it cost, and what it rests on
+
+Nothing, and that is the point. Every exact datapoint is one of the four solves
+already read for H1 and again for H2; H6 reports them a third time. Producing an
+independent one would have needed arbitrary-deck machinery the engine does not
+have, an adr-009 amendment against a ratified clause, and **31–34 h** per new 5×3
+arm at EXP-002's measured sweep cost.
+
+### The shape of the finding
+
+This is H4's clause-2 shape again, one hypothesis over: the claim survives its
+test, and the test is narrower than the claim it was written to carry. A
+falsifying experiment would need a board whose parity construction differs —
+adr-011 forbids it — or a deck without an anchor — adr-009 forbids it. The
+hypothesis asks whether the design is robust; the decision records that make the
+variants legal are the same ones that keep the answer fixed.
+
+Worth saying plainly: this is not a case of the ADRs being wrong. adr-009 and
+adr-011 are both well argued and both predate the lock. It is a case of a
+hypothesis written without checking what its own project already permitted.
+
 ## Tile criticality — the reference distribution H2's 17.07% is waiting for
 
 ## `figures/` — the canonical figure per hypothesis, carried from Phase 5

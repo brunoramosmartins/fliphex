@@ -5680,7 +5680,7 @@ registration, not here.
 | 6 | State-space and game-tree bounds; cross-game comparison table | H4 |
 | 6 | ~~Archetype **win contribution**~~ — **withdrawn 2026-09-20**, forced like the frequency half, see below | H5 |
 | 6 | **Tile criticality** — for each archetype, the fraction of solved 5×3 positions whose value changes when that tile is removed from the hand | H5 |
-| 6 | **Mirror-optimality rate** — on solved positions where the Z/2 mirror is a valid game symmetry (both `P3-y` placed), the fraction of optimal moves whose mirror image is also optimal | H5, H6 |
+| 6 | **Mirror-optimality rate** — on solved positions where the Z/2 mirror is a valid game symmetry (both `P3-y` placed), the fraction of optimal moves whose mirror image is also optimal | ~~H5, H6~~ — **unrun; both verdicts are written without it**, see below |
 | 6 | **First-player advantage curve** — fraction of solved positions at each ply `t` won by the player to move, 5×3 | H1 |
 
 > **No ID allocated 2026-09-19 — the H4 row above was answered in closed form,
@@ -5707,6 +5707,25 @@ registration, not here.
 > Recorded here rather than left implicit, because "this planned row produced no
 > registry entry" should be a statement in the registry and not an absence from
 > it. The verdict is in [`docs/research.md`](../docs/research.md), H4.
+
+> **Unrun 2026-09-20 — mirror-optimality rate, and both hypotheses it was
+> tagged to are decided without it.** H5 is closed because both halves of its
+> locked measure are fixed by the rules, and H6 because every perturbation its
+> statement names is either forbidden by a ratified ADR or not constructible.
+> Neither verdict waited on this row.
+>
+> **It is not withdrawn, because it is not vacuous.** The mirror-optimality rate
+> is genuinely free to vary and has no obvious confound: on solved positions
+> where both `P3-y` tiles are already placed the Z/2 mirror is a valid game
+> symmetry ([adr-008](../docs/adr/adr-008-board-mirror-symmetry.md)), and whether
+> an optimal move's mirror image is also optimal is a property of the solved
+> database rather than of any agent. It would be a real measurement of how much
+> of the board's symmetry survives into play. It is simply not needed by any
+> hypothesis now that both are decided, and running it would be answering a
+> question nothing asked.
+>
+> Left here as an open, affordable and unclaimed measurement rather than
+> deleted. It reads an existing 5×3 solution; no new sweep is required.
 
 > **Withdrawn 2026-09-20 — archetype win contribution, before any entry was
 > written.** The surviving half of H5's locked test is forced by the same
