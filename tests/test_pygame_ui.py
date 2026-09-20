@@ -377,3 +377,59 @@ def test_the_replay_viewer_opens_paints_and_seeks():
     )
     assert result.returncode == 0, result.stderr[-2000:]
     assert "SMOKE OK" in result.stdout
+
+
+# -- which colour the person holds ---------------------------------------------
+
+_SEAT_SMOKE = '''
+from ui.pygame_ui import Window
+from ui.session import GameSession
+
+# Holding purple: the person opens.
+first = Window(GameSession(3, 3), "heuristic", seed=0, human="PURPLE")
+assert first._human_to_move(), "purple moves first and the person holds it"
+assert first.snapshot["ply"] == 0
+
+# Holding green: the agent owns the opening, and must take it unprompted.
+second = Window(GameSession(3, 3), "heuristic", seed=0, human="GREEN")
+assert not second._human_to_move(), "purple moves first and an agent holds it"
+second._agent_reply()
+assert second.snapshot["ply"] == 1, "the agent did not open"
+assert second._human_to_move(), "it should be the person's turn now"
+
+# A move from the second seat still lands, and the reply follows.
+rect, _ = second.hand_rects[0]
+second._on_click(rect.center)
+cell = sorted(second._playable_cells())[0]
+second._on_click(tuple(int(v) for v in second.placement.centre(second.cells[cell])))
+second._commit()
+assert second.snapshot["ply"] == 3, f"expected ply 3, got {second.snapshot['ply']}"
+
+# Undo gives the person their turn back from either seat.
+second._undo()
+assert second._human_to_move()
+print("SEATS OK")
+'''
+
+
+def test_the_person_can_hold_either_colour():
+    """Until 2026-09-21 the window assumed the person was purple.
+
+    That meant a player could only ever experience the side of the board H1
+    says is favoured, in a project whose question is whether it is favoured.
+    """
+    import os
+    import subprocess
+    import sys
+
+    pytest.importorskip("pygame")
+    environment = {**os.environ, "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy"}
+    result = subprocess.run(
+        [sys.executable, "-c", _SEAT_SMOKE],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+    assert "SEATS OK" in result.stdout

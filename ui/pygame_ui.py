@@ -203,13 +203,25 @@ class Window:
     the player is part-way through choosing.
     """
 
-    def __init__(self, session: GameSession, opponent: str, seed: int | None) -> None:
+    def __init__(
+        self,
+        session: GameSession,
+        opponent: str,
+        seed: int | None,
+        human: str = "PURPLE",
+    ) -> None:
         import pygame
 
         self.pygame = pygame
         self.session = session
         self.opponent = opponent
         self.seed = seed
+        #: ``None`` marks the seat the person holds. Both may be agents, which
+        #: is how a game is watched rather than played.
+        self.agents: dict[str, str | None] = {
+            "PURPLE": None if human == "PURPLE" else opponent,
+            "GREEN": None if human == "GREEN" else opponent,
+        }
         self.cells = session.geometry()["cells"]
         self.names = {c["id"]: c["name"] for c in self.cells}
         self.snapshot = session.snapshot()
@@ -369,9 +381,14 @@ class Window:
         return set(self.session.playable_cells(self.selected_tile))
 
     def _human_to_move(self) -> bool:
-        if self.opponent == "human":
-            return True
-        return self.snapshot["to_move"] == "PURPLE"
+        """Whether the side to move is a seat no agent holds.
+
+        Derived from the seats rather than assumed to be purple. This window
+        hardcoded the human as purple until 2026-09-21, which meant a player
+        could only ever experience the side of the board H1 says is favoured —
+        in a project whose whole question is whether that side is favoured.
+        """
+        return self.agents[self.snapshot["to_move"]] is None
 
     def _reset_selection(self) -> None:
         self.selected_tile = None
@@ -448,12 +465,14 @@ class Window:
             return
         self.status = "Thinking…"
         self._paint()  # show the human's move before the search blocks
-        result = self.session.agent_move_by_name(self.opponent, seed=self.seed)
+        kind = self.agents[self.snapshot["to_move"]]
+        result = self.session.agent_move_by_name(kind, seed=self.seed)
         self._refresh(result)
 
     def _undo(self) -> None:
         self.session.undo()
-        if self.opponent != "human":
+        if any(kind is not None for kind in self.agents.values()):
+            # An agent holds a seat, so one more ply belongs to it.
             self.session.undo()
         self._refresh()
         self.status = "Took it back."
@@ -480,6 +499,9 @@ class Window:
 
     def run(self) -> None:
         pygame = self.pygame
+        # When the person holds the second seat, the agent owns the opening and
+        # has to take it, or the window waits for a move the player cannot make.
+        self._agent_reply()
         running = True
         while running:
             for event in pygame.event.get():
@@ -514,10 +536,15 @@ class Window:
         pygame.quit()
 
 
-def run(variant: Variant, opponent: str = "heuristic", seed: int | None = None) -> None:
+def run(
+    variant: Variant,
+    opponent: str = "heuristic",
+    seed: int | None = None,
+    human: str = "PURPLE",
+) -> None:
     """Open the window and play. Blocks until it is closed."""
     session = GameSession(variant.n_cols, variant.n_rows, variant.arm.value)
-    Window(session, opponent, seed).run()
+    Window(session, opponent, seed, human).run()
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -525,7 +552,17 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--variant", default="5x5", help="board as COLSxROWS")
     parser.add_argument("--arm", choices=[a.value for a in Arm], default=Arm.H1.value)
     parser.add_argument(
-        "--green", choices=SEAT_KINDS, default="heuristic", help="who plays green"
+        "--opponent",
+        choices=[k for k in SEAT_KINDS if k != "human"],
+        default="heuristic",
+        help="the agent you play against",
+    )
+    parser.add_argument(
+        "--play",
+        choices=["purple", "green"],
+        default="purple",
+        help="which colour you hold. Purple moves first and holds the joker, "
+        "so --play green is how you face the advantage H1 is about",
     )
     parser.add_argument("--seed", type=int, default=None)
     args = parser.parse_args(argv)
@@ -539,12 +576,18 @@ def main(argv: list[str] | None = None) -> None:
     # Fail before opening a window, not after: building the learner seat can
     # raise, and a window that appears and vanishes explains nothing.
     try:
-        seat = build_seat(args.green, variant=variant, seed=args.seed)
+        seat = build_seat(args.opponent, variant=variant, seed=args.seed)
     except ChampionUnavailableError as exc:
-        raise SystemExit(f"  ✗ green seat: {exc}") from None
-    print(f"  {variant.n_cols}x{variant.n_rows}  green: {describe_seat(seat)}")
+        raise SystemExit(f"  ✗ opponent seat: {exc}") from None
 
-    run(variant, args.green, args.seed)
+    human = args.play.upper()
+    opening = "you open" if human == "PURPLE" else "the agent opens"
+    print(
+        f"  {variant.n_cols}x{variant.n_rows}  you play {args.play} against "
+        f"{describe_seat(seat)} — {opening}"
+    )
+
+    run(variant, args.opponent, args.seed, human)
 
 
 if __name__ == "__main__":

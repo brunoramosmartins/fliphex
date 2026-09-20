@@ -28,70 +28,195 @@ Full rules: [`docs/rules-canonical.md`](docs/rules-canonical.md).
 > balance, and does the game admit an efficient learned policy that approaches
 > optimal play?
 
-Answered along three axes that are built to fail differently, so their agreement
-is evidence:
+Six hypotheses were **pre-registered and locked** before any experiment ran
+(tag `v0.3-hypotheses`, 2026-08-05). After the lock, `docs/research.md` could
+only gain verdicts — no statement was edited to fit a result.
 
-| Axis | Method | Produces |
+---
+
+## What was found
+
+Every hypothesis has a verdict. Two were rejected, one turned out to be true by
+construction, and one records a locked figure that is wrong by a factor of 236.
+That shape is the result, not a blemish on it.
+
+| | verdict | on what evidence |
 |---|---|---|
-| **1 — Exact solver** | Alpha-beta with transposition tables; retrograde endgame databases | Exact game values on reduced variants and endgames |
-| **2 — Self-play** | AlphaZero-style policy/value network with PUCT MCTS | A strong learned policy on the full game |
-| **3 — Complexity** | State-space and game-tree bounds, branching analysis | Where FLIPHEX sits among known games |
+| **H1** — the first player has an advantage | **supported** where perfect play is computable; **not decidable** on the shipped 5×5 | four exhaustive solves, all returning P1 |
+| **H2** — removing the joker does not change who wins | **supported** where computable; **out of reach by construction** on the 5×5 | both arms, both reduced boards, same winner |
+| **H3** — self-play converges and agrees with the solver | **rejected**, on both clauses independently | 5 seeds, 135 h; one seed fails the floor, `χ² = 18.52` rejects a common rate |
+| **H4** — where FLIPHEX sits among known games | clause 1 **supported**; clause 2's magnitude is **236× wrong** | both complexity bounds in closed form |
+| **H5** — no archetype dominates | **true by construction, and therefore not evidence of anything** | the rules force it; 5,000 games, zero exceptions |
+| **H6** — the design is robust to perturbation | **supported on every perturbation that exists** — and the set cannot falsify it | two ratified ADRs forbid the rest |
 
-Hypotheses are pre-registered and locked before the experiments run; each gets a
-verdict of supported, rejected, or inconclusive. See
+Read the rows in full, with their intervals and their caveats, in
 [`docs/research.md`](docs/research.md).
 
-## Two things Phase 0 found
+### Two boards are solved exactly
 
-**The deck is a theorem.** The poster specifies 1 tile with 1 arrow, 3 with 2,
-3 with 3, 3 with 4, 1 with 5, 1 with 6. That shape is not arbitrary: it is
-exactly the number of distinct arrow patterns possible on a two-sided hexagonal
-tile — binary bracelets of length 6 — so the deck is the *complete enumeration*
-of possible pieces. See
-[`docs/piece-archetypes.md`](docs/piece-archetypes.md).
+| | cells | configurations | result |
+|---|--:|--:|---|
+| **3×3** | 9 | 711,963 | **P1 wins**, both arms |
+| **5×3** | 15 | 1.75 × 10¹⁰ | **P1 wins**, both arms |
+| 5×5 (shipped) | 25 | 4.886 × 10¹⁷ | not decidable |
 
-**Placed tiles are inert.** Because flips never chain, a tile's arrows fire once
-and never again, so the game state does not need to store orientation. This cuts
-the reachable state-space bound from ~10³⁷ to ~10¹⁷ and is what makes exact
-analysis viable at all. See
-[`docs/adr/adr-003-piece-representation.md`](docs/adr/adr-003-piece-representation.md).
+The 3×3 was solved **twice, by independent methods** — forward alpha-beta and a
+retrograde sweep — which agree on 604,347 of 711,963 positions (84.9%). It is
+the only board in this project with two witnesses to the same truth.
 
-## Status
+On the 5×3, uniformity breaks at exactly `t = 5`: every one of the 12,841,920
+configurations at four tiles placed is a P1 win. An advantage that is total
+rather than positional is what a structural cause looks like.
 
-**Phase 0 — Foundation.** Rules canonicalised, geometry and archetypes derived
-from the physical artifact, six ADRs written, repository scaffolded. The engine
-(Phase 1) is not implemented yet.
+### The shipped game is larger than it looks
 
-Phases are sequenced by dependency, not by calendar.
+| | |
+|---|--:|
+| reachable state space | **4.886 × 10¹⁷** |
+| game tree, exact count of distinct games | **4.229 × 10⁵⁸** |
+| effective branching factor | 221.3 |
+| legal opening moves | **1,450** |
+
+The game tree is not a `b^d` estimate — it is an exact count,
+`25! × 13! × ∏orbits × 12! × ∏orbits`, checked against the engine's own move
+generator at full depth on the 5×1 and to three plies on both reduced boards.
+
+That figure exceeds every strongly solved game this project could source, and is
+**4.2× larger than Othello 8×8**, which was weakly solved in 2023. A factor, not
+an order.
+
+### What is not established
+
+Nobody has solved FLIPHEX, and nothing here says it is solvable. The
+shipped-board first-player figure — **54.2% [52.9%, 55.6%]** over 5,000 games —
+comes from play that is heuristic for ~17 plies and exact only for the last 8
+(`proved_rate` 32%). It corroborates a direction. It says nothing about perfect
+play.
+
+---
+
+## Play it
+
+Four interfaces, all driving the same engine.
+
+**In a browser** — the rules are the real Python, compiled to WebAssembly:
+
+```bash
+cd web && python3 -m http.server 8765
+```
+
+**In a window:**
+
+```bash
+python -m ui.pygame_ui --variant 3x3 --green solver
+```
+
+**In the terminal:**
+
+```bash
+python -m ui.cli --variant 3x3 --green solver
+```
+
+**Watch a recorded game:**
+
+```bash
+python -m ui.replay_viewer --variant 5x3 --purple solver
+```
+
+On the **3×3 the solver plays perfectly from the first move** — you are playing
+against the truth of the game, not an approximation. On the 5×5 it is exact only
+for the last 8 plies and reports its own proved rate, because a solver that fell
+back to a heuristic for most of a game played mostly heuristic moves.
+
+Seats are named per colour (`--purple`, `--green`) from `human`, `random`,
+`heuristic`, `solver`, `uct`, `az`. Reduced boards are dealt reduced decks, per
+[adr-011](docs/adr/adr-011-reduced-variant-parity.md).
+
+---
+
+## Where to read what
+
+The documents are layered deliberately. Start at the top and stop when you have
+what you came for.
+
+| If you want | Read |
+|---|---|
+| the verdicts, with intervals and caveats | [`docs/research.md`](docs/research.md) |
+| why a decision was live at the time, including the wrong turns | [`writeup/decision-journal.md`](writeup/decision-journal.md) |
+| what a phase actually did, in its own words | `notes/phase<N>-*.md` |
+| an experiment's design, rule and result | [`experiments/registry.md`](experiments/registry.md) |
+| why the code is shaped this way | [`docs/adr/`](docs/adr/) — thirteen decision records |
+| how a number is allowed to become a claim | [`docs/measurement-gates.md`](docs/measurement-gates.md) |
+| the rules, authoritatively | [`docs/rules-canonical.md`](docs/rules-canonical.md) |
+
+Two of those are worth singling out. The **decision journal** records what was
+believed on the day, including the parts that turned out wrong; the **measurement
+gates** are nine questions every quantity has to survive before it is reported,
+and the ninth — *what is this quantity free to be?* — was added after the first
+eight let the same defect through three times.
+
+---
 
 ## Layout
 
 ```
-docs/          rules, geometry, archetypes, ADRs, research question
-fliphex/       the game engine                    (Phase 1)
-solver/        Axis 1 — exact analysis            (Phase 3)
-az/            Axis 2 — AlphaZero self-play       (Phase 4)
-complexity/    Axis 3 — structural analysis       (Phase 6)
+docs/          rules, geometry, archetypes, thirteen ADRs, the verdicts
+fliphex/       the game engine — pure standard library      (Phase 1)
+solver/        Axis 1 — exact analysis                      (Phase 3)
+az/            Axis 2 — AlphaZero self-play                 (Phase 4)
+complexity/    Axis 3 — structural analysis                 (Phase 6)
 agents/        random, heuristic, solver, AZ
 stats/         Wilson intervals, bootstrap, paired tests
-ui/            CLI, pygame, replay viewer         (Phase 7)
+ui/            CLI, pygame window, replay viewer, shared session
+web/           the browser build — the engine under Pyodide (Phase 7)
+figures/       seven canonical figures, one per verdict
 scripts/       experiment entry points and doc generators
 experiments/   the experiment registry
 writeup/       decision journal and portfolio article
 ```
 
-## Reproducing the generated documents
+`fliphex/` imports nothing from the project. `solver/`, `az/` and `complexity/`
+import `fliphex/` and never each other — which is why the engine and the exact
+solver run unmodified in a browser.
 
-`docs/board-geometry.md` and `docs/piece-archetypes.md` are generated, so they
-cannot drift from the definitions the engine uses:
+## Running it yourself
 
 ```bash
-python scripts/build_docs.py
+python -m venv .venv && .venv/bin/pip install -e ".[dev,ui,figures]"
 ```
 
-The generators are standalone and assert their own correctness — the adjacency
-table is checked for symmetry, and the deck is checked to be exactly the 12
-bracelet classes.
+`az` is a separate extra because it pulls in torch:
+`pip install -e ".[az]"`.
+
+```bash
+pytest tests/ && ruff check . && ruff format --check .
+```
+
+1,208 tests. The browser build has its own suite, which needs Node:
+
+```bash
+cd web && npm install && npm test
+```
+
+### Generated files
+
+`docs/board-geometry.md` and `docs/piece-archetypes.md` come from
+`scripts/build_docs.py`; `web/payload.json` and `web/geometry.json` come from
+`scripts/build_web.py`. Both refuse to be edited by hand — CI fails if the tree
+is dirty after a rebuild.
+
+```bash
+python scripts/build_docs.py && python scripts/build_web.py
+```
+
+### What a clone does not get
+
+`data/az-runs/`, `data/checkpoints/` and `results/*.jsonl` are gitignored, so a
+fresh clone has the solved reduced boards and the experiment summaries but **no
+trained network and no recorded games**. Everything in this repository is built
+to work without them: the AZ seat explains what is missing and how to train one,
+and the replay viewer records a game from a seed rather than reading a file
+nobody has.
 
 ## Credits
 

@@ -25,7 +25,13 @@
         <option value="3x3">3&times;3 &mdash; solved exactly</option>
       </select>
     </label>
-    <label>Green
+    <label>You play
+      <select id="side">
+        <option value="PURPLE" selected>purple &mdash; moves first</option>
+        <option value="GREEN">green &mdash; moves second</option>
+      </select>
+    </label>
+    <label>Against
       <!-- adr-013's 2026-09-21 amendment: the deployed page offers nothing
            above the heuristic. ui/seats.py still builds all six, and a local
            checkout can add them here. -->

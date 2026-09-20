@@ -369,6 +369,27 @@ await page.startGame();
 equal("the 5x3 redraws fifteen cells", board.querySelectorAll("g.cell-group").length, 15);
 equal("the 5x3 is dealt eight pieces", page.ui.hand.querySelectorAll("button.piece").length, 8);
 
+// -- which colour the visitor holds --------------------------------------------
+
+page.ui.variant.value = "3x3";
+page.ui.side.value = "GREEN";
+await page.startGame();
+await until(() => page.state.snapshot.ply === 1, 15_000);
+check(
+  "choosing green makes the agent open unprompted",
+  page.state.snapshot.ply === 1 && page.state.snapshot.to_move === "GREEN",
+  `ply ${page.state.snapshot.ply}, to move ${page.state.snapshot.to_move}`,
+);
+equal(
+  "the hand shown is the one the visitor holds",
+  page.ui.handTitle.textContent.startsWith("Green"),
+  true,
+);
+
+page.ui.side.value = "PURPLE";
+await page.startGame();
+equal("choosing purple leaves the opening to the visitor", page.state.snapshot.ply, 0);
+
 // -- the deployed seat list ----------------------------------------------------
 
 const seats = [...page.ui.opponent.options].map((o) => o.value);

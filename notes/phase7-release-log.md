@@ -461,6 +461,50 @@ no special case.
 windows draw the same shapes from the same code. 34 tests for `ui/replay.py`,
 plus scrubber arithmetic and a headless window smoke under SDL's dummy driver.
 
+## Both graphical interfaces assumed you were purple
+
+Raised by the author after play-testing: *"the first player is always me."*
+
+**The solver was never the cause, and it is worth being precise about why.** It
+is not trained — it is exact search — and `agents/solver_agent.py` contains no
+reference to `PURPLE`, `GREEN` or `first` anywhere. It solves for whoever is to
+move. `ui/cli.py` has taken `--purple`, `--green` and `--first` since it was
+rewritten.
+
+The two graphical interfaces hardcoded it. `ui/pygame_ui.py` offered only
+`--green` and decided the human's turn with `to_move == "PURPLE"`; `web/app.js`
+did the same. So a player could only ever experience **the side of the board H1
+says is favoured**, on the interfaces whose whole subject is whether it is
+favoured.
+
+Both now derive the human's turn from the seats rather than assuming a colour.
+The window takes `--play purple|green`, the page has a *You play* selector, and
+when the person holds the second seat the agent **takes the opening unprompted**
+— without that, the board waits for a move the player cannot make, which is a
+deadlock rather than a preference.
+
+`--play green` is now the way to feel, rather than read, the thing four
+exhaustive solves say about this game.
+
+## `README.md` — the high-level summary that did not exist
+
+Also raised by the author: *which file do I read for a summary of what the
+experiments concluded?* The honest answer was **none of them**.
+`docs/research.md` holds all six verdicts but each row is a dense paragraph;
+`experiments/registry.md` is 5,800 lines; the README had been frozen at Phase 0
+through seven phases, still saying *"The engine (Phase 1) is not implemented
+yet"*.
+
+The README is now that file. It carries the six verdicts in one scannable
+table, the two solved boards, the shipped board's complexity, an explicit
+*what is not established*, how to play in all four interfaces, and a **Where to
+read what** map that sends a reader to the right layer and no further.
+
+Its shape is deliberate: two hypotheses rejected, one true by construction, and
+one carrying a locked figure that is 236× wrong, stated as the result rather
+than buried. A README that read as a clean sweep would misrepresent the
+project's best work.
+
 ## `writeup/main-writeup.md` — the long-form article
 
 ## `exercises/ex05_complexity_analysis.md` — carried from Phases 5 and 6

@@ -53,6 +53,7 @@ const ui = {
   cancel: $("cancel"),
   newGame: $("new-game"),
   variant: $("variant"),
+  side: $("side"),
   opponent: $("opponent"),
 };
 
@@ -576,9 +577,15 @@ function refresh(snapshot) {
 
 /* -- interaction ----------------------------------------------------------- */
 
+/* Whether the side to move is the one nobody automated.
+ *
+ * Read from the selector rather than assumed to be purple. The page hardcoded
+ * the human as purple until 2026-09-21, which meant a visitor could only ever
+ * experience the side of the board H1 says is favoured — on the page whose
+ * whole point is the question of whether it is. */
 function isHumanTurn() {
   if (ui.opponent.value === "human") return true;
-  return state.snapshot.to_move === "PURPLE";
+  return state.snapshot.to_move === ui.side.value;
 }
 
 function resetSelection() {
@@ -689,6 +696,10 @@ async function startGame() {
   clearMarks();
   ui.rotationPanel.hidden = true;
   say("");
+
+  // When the visitor holds the second seat, the agent owns the opening and has
+  // to take it, or the board waits for a move they cannot make.
+  await maybeAgentMove();
 }
 
 /* -- boot ------------------------------------------------------------------ */
@@ -751,6 +762,7 @@ window.fliphexReset = fliphexReset;
 ui.newGame.addEventListener("click", startGame);
 ui.variant.addEventListener("change", () => { if (state.py) startGame(); });
 ui.opponent.addEventListener("change", () => { if (state.py) startGame(); });
+ui.side.addEventListener("change", () => { if (state.py) startGame(); });
 ui.undo.addEventListener("click", onUndo);
 ui.cancel.addEventListener("click", resetSelection);
 
