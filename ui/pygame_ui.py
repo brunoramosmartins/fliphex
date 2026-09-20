@@ -47,13 +47,22 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from math import cos, radians, sin, sqrt
+from pathlib import Path
 from typing import Any
 
+from agents.solver_agent import SolverAgent
 from fliphex.state import Colour
 from fliphex.variant import Arm, Variant
-from ui.seats import SEAT_KINDS, ChampionUnavailableError, build_seat, describe_seat
+from ui.seats import (
+    DEFAULT_SWEEP_ROOT,
+    SEAT_KINDS,
+    ChampionUnavailableError,
+    SweepUnavailableError,
+    build_seat,
+    describe_seat,
+)
 from ui.session import GameSession
-from ui.theme import rgb
+from ui.theme import TYPE_SCALE, font_families, mix, rgb
 
 # -- palette -------------------------------------------------------------------
 
@@ -73,6 +82,12 @@ LINE = rgb("line")
 EMPTY = rgb("empty")
 DANGER = rgb("danger")
 WHITE = (255, 255, 255)
+
+#: A cell's coordinate is research information sitting on the play surface. It
+#: recedes rather than disappearing — half way to the surface behind it on an
+#: empty cell, and well short of white on a played one.
+COORD_EMPTY = mix(INK_SOFT, EMPTY, 0.5)
+COORD_FILLED = mix(WHITE, PURPLE, 0.35)
 
 #: Flat-top hexagon: vertices every 60 degrees from due East, so the flat edges
 #: land on top and bottom. The same outline ``web/app.js`` draws.
@@ -153,6 +168,20 @@ def cell_at(
     return None if best is None else best[1]
 
 
+def badge_y(centre_y: float, radius: float, top: float, bottom: float) -> float:
+    """Where the net-swing badge goes: above the cell, or below if it would clip.
+
+    Found by screenshot rather than by test: previewing a rotation on the top
+    row drew the badge off the window entirely, so the one number the preview
+    exists to show was invisible exactly where a player is most likely to open.
+    """
+    above = centre_y - radius * 1.35
+    if above >= top:
+        return above
+    below = centre_y + radius * 1.35
+    return below if below <= bottom else centre_y
+
+
 def colour_of(name: str) -> tuple[int, int, int]:
     """Fill colour for a cell state, by the name the session reports."""
     return {"PURPLE": PURPLE, "GREEN": GREEN}.get(name, EMPTY)
@@ -222,16 +251,30 @@ def draw_hex(pygame, screen, centre, radius, fill, width=0) -> None:
     pygame.draw.polygon(screen, fill, hex_corners(centre[0], centre[1], radius), width)
 
 
+#: Where an arrow starts, where its head starts, and where it ends — as
+#: fractions of the hexagon's radius. Widened and thinned on 2026-09-20: the
+#: old 0.24/0.64/0.86 with a 0.15 wing drew six short fat arrows per tile, and
+#: a hand of those reads as six little diagrams rather than as six symbols. The
+#: reach is longer, the shaft thinner and the head smaller, which is the same
+#: information at less visual weight.
+ARROW_START = 0.20
+ARROW_HEAD = 0.72
+ARROW_TIP = 0.88
+ARROW_WING = 0.105
+ARROW_WEIGHT = 0.05
+
+
 def draw_arrow(pygame, screen, centre, radius, slot, colour, scale=1.0) -> None:
     """One arrow, from just outside the centre to just inside the edge."""
     dx, dy = direction_vector(slot)
     cx, cy = centre
-    start = (cx + dx * radius * 0.24, cy + dy * radius * 0.24)
-    end = (cx + dx * radius * 0.64, cy + dy * radius * 0.64)
-    pygame.draw.line(screen, colour, start, end, max(2, int(radius * 0.075 * scale)))
-    tip = (cx + dx * radius * 0.86, cy + dy * radius * 0.86)
+    start = (cx + dx * radius * ARROW_START, cy + dy * radius * ARROW_START)
+    end = (cx + dx * radius * ARROW_HEAD, cy + dy * radius * ARROW_HEAD)
+    weight = max(1, round(radius * ARROW_WEIGHT * scale))
+    pygame.draw.line(screen, colour, start, end, weight)
+    tip = (cx + dx * radius * ARROW_TIP, cy + dy * radius * ARROW_TIP)
     px, py = -dy, dx
-    wing = radius * 0.15 * scale
+    wing = radius * ARROW_WING * scale
     pygame.draw.polygon(
         screen,
         colour,
@@ -357,12 +400,19 @@ class Window:
         opponent: str,
         seed: int | None,
         human: str = "PURPLE",
+        sweep_root: Any = None,
     ) -> None:
         import pygame
 
         self.pygame = pygame
         self.session = session
         self.seed = seed
+        #: Opt-in: prefer the completed retrograde sweep for this board over a
+        #: forward search. `None` means the search backend, which is what a
+        #: clone has.
+        self.sweep_root = sweep_root
+        #: One agent per seat kind, for the life of the board. See `_seat`.
+        self._seats: dict[str, Any] = {}
         #: The three things a game is. Every one is also a command-line flag,
         #: and every one can be changed without leaving the window.
         board = f"{session.variant.n_cols}x{session.variant.n_rows}"
@@ -406,10 +456,12 @@ class Window:
         pygame.display.set_caption("FLIPHEX")
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_icon(window_icon(pygame))
-        self.font = pygame.font.SysFont("dejavusans,arial", 15)
-        self.small = pygame.font.SysFont("dejavusans,arial", 12)
-        self.mid = pygame.font.SysFont("dejavusans,arial", 20, bold=True)
-        self.big = pygame.font.SysFont("dejavusans,arial", 24, bold=True)
+        families = font_families()
+        self.micro = pygame.font.SysFont(families, TYPE_SCALE["micro"])
+        self.small = pygame.font.SysFont(families, TYPE_SCALE["small"])
+        self.font = pygame.font.SysFont(families, TYPE_SCALE["body"])
+        self.mid = pygame.font.SysFont(families, TYPE_SCALE["lead"], bold=True)
+        self.big = pygame.font.SysFont(families, TYPE_SCALE["display"], bold=True)
         self.clock = pygame.time.Clock()
 
     # -- drawing ---------------------------------------------------------------
@@ -438,8 +490,8 @@ class Window:
                 self.pygame.draw.circle(
                     self.screen, PURPLE_SOFT, (int(centre[0]), int(centre[1])), 5
                 )
-            label = self.small.render(
-                cell["name"], True, INK_SOFT if state == "EMPTY" else WHITE
+            label = self.micro.render(
+                cell["name"], True, COORD_EMPTY if state == "EMPTY" else COORD_FILLED
             )
             self.screen.blit(label, label.get_rect(center=centre))
 
@@ -476,10 +528,9 @@ class Window:
         net = net_label(option["net"])
         swing = option["net"]
         colour = GREEN_SOFT if swing > 0 else DANGER if swing < 0 else INK_SOFT
-        chip = self.big.render(net, True, colour)
-        self.screen.blit(
-            chip, chip.get_rect(center=(centre[0], centre[1] - placement.radius * 1.35))
-        )
+        chip = self.mid.render(net, True, colour)
+        y = badge_y(centre[1], placement.radius, 20, BOARD_H - 20)
+        self.screen.blit(chip, chip.get_rect(center=(centre[0], y)))
 
     def _chip_width(self, caption: str, value: str, key: str) -> int:
         return (
@@ -488,7 +539,16 @@ class Window:
             + 34
         )
 
-    def _chip(self, x: int, top: int, caption: str, value: str, key: str, on: bool):
+    def _chip(
+        self,
+        x: int,
+        top: int,
+        caption: str,
+        value: str,
+        key: str,
+        on: bool,
+        primary: bool = False,
+    ):
         """One chip: an optional caption, a value, and the key that also does it.
 
         A setting needs the caption — "purple" alone does not say what it is a
@@ -498,13 +558,19 @@ class Window:
         busier without making it clearer.
         """
         pygame = self.pygame
-        rendered = self.font.render(value, True, INK if on else INK_SOFT)
-        hint = self.small.render(key.upper(), True, INK_SOFT)
+        ink = WHITE if primary else (INK if on else INK_SOFT)
+        rendered = self.font.render(value, True, ink)
+        hint = self.micro.render(
+            key.upper(), True, mix(WHITE, PURPLE, 0.45) if primary else INK_SOFT
+        )
         rect = pygame.Rect(
             x, top + 5, self._chip_width(caption, value, key), CONTROL_H - 14
         )
-        pygame.draw.rect(self.screen, WOOD if on else WOOD_DEEP, rect, border_radius=8)
-        pygame.draw.rect(self.screen, LINE, rect, 1, border_radius=8)
+        fill = PURPLE if primary else (WOOD if on else WOOD_DEEP)
+        pygame.draw.rect(self.screen, fill, rect, border_radius=8)
+        pygame.draw.rect(
+            self.screen, PURPLE if primary else LINE, rect, 1, border_radius=8
+        )
         if caption:
             label = self.small.render(caption.upper(), True, INK_SOFT)
             self.screen.blit(label, (rect.x + 13, rect.y + 4))
@@ -532,7 +598,13 @@ class Window:
             width = self._chip_width("", button.label, SHORTCUTS[name])
             right -= width
             button.rect = self._chip(
-                right, top, "", button.label, SHORTCUTS[name], button.enabled
+                right,
+                top,
+                "",
+                button.label,
+                SHORTCUTS[name],
+                button.enabled,
+                primary=name == "new",
             )
             right -= 10
 
@@ -567,6 +639,9 @@ class Window:
         pygame.draw.rect(self.screen, WOOD_DEEP, (0, top, WIDTH, PANEL_H))
         pygame.draw.line(self.screen, LINE, (0, top), (WIDTH, top), 2)
         self._draw_controls(top)
+        pygame.draw.line(
+            self.screen, LINE, (20, top + CONTROL_H), (WIDTH - 20, top + CONTROL_H), 1
+        )
         top += CONTROL_H
 
         # The score is smaller than the turn indicator on purpose. It is the
@@ -593,7 +668,8 @@ class Window:
         status = self.font.render(self.status, True, INK_SOFT)
         self.screen.blit(status, status.get_rect(center=(WIDTH // 2, top + 52)))
 
-        self._draw_hand(top + 74)
+        pygame.draw.line(self.screen, LINE, (20, top + 66), (WIDTH - 20, top + 66), 1)
+        self._draw_hand(top + 76)
 
         # Only what no control on screen already says: the two gestures that
         # have no button, because they act on a move you are part-way through.
@@ -741,28 +817,58 @@ class Window:
         self._refresh(result)
         self._agent_reply()
 
+    def _seat(self, kind: str):
+        """The agent holding ``kind``, built once and kept for the game.
+
+        The window used to call ``GameSession.agent_move_by_name``, which builds
+        a fresh seat every move. That is right for the browser page — a visitor
+        changing opponent should not pay to construct a learner — and wrong
+        here, twice over.
+
+        It threw away the solver's **transposition table** every ply, which
+        ``SolverAgent`` shares across moves on purpose so a game reuses its own
+        work. And it would rebuild the sweep reader every ply, reloading a
+        1.2 GB layer from disk each time, which is the difference between the
+        database backend being usable and being unusable.
+
+        Cleared by :meth:`_new_game`, because the solver's budget and the
+        learner's weights are both bound to one board.
+        """
+        if kind not in self._seats:
+            self._seats[kind] = build_seat(
+                kind,
+                variant=self.session.variant,
+                seed=self.seed,
+                sweep_root=self.sweep_root,
+            )
+        return self._seats[kind]
+
     def _agent_reply(self) -> bool:
         """Let whoever holds the side to move play. ``False`` if it could not.
 
-        The one failure that is expected rather than exceptional: the learner
+        The failures that are expected rather than exceptional: the learner
         seat needs weights a fresh clone does not have. Saying so in the status
         bar and putting the control back beats a window that dies mid-game.
         """
         if self.snapshot["terminal"] or self._human_to_move():
             return True
         kind = self._seat_kind(self.snapshot["to_move"])
-        self.status = (
-            "The solver is searching — the window will not respond until it answers."
-            if kind == "solver"
-            else f"{kind.title()} is thinking…"
-        )
-        self._paint()  # show the human's move before the search blocks
         try:
-            result = self.session.agent_move_by_name(kind, seed=self.seed)
-        except ChampionUnavailableError as exc:
+            agent = self._seat(kind)
+        except (ChampionUnavailableError, SweepUnavailableError) as exc:
             self.status = str(exc).splitlines()[0]
             return False
-        self._refresh(result)
+        # Named from the agent rather than the seat: with a sweep database the
+        # "solver" answers in microseconds and warning about a freeze would be
+        # false, so the window says what it actually has.
+        blocking = isinstance(agent, SolverAgent) and agent.reader is None
+        self.status = (
+            "The solver is searching — the window will not respond until it answers."
+            if blocking
+            else f"{describe_seat(agent)} is thinking…"
+        )
+        self._paint()  # show the human's move before the search blocks
+        self._refresh(self.session.agent_move(agent))
         return True
 
     def _undo(self) -> None:
@@ -806,6 +912,8 @@ class Window:
     def _new_game(self) -> bool:
         cols, _, rows = self.controls["board"].value.partition("x")
         self.session = GameSession(int(cols), int(rows), self.session.variant.arm.value)
+        # The solver's budget and the learner's weights are bound to one board.
+        self._seats.clear()
         # All three follow the board, and until the board could change none of
         # them needed to: a 3x3 drawn with a 5x5's cell list and placement puts
         # every hexagon in the wrong place and every click on the wrong cell.
@@ -874,10 +982,11 @@ def run(
     opponent: str = "heuristic",
     seed: int | None = None,
     human: str = "PURPLE",
+    sweep_root: Any = None,
 ) -> None:
     """Open the window and play. Blocks until it is closed."""
     session = GameSession(variant.n_cols, variant.n_rows, variant.arm.value)
-    Window(session, opponent, seed, human).run()
+    Window(session, opponent, seed, human, sweep_root).run()
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -899,6 +1008,17 @@ def main(argv: list[str] | None = None) -> None:
         "so --play green is how you face the advantage H1 is about",
     )
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument(
+        "--sweep",
+        nargs="?",
+        const=str(DEFAULT_SWEEP_ROOT),
+        default=None,
+        metavar="DIR",
+        help="play the solver seat from a completed retrograde sweep instead of "
+        "searching: perfect from move one, at ~3 GB resident and up to 5 s on "
+        "the move that loads the largest layer. Falls back to search on a board "
+        "with no sweep, and says which it used",
+    )
     args = parser.parse_args(argv)
 
     cols, _, rows = args.variant.lower().partition("x")
@@ -911,8 +1031,11 @@ def main(argv: list[str] | None = None) -> None:
     # raise, and a window that appears and vanishes explains nothing. Once the
     # window is up the same failure is recoverable — the control goes back —
     # because by then there is somewhere to say it.
+    sweep_root = Path(args.sweep) if args.sweep else None
     try:
-        seat = build_seat(args.opponent, variant=variant, seed=args.seed)
+        seat = build_seat(
+            args.opponent, variant=variant, seed=args.seed, sweep_root=sweep_root
+        )
     except ChampionUnavailableError as exc:
         raise SystemExit(f"  ✗ opponent seat: {exc}") from None
 
@@ -925,7 +1048,7 @@ def main(argv: list[str] | None = None) -> None:
         f"  board, colour and opponent are all changeable in the window"
     )
 
-    run(variant, args.opponent, args.seed, human)
+    run(variant, args.opponent, args.seed, human, sweep_root)
 
 
 if __name__ == "__main__":

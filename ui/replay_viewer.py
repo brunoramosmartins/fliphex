@@ -42,6 +42,8 @@ from typing import Any
 from fliphex.state import Colour
 from fliphex.variant import Arm, Variant
 from ui.pygame_ui import (
+    COORD_EMPTY,
+    COORD_FILLED,
     DANGER,
     GREEN,
     GREEN_SOFT,
@@ -60,6 +62,7 @@ from ui.pygame_ui import (
 )
 from ui.replay import Recording, RecordingError, Replay
 from ui.seats import SEAT_KINDS
+from ui.theme import TYPE_SCALE, font_families
 
 WIDTH = 900
 BOARD_H = 600
@@ -100,9 +103,13 @@ class Viewer:
         pygame.init()
         pygame.display.set_caption("FLIPHEX — replay")
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        self.font = pygame.font.SysFont("dejavusans,arial", 15)
-        self.small = pygame.font.SysFont("dejavusans,arial", 12)
-        self.big = pygame.font.SysFont("dejavusans,arial", 24, bold=True)
+        # The same stack and scale the playing window uses. This file declared
+        # its own until 2026-09-20, which made the third interface the one that
+        # would drift first.
+        families = font_families()
+        self.small = pygame.font.SysFont(families, TYPE_SCALE["micro"])
+        self.font = pygame.font.SysFont(families, TYPE_SCALE["body"])
+        self.big = pygame.font.SysFont(families, TYPE_SCALE["display"], bold=True)
         self.clock = pygame.time.Clock()
 
     # -- drawing ---------------------------------------------------------------
@@ -137,9 +144,8 @@ class Viewer:
                         slot,
                         WHITE,
                     )
-            label = self.small.render(
-                cell["name"], True, INK_SOFT if state == "EMPTY" else WHITE
-            )
+            tint = COORD_EMPTY if state == "EMPTY" else COORD_FILLED
+            label = self.small.render(cell["name"], True, tint)
             self.screen.blit(label, label.get_rect(center=centre))
 
     def _draw_panel(self) -> None:

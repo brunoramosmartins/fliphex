@@ -9,7 +9,7 @@ import pytest
 from agents.heuristic_agent import HeuristicAgent
 from agents.random_agent import RandomAgent
 from agents.solver_agent import SolverAgent
-from fliphex.variant import FIVE_BY_THREE, FULL_GAME, THREE_BY_THREE
+from fliphex.variant import FIVE_BY_THREE, FULL_GAME, THREE_BY_THREE, Arm, Variant
 from ui.seats import (
     DEFAULT_SEARCH_BELOW_K,
     DEFAULT_SOLVER_NODES,
@@ -180,3 +180,46 @@ def test_a_search_agent_is_described_with_its_budget():
 
 def test_the_plain_agents_are_described_by_name():
     assert describe_seat(build_seat("heuristic", variant=FULL_GAME)) == "heuristic"
+
+
+# -- the sweep backend ---------------------------------------------------------
+
+
+def test_the_sweep_directory_is_named_by_board_and_arm():
+    """One completed sweep per arm, because the decks differ (adr-009)."""
+    from ui.seats import sweep_dir
+
+    assert sweep_dir(FIVE_BY_THREE).name == "5x3-h1"
+    assert sweep_dir(Variant(5, 3, Arm.H2)).name == "5x3-h2"
+
+
+def test_a_missing_sweep_explains_itself_rather_than_raising_filenotfound(tmp_path):
+    from ui.seats import SweepUnavailableError, load_sweep
+
+    with pytest.raises(SweepUnavailableError) as caught:
+        load_sweep(FIVE_BY_THREE, tmp_path)
+    message = str(caught.value)
+    assert "gitignored" in message, "a clone has none, and that is distribution"
+    assert "exp002_solve_5x3.py" in message, "the remedy has to be runnable"
+
+
+def test_asking_for_a_sweep_that_is_not_there_falls_back_to_search(tmp_path):
+    """The flag says which backend is *preferred*, not which is mandatory.
+
+    Every interface reports the backend it got through `describe_seat`, so a
+    fallback is visible rather than silent — which is why it may be silent here.
+    """
+    seat = build_seat("solver", variant=FIVE_BY_THREE, sweep_root=tmp_path)
+    assert seat.reader is None
+    assert "database" not in describe_seat(seat)
+
+
+def test_the_database_backend_is_named_as_perfect_not_as_a_budget():
+    """A lookup has no node count to report and nothing to fall back to."""
+
+    class _Reader:
+        pass
+
+    assert describe_seat(SolverAgent(reader=_Reader())) == (
+        "solver (perfect, database lookup)"
+    )

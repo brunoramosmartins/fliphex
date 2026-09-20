@@ -45,6 +45,7 @@ from fliphex.variant import Arm, Variant
 from ui.seats import (
     DEFAULT_RUN_ROOT,
     DEFAULT_SIMULATIONS,
+    DEFAULT_SWEEP_ROOT,
     SEAT_KINDS,
     ChampionUnavailableError,
     build_seat,
@@ -500,6 +501,16 @@ def main(argv: list[str] | None = None) -> None:
         default=None,
         help="override the solver's node budget (default is per board size)",
     )
+    parser.add_argument(
+        "--sweep",
+        nargs="?",
+        const=str(DEFAULT_SWEEP_ROOT),
+        default=None,
+        metavar="DIR",
+        help="play the solver seat from a completed retrograde sweep instead of "
+        "searching: perfect from move one, at ~3 GB resident. Falls back to "
+        "search on a board with no sweep, and the header says which it used",
+    )
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--no-color", action="store_true", help="disable ANSI colour")
     args = parser.parse_args(argv)
@@ -519,6 +530,7 @@ def main(argv: list[str] | None = None) -> None:
                 run_root=args.az_run,
                 simulations=args.simulations,
                 max_nodes=args.solver_nodes,
+                sweep_root=Path(args.sweep) if args.sweep else None,
             )
         except ChampionUnavailableError as exc:
             raise SystemExit(f"  ✗ {colour.name} seat: {exc}") from None

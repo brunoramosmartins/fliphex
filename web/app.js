@@ -334,22 +334,27 @@ function el(name, attrs = {}, parent = null) {
   return node;
 }
 
-/* One arrow, drawn from just outside the centre to just inside the edge. */
+/* One arrow, drawn from just outside the centre to just inside the edge.
+ *
+ * The four fractions match `ui/pygame_ui.py`'s ARROW_* constants. Widened and
+ * thinned on 2026-09-20: the old 0.22/0.66/0.82 with a 0.13 wing drew six
+ * short fat arrows per tile, and a hand of those reads as six little diagrams
+ * rather than as six symbols. Same information, less visual weight. */
 function drawArrow(parent, cx, cy, direction, className, headClass) {
   const a = directionAngle(direction);
   const [dx, dy] = [Math.cos(a), Math.sin(a)];
-  const from = 0.22;
-  const to = 0.66;
+  const from = 0.20;
+  const to = 0.72;
   el("line", {
     x1: cx + dx * from,
     y1: cy + dy * from,
     x2: cx + dx * to,
     y2: cy + dy * to,
-    "stroke-width": 0.06,
+    "stroke-width": 0.042,
     class: `arrow ${className}`,
   }, parent);
-  const tip = 0.82;
-  const wing = 0.13;
+  const tip = 0.88;
+  const wing = 0.105;
   const [px, py] = [-dy, dx];
   el("polygon", {
     points: [

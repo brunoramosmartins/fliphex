@@ -388,6 +388,30 @@ def test_the_replay_viewer_opens_paints_and_seeks():
 
 # -- which colour the person holds ---------------------------------------------
 
+
+def test_the_net_badge_flips_below_a_cell_it_would_clip_above():
+    """Caught in a screenshot: previewing on the top row drew it off-window.
+
+    The badge is the one number the rotation preview exists to show, and it was
+    invisible on the row a player is most likely to open on.
+    """
+    from ui.pygame_ui import badge_y
+
+    # Comfortably inside: above, as normal.
+    assert badge_y(300.0, 50.0, 20.0, 580.0) == pytest.approx(232.5)
+    # Near the top: below instead.
+    assert badge_y(40.0, 50.0, 20.0, 580.0) == pytest.approx(107.5)
+    # Near the bottom: back above.
+    assert badge_y(560.0, 50.0, 20.0, 580.0) == pytest.approx(492.5)
+
+
+def test_a_cell_too_tight_for_either_side_keeps_the_badge_on_the_cell():
+    """Never off-window, even on a board so cramped neither side fits."""
+    from ui.pygame_ui import badge_y
+
+    assert badge_y(50.0, 60.0, 20.0, 100.0) == pytest.approx(50.0)
+
+
 # -- the control strip ---------------------------------------------------------
 
 
@@ -512,7 +536,10 @@ def test_the_person_can_hold_either_colour():
 
 
 _CONTROL_SMOKE = """
+from ui import pygame_ui
 from ui.pygame_ui import Window
+
+_real_build_seat = pygame_ui.build_seat
 from ui.seats import ChampionUnavailableError, SEAT_KINDS
 from ui.session import GameSession
 
@@ -551,19 +578,31 @@ assert window.snapshot["ply"] == 3, "the new seat did not answer"
 window._on_click(window.controls["side"].rect.center, backwards=True)
 assert window.controls["side"].value == "purple"
 
+# Seats are built once and kept: the solver shares a transposition table
+# across moves on purpose, and a sweep reader would reload a 1.2 GB layer every
+# ply if it were rebuilt.
+window.controls["side"].index = 0
+first = window._seat("heuristic")
+assert window._seat("heuristic") is first, "the seat was rebuilt mid-game"
+
 # A seat that cannot be built is not the seat. The learner needs weights a
 # fresh clone does not have, and that is the expected failure, not a crash.
-window.controls["side"].index = 1                       # green: purple is the agent
+window.controls["side"].index = 1   # you hold green, so purple is the agent
+assert not window._human_to_move(), "the setup must leave the agent to move"
+# Step onto a seat the cache has never held, or `_seat` answers from the cache
+# and `build_seat` is never reached — which is what the first version of this
+# check did, silently testing nothing.
+window.controls["opponent"].index = SEAT_KINDS.index("uct")
 before = window.controls["opponent"].index
 def _no_champion(*args, **kwargs):
     raise ChampionUnavailableError("no trained network in data/az-runs/nowhere")
-window.session.agent_move_by_name = _no_champion
+pygame_ui.build_seat = _no_champion
 window._apply_control("opponent", 1)
 assert window.controls["opponent"].index == before, "an unbuildable seat was kept"
 assert "no trained network" in window.status, window.status
 
 # The board is the one control that does restart, and everything follows it.
-del window.session.agent_move_by_name
+pygame_ui.build_seat = _real_build_seat
 window.controls["side"].index = 0
 window._on_click(window.controls["board"].rect.center)
 assert window.controls["board"].value == "5x3"
@@ -571,6 +610,9 @@ assert window.snapshot["ply"] == 0, "a new board kept the old position"
 assert len(window.cells) == 15, len(window.cells)
 assert len(window.names) == 15, "the cell names did not follow the board"
 assert len(window.snapshot["hands"]["PURPLE"]) == 8, "the 5x3 deck is reduced"
+assert window._seats == {} or all(
+    s is not first for s in window._seats.values()
+), "a seat bound to the old board survived the new one"
 window._paint()   # a wrongly-sized placement would put hexagons off screen
 assert all(
     0 <= window.placement.centre(c)[0] <= 900 for c in window.cells

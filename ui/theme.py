@@ -64,15 +64,78 @@ DARK: dict[str, str] = {
     "green-soft": "#6fc08d",
 }
 
-#: Tokens the page needs and a drawn window has no use for.
+#: The type stack, in preference order, shared by both renderers.
+#:
+#: The window used to ask pygame for ``SysFont("dejavusans,arial")``, which
+#: resolves against whatever the machine happens to have — DejaVu on this Linux,
+#: Arial on Windows. So the same window had two different typefaces depending on
+#: where it ran, and neither one matched the page's ``system-ui`` stack. That is
+#: the same class of defect as the hand-copied palette: a declaration in each
+#: interface, and nothing making them agree.
+#:
+#: The first four are not installed here and are listed anyway. They are what
+#: this resolves to *if* the fonts are ever vendored under ``assets/fonts/``,
+#: and until then both interfaces fall through to DejaVu together rather than
+#: separately. Vendoring is a decision about adding binary assets to the
+#: repository and has not been taken.
+FONT_STACK: tuple[str, ...] = (
+    "IBM Plex Sans",
+    "Source Sans 3",
+    "Inter",
+    "Noto Sans",
+    "DejaVu Sans",
+    "Segoe UI",
+    "Roboto",
+    "Helvetica Neue",
+    "Arial",
+)
+
+#: The type scale, in pixels. Five steps, named by role rather than by size, so
+#: the window and the page can be asked for the same thing.
+TYPE_SCALE: dict[str, int] = {
+    "micro": 11,
+    "small": 12,
+    "body": 15,
+    "lead": 20,
+    "display": 24,
+}
+
+
+def font_families() -> str:
+    """The stack as pygame's :func:`SysFont` wants it: comma-separated names."""
+    return ",".join(FONT_STACK)
+
+
+def font_css() -> str:
+    """The stack as a CSS ``font-family`` value."""
+    quoted = [f'"{name}"' if " " in name else name for name in FONT_STACK]
+    return ", ".join([*quoted, "sans-serif"])
+
+
+#: Tokens the page needs and a drawn window has no use for. ``font-sans`` is
+#: the one exception: it is the same stack the window resolves, written the way
+#: CSS wants it, so the two cannot be changed apart.
 WEB_ONLY: dict[str, str] = {
     "shadow": "0 1px 2px rgba(35, 32, 29, .08), 0 6px 20px rgba(35, 32, 29, .07)",
     "radius": "12px",
+    "font-sans": font_css(),
 }
 
 DARK_WEB_ONLY: dict[str, str] = {
     "shadow": "0 1px 2px rgba(0, 0, 0, .3), 0 6px 20px rgba(0, 0, 0, .35)",
 }
+
+
+def mix(
+    a: tuple[int, int, int], b: tuple[int, int, int], t: float
+) -> tuple[int, int, int]:
+    """Blend two colours, ``t`` of the way from ``a`` to ``b``.
+
+    For the things that should recede rather than disappear — a cell's
+    coordinate is wanted when looked for and unwanted the rest of the time, and
+    weight is a better answer to that than a toggle.
+    """
+    return tuple(round(x + (y - x) * t) for x, y in zip(a, b, strict=True))  # type: ignore[return-value]
 
 
 def rgb(token: str, palette: dict[str, str] | None = None) -> tuple[int, int, int]:

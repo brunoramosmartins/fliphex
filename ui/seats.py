@@ -59,6 +59,60 @@ DEFAULT_SEARCH_BELOW_K = 8
 #: that a move lands in seconds rather than minutes.
 DEFAULT_SIMULATIONS = 400
 
+#: Where ``scripts/exp002_solve_5x3.py --checkpoint`` writes its completed
+#: retrograde layers, one directory per arm. Gitignored: the 5x3's sixteen
+#: layers are 4.1 GB and were never distributed.
+DEFAULT_SWEEP_ROOT = Path("data/checkpoints")
+
+
+class SweepUnavailableError(RuntimeError):
+    """No usable completed sweep for this board at the path asked for."""
+
+
+def sweep_dir(variant: Variant, root: Path = DEFAULT_SWEEP_ROOT) -> Path:
+    """Where this variant's completed layers would live."""
+    return root / f"{variant.n_cols}x{variant.n_rows}-{variant.arm.value}"
+
+
+def load_sweep(variant: Variant, root: Path = DEFAULT_SWEEP_ROOT):
+    """Open the completed retrograde sweep for ``variant``.
+
+    This is the difference between an agent that searches and an agent that
+    *knows*. With a reader every move is a table lookup into a database that
+    holds the value of every configuration, so ``proved_rate`` is 1.0 from the
+    opening — Allis's "strongly solved", made playable.
+
+    The cost is real and is the reason this is opt-in. Measured on the 5x3,
+    a full game: peak resident **3.0 GB**, worst single move **4.9 s** (layer 9
+    alone is 1.2 GB), and 4.1 GB read from disk across sixteen plies. The layer
+    cache holds three at a time, so the peak is the three largest consecutive
+    layers rather than the whole database.
+
+    Raises:
+        SweepUnavailableError: If no completed sweep is there. A clone has
+            none, which is a fact about distribution rather than a bug.
+    """
+    from solver.checkpoint import Checkpoint  # local: keeps this import cheap
+    from solver.sweep_reader import SweepReader
+
+    directory = sweep_dir(variant, root)
+    if not (directory / "manifest.json").exists():
+        raise SweepUnavailableError(
+            f"no completed sweep in {directory}/.\n"
+            f"  data/checkpoints/ is gitignored — the layers are 4.1 GB on the\n"
+            f"  5x3 and were never distributed. Produce them with:\n"
+            f"    .venv/bin/python scripts/exp002_solve_5x3.py --checkpoint\n"
+            f"  Without one the solver seat searches instead, which on any board\n"
+            f"  above 9 cells means heuristic play until 8 cells remain."
+        )
+    try:
+        return SweepReader(variant, Checkpoint(root=directory))
+    except SystemExit as exc:
+        # SweepReader is a script-facing instrument and *exits* on an
+        # incomplete checkpoint. Building a seat is a library call, so the exit
+        # becomes an error a caller can catch and an interface can print.
+        raise SweepUnavailableError(str(exc)) from None
+
 
 def solver_budget(variant: Variant) -> tuple[int | None, int | None]:
     """Return ``(max_nodes, search_below_k)`` suited to ``variant``.
@@ -157,6 +211,7 @@ def build_seat(
     simulations: int = DEFAULT_SIMULATIONS,
     max_nodes: int | None = None,
     search_below_k: int | None = None,
+    sweep_root: Path | None = None,
 ) -> Agent | None:
     """Build the agent for one seat. ``None`` means a human plays it.
 
@@ -187,6 +242,15 @@ def build_seat(
     if kind == "heuristic":
         return HeuristicAgent(seed=seed)
     if kind == "solver":
+        if sweep_root is not None:
+            # "Use the database where one exists" rather than "refuse without
+            # one": the flag is about which backend is *preferred*, and every
+            # interface reports which it got through `describe_seat`, so a
+            # fallback is visible rather than silent.
+            try:
+                return SolverAgent(reader=load_sweep(variant, sweep_root), seed=seed)
+            except SweepUnavailableError:
+                pass
         budget_nodes, budget_k = solver_budget(variant)
         return SolverAgent(
             max_nodes=budget_nodes if max_nodes is None else max_nodes,
@@ -208,6 +272,11 @@ def describe_seat(agent: Agent | None) -> str:
     if agent is None:
         return "human"
     if isinstance(agent, SolverAgent):
+        if agent.reader is not None:
+            # Not a budget at all: every move is a lookup into a database that
+            # holds the value of every position, so there is no node count to
+            # report and nothing to fall back to.
+            return "solver (perfect, database lookup)"
         budget = "exhaustive" if agent.search_below_k is None else "endgame-exact"
         return f"solver ({budget}, {agent.max_nodes:,} nodes)"
     simulations = getattr(agent, "simulations", None)
