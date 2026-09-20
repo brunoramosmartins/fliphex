@@ -1,25 +1,32 @@
-"""The API the browser page calls. Plain dicts in, plain dicts out.
+"""One game, as every interface sees it. Plain dicts in, plain dicts out.
 
-This is the whole Python surface the web interface has. It is deliberately small
-and deliberately **testable natively**: every function here runs under CPython in
-the test suite and under Pyodide in the page, and nothing in it touches a browser
-API. When the page is wrong, the question "is it the rules or is it the drawing?"
-has to be answerable, and it is only answerable if this half can be exercised
-without a browser.
+This is the Python surface the *graphical* interfaces share — the browser page
+and the pygame window both drive it, and neither one holds a rule. It started
+life as ``ui/web_bridge.py``, named for its only caller; the name was wrong as
+soon as a second interface wanted the same thing, which is why it is
+:mod:`ui.session` now.
+
+It is deliberately small and deliberately **testable natively**: every function
+here runs under CPython in the test suite, under Pyodide in the page and under
+CPython again behind pygame, and nothing in it touches a display. When a board
+looks wrong, the question "is it the rules or is it the drawing?" has to be
+answerable, and it is only answerable if this half can be exercised without
+either.
 
 Per [adr-013](../docs/adr/adr-013-interface-targets.md) clause 2, the rules are
-**never reimplemented in JavaScript**. The page draws; this decides. Every move
-the page can make is one ``fliphex.legal_moves`` returned, and every flip it
-animates is one ``fliphex.apply_move`` produced.
+**never reimplemented** outside the engine. The interface draws; this decides.
+Every move an interface can offer is one ``fliphex.legal_moves`` returned, and
+every flip it animates is one ``fliphex.apply_move`` produced.
 
-The layout is here rather than in the page
-------------------------------------------
+The layout is here rather than in the interface
+-----------------------------------------------
 :func:`layout` computes each cell's centre in hex-radius units. It lives on this
-side because the page must not invent a second geometry — ``docs/board-geometry.md``
-is generated from the engine, and a hand-placed SVG would be a third description
-of the board able to disagree with both. :func:`layout` is checked against
-``Board.neighbour`` by test, so a wrong coordinate is a failure rather than a
-picture that looks slightly off.
+side because no interface may invent a second geometry — ``docs/board-geometry.md``
+is generated from the engine, and a hand-placed board would be a third
+description able to disagree with both. Two renderers making the same mistake
+independently is worse than one making it, so neither is allowed to try:
+:func:`layout` is checked against ``Board.neighbour`` by test, and both the SVG
+page and the pygame window scale its output rather than recomputing it.
 """
 
 from __future__ import annotations
@@ -120,7 +127,7 @@ def _net_flips(effects: list[dict[str, Any]]) -> int:
     )
 
 
-class WebGame:
+class GameSession:
     """One game, with an undo stack. Everything the page needs is a method here.
 
     Holds no agent. The page names a seat per move instead, so a visitor can

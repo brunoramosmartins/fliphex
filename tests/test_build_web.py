@@ -42,7 +42,7 @@ def test_the_learner_agent_is_not_shipped():
 
 def test_the_bridge_and_the_seats_are_shipped():
     payload = build_web.sources()
-    assert "ui/web_bridge.py" in payload
+    assert "ui/session.py" in payload
     assert "ui/seats.py" in payload
 
 

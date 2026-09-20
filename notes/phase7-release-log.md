@@ -182,15 +182,15 @@ real dependency. It refused the first build it was given, correctly, naming
 rather than declared.
 
 **The page draws and nothing else.** Every legality question, flip and score
-comes back from `ui/web_bridge.py`. Cell positions come from
-`web_bridge.layout`, and `tests/test_web_bridge.py` asserts each centre lands
+comes back from `ui/session.py`. Cell positions come from
+`session.layout`, and `tests/test_session.py` asserts each centre lands
 exactly where `Board.neighbour` says the neighbour is — on all three boards, in
 all six directions. A cell drawn in the wrong place is a test failure, not a
 picture that looks slightly off.
 
 One thing was caught by writing it down: the first version carried a `BrowserGame`
 subclass **inside a Python string in `app.js`** — rules-adjacent code in a file
-no test can reach. Both its methods moved to `web_bridge.py` and got tests.
+no test can reach. Both its methods moved to `session.py` and got tests.
 
 ### Verified in the target environment, not only natively
 
@@ -253,12 +253,38 @@ shipped code is a different thing, and the case for bringing it in is now
 concrete rather than hypothetical — it would have caught both defects before
 either reached a browser. **Open decision, not a closed one.**
 
+### The browser cost is registered before it is measured — [EXP-019](../experiments/registry.md)
+
+The first play session produced *"fast enough not to bother me"*. That is an
+impression, it is not recorded as a measurement, and EXP-018's lesson is why:
+the entry has to exist to fix the **decision rule** before the number is visible.
+
+So EXP-019 was registered first, and it decides three pieces of pending work
+rather than merely reporting a duration. **The split render** — adr-013 says the
+board must draw before Python is ready, and it does not — is built only if warm
+time-to-playable exceeds 1 s. **A byte-counting indicator** only if cold exceeds
+10 s. **The exhaustive 3×3 solver seat** does not ship if its browser solve
+exceeds 10 s. The two limits are adr-013's, from Nielsen, external and published
+in 1993.
+
+The page now times itself: four cumulative marks on `window.fliphexMarks`, and
+`window.fliphexBench()` for the solver probe. A stopwatch cannot separate
+`chrome`, `runtime`, `engine` and `playable`, and the distinction is the whole
+point — a reader who cannot tell a slow runtime from a slow import learns
+nothing about which one to fix.
+
+Also fixed: the `favicon.ico` 404 in the server log. Inline SVG data URI, so the
+page still needs exactly one request beyond its own four files.
+
 ### What is not done
 
 No real browser has run this — jsdom is not a browser and Node is V8 with local
-files. A browser adds a different cold start and a CDN download, and adr-013
-says explicitly that its solver rows may not survive that measurement. The page
-is not linked from anywhere until it has been.
+files. **EXP-019 exists precisely to close that**, and until it does the page is
+not linked from anywhere.
+
+The split render is deliberately **not** built yet. Building it before measuring
+would be optimising against an unmeasured baseline, which is the habit gate 1
+exists to break; EXP-019's first rule decides whether it is needed at all.
 
 ## `ui/pygame_ui.py` — the physical palette, on screen
 

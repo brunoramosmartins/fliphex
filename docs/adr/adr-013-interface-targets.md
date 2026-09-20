@@ -182,6 +182,30 @@ cold CDN, a phone — clause 8's first cut is still free but clause 4's solver r
 may not survive. The measurement is cheap once the page exists, and is owed
 before the page is linked from anywhere.
 
+## Amendment, 2026-09-21 — the deployed page carries no agent stronger than the heuristic
+
+**Author's decision, not a measurement.** Clause 4 shipped the solver seats to
+the browser subject to EXP-019's third rule. They are now withdrawn from the
+**deployed** page: what the public link offers is human-versus-human and
+human-versus-heuristic, and nothing above that.
+
+The seats are not deleted. `ui/seats.py` builds all six and the local page
+serves them, so anyone running the repository plays the exhaustive 3×3 solver in
+a browser. The withdrawal is about what is published, not about what exists.
+
+**This makes EXP-019's third rule moot**, and the entry records it that way
+rather than repointing it at some other decision — the same status EXP-004 and
+EXP-005 carry, and for the same reason: the decision the rule fed has been taken
+on other grounds. The 3×3 browser solve may still be timed, and its number is now
+descriptive rather than decisive.
+
+Two reasons the decision is sound independent of any timing. A page that offers
+perfect play on one board and heuristic play on another invites the comparison
+its own verdicts refuse — H1 is `exact` on the 3×3 and `not decidable` on the
+5×5, and a visitor losing to both would reasonably conclude they are the same
+kind of opponent. And a solver seat is the one thing on the page that can hang a
+tab, which no first impression should risk.
+
 ## Related
 
 - [adr-003](adr-003-piece-representation.md) — inert placed tiles; why the state

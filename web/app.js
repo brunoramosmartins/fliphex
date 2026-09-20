@@ -1,12 +1,12 @@
 /* FLIPHEX in the browser.
  *
  * This file draws and nothing else. Every legality question, every flip and
- * every score comes back from `ui/web_bridge.py` running under Pyodide, per
+ * every score comes back from `ui/session.py` running under Pyodide, per
  * adr-013 clause 2: the rules are the engine that produced the project's exact
  * solutions, not a second implementation that could disagree with it.
  *
  * The one piece of geometry here is the hexagon's own outline. Cell *positions*
- * come from `ui.web_bridge.layout`, which is checked against `Board.neighbour`
+ * come from `ui.session.layout`, which is checked against `Board.neighbour`
  * by test — so a cell drawn in the wrong place is a test failure rather than a
  * picture that looks slightly off.
  */
@@ -22,7 +22,7 @@ const PY_ROOT = "/app";
 const VERTEX_ANGLES = [0, 60, 120, 180, 240, 300];
 
 /* Direction d, clockwise from North, points at angle -90 + 60d degrees. The
- * same six offsets `tests/test_web_bridge.py` asserts the layout against. */
+ * same six offsets `tests/test_session.py` asserts the layout against. */
 const directionAngle = (d) => (-90 + 60 * d) * (Math.PI / 180);
 
 const $ = (id) => document.getElementById(id);
@@ -60,6 +60,54 @@ const state = {
   selectedCell: null,
   busy: false,
 };
+
+/* -- instrumentation (EXP-019) --------------------------------------------- */
+
+/* The page times itself, because a stopwatch cannot separate these four and an
+ * impression is not a measurement. Marks are cumulative from navigation start;
+ * both totals and deltas are reported, since a reader who sees only deltas
+ * cannot tell a slow runtime from a slow import. */
+const MARK_ORDER = ["chrome", "runtime", "engine", "playable"];
+const marks = new Map();
+
+function mark(name) {
+  marks.set(name, performance.now());
+}
+
+function reportMarks() {
+  const rows = [];
+  let previous = 0;
+  for (const name of MARK_ORDER) {
+    if (!marks.has(name)) continue;
+    const total = marks.get(name);
+    rows.push({ mark: name, deltaMs: Math.round(total - previous), totalMs: Math.round(total) });
+    previous = total;
+  }
+  // Exposed so a measurement run can read it without scraping the console.
+  window.fliphexMarks = rows;
+  console.table(rows);
+
+  const playable = marks.get("playable");
+  if (playable !== undefined) {
+    ui.badge.textContent = `ready in ${(playable / 1000).toFixed(2)}s`;
+    ui.badge.title = rows.map((r) => `${r.mark} +${r.deltaMs}ms`).join("  ");
+  }
+  return rows;
+}
+
+/* Timed around the one SolverAgent call, per EXP-019's third rule. Exposed on
+ * `window` rather than wired to a control: it is a measurement, not a feature,
+ * and it is expensive enough that nobody should trigger it by accident. */
+async function timeSolverOpening(cols = 3, rows = 3) {
+  const conv = { dict_converter: Object.fromEntries };
+  const probe = state.py.globals.get("new_game")(cols, rows);
+  const started = performance.now();
+  probe.agent_move_by_name("solver");
+  const elapsed = Math.round(performance.now() - started);
+  probe.destroy();
+  console.log(`solver opening on ${cols}x${rows}: ${elapsed} ms`);
+  return elapsed;
+}
 
 /* -- hexagon geometry ------------------------------------------------------ */
 
@@ -472,9 +520,11 @@ async function startGame() {
 
 async function boot() {
   try {
+    mark("chrome");
     ui.bootText.textContent = "Downloading the Python runtime…";
     const { loadPyodide } = await import(`${PYODIDE}pyodide.mjs`);
     const py = await loadPyodide({ indexURL: PYODIDE });
+    mark("runtime");
 
     ui.bootText.textContent = "Unpacking the engine…";
     const payload = await (await fetch("payload.json")).json();
@@ -488,21 +538,24 @@ async function boot() {
     }
 
     // No Python is defined here. Everything the page calls lives in
-    // `ui/web_bridge.py`, where the test suite can reach it — a rule the page
+    // `ui/session.py`, where the test suite can reach it — a rule the page
     // broke once already by carrying its own subclass in this string.
     ui.bootText.textContent = "Starting the rules…";
     await py.runPythonAsync(`
 import sys
 sys.path.insert(0, ${JSON.stringify(PY_ROOT)})
-from ui.web_bridge import WebGame
-new_game = WebGame
+from ui.session import GameSession
+new_game = GameSession
 `);
 
     state.py = py;
+    mark("engine");
     ui.badge.textContent = "ready";
     ui.badge.classList.add("ready");
     ui.newGame.disabled = false;
     await startGame();
+    mark("playable");
+    reportMarks();
   } catch (error) {
     ui.badge.textContent = "failed";
     ui.badge.classList.add("failed");
@@ -512,6 +565,10 @@ new_game = WebGame
     console.error(error);
   }
 }
+
+/* EXP-019's console surface. `fliphexMarks` is filled at boot; the solver probe
+ * is a function so that nothing expensive runs unless it is asked for. */
+window.fliphexBench = timeSolverOpening;
 
 ui.newGame.addEventListener("click", startGame);
 ui.variant.addEventListener("change", () => { if (state.py) startGame(); });

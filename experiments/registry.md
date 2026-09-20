@@ -35,6 +35,7 @@ Freely editable (append-only in practice).
 | EXP-016 | 2026-09-18 | H1 | 1 + 2 | H1's shipped-board arm: the first-player rate under named, imperfect play | Shipped 5×5-`h1`. Primary: prior-free UCT self-play, 400 simulations, **20 seeds × 250 = 5,000 games** (20.5 h at a measured 14.77 s/game). Secondary: the five EXP-015 champions, 250 games each | 1–20 | **withdrawn before running** | **Withdrawn 2026-09-18, same day, by red-team.** Prior-free UCT at 400 simulations visits **10–18 of 325** root children (4%) and the coverage is seat-dependent, so the design measured cell-enumeration order. Six further blocking findings, including a seed schedule sharing **975 of 5,000** player seeds. No data collected. Superseded by **EXP-017**. |
 | EXP-017 | 2026-09-18 | H1 | 1 + 2 | H1's shipped-board arm: the first-player rate under exact endgame play | Shipped 5×5-`h1`. `SolverAgent` both seats (`max_nodes` 2M, `search_below_k` 8, heuristic fallback), **5,000 games, one match seed**, 11.0 h single-worker at a measured 7.95 s/game. Diversity from the heuristic's random tie-break; `proved_rate` ~31% | 1 | **complete** | **First player wins 2,712/5,000 = 54.2% [52.9%, 55.6%]**, interval entirely above 50%, under play that is heuristic for ~17 plies and **exact for the last 8** (`proved_rate` **32.0%**, and no rate may be quoted without it). 5,000/5,000 games distinct; ply accounting closes at 125,000 exactly. All three registered predictions held. **Corroborates H1's direction on a board no solver reaches; does not demonstrate it** — H1's evidence is the four exhaustive solves. [`exp017-first-player-5x5.json`](../results/exp017-first-player-5x5.json) |
 | EXP-018 | 2026-09-21 | — | 3 | Engine cost under Pyodide (CPython on WebAssembly) against native CPython, for the browser-build decision | Same tracked instrument both sides — `scripts/bench_engine.py`, pure stdlib, unmodified under Emscripten. Six workloads, 1 s budget each, shipped 5×5 plus the 3×3 solve | — | **complete (registered retrospectively — see the entry)** | **WebAssembly costs ~3×, not the order of magnitude assumed.** Slowdown is 2.84–3.43× across all six workloads: `legal_moves` 3.43×, `apply_move` 2.97×, random playout 3.30×, heuristic game 2.96×, UCT 2.93×, 3×3 solve 2.84×. In the browser a heuristic move costs **4 ms** and a whole heuristic game 99 ms, so the planned web v1 is free; the 3×3 opening solve costs **7.5 s** once; UCT at the trained 400-simulation budget costs **11.8 s per move**, which is not interactive. Pyodide boot ~1.9 s from local disk in node — **not** a browser-over-network figure and not to be quoted as one. |
+| EXP-019 | 2026-09-21 | — | 3 | Browser cold- and warm-cache cost of the web build, against adr-013's declared response-time limits | `web/` served over HTTP, instrumented by `web/app.js` itself. Four marks per load, cold and warm cache, on at least two browsers and one phone, 5 loads per cell | — | **registered 2026-09-21, before the run** | |
 
 **Registration basis.** EXP-001 through EXP-005 are registered against the H1/H2
 text at tag `v0.3-hypotheses`. Any post-lock amendment to that text is recorded
@@ -5884,3 +5885,123 @@ measure.
 
 Not that 3× holds on other hardware, other browsers, or WASM engines other than
 V8. One machine, one runtime.
+
+---
+
+### EXP-019 — what the browser build costs a first-time visitor
+
+**Registered 2026-09-21, before the run.** EXP-018 was not, and its own entry
+records what that cost: a registration's work is to fix the decision rule before
+the number is visible, and there was no rule to protect. This entry exists to
+carry one.
+
+#### The decision, named first
+
+Three pieces of work are pending on this measurement, and each has a threshold
+declared here **before anything is measured**:
+
+1. **The split render.** [adr-013](../docs/adr/adr-013-interface-targets.md)'s
+   consequences say the page "must be designed to render the board *before*
+   Python is ready". It does not: the board appears only once the engine
+   imports. Building it means generating the three boards' layouts at bundle
+   time so the page can draw an inert board immediately.
+   **Rule: build it if warm-cache time-to-playable exceeds 1 s.** Otherwise it
+   is recorded as work *not done* rather than work forgotten.
+2. **A byte-counting progress indicator**, and revisiting the CDN.
+   **Rule: build it if cold-cache time-to-playable exceeds 10 s.**
+3. **The exhaustive solver seat on the 3×3.** adr-013 clause 4 ships it on a
+   7.5 s opening solve — which is a *Node* figure.
+   **Rule: the seat does not ship if the browser solve exceeds 10 s.**
+
+The two limits are adr-013's, taken from Nielsen's response-time thresholds:
+1 s preserves flow of thought, 10 s is the limit of held attention. They are
+external to this engine and published in 1993, which is the whole reason they
+can judge a number measured in 2026. Provenance: **cited, not verified**.
+
+#### Why the quantity is free to vary — gate 9
+
+Boot cost depends on download bandwidth, WASM engine, device class and cache
+state, none of which this project controls. It is not fixed by the rules the way
+H5's measures were, and the three rules above resolve differently across the
+plausible range rather than all landing the same way. Checked by computing each
+conclusion at the range's floor and ceiling, per the gate's 2026-09-18
+amendment.
+
+#### Instrument
+
+`web/app.js` records its own marks with `performance.now()` and prints them to
+the console and to the page. A stopwatch cannot separate the four, and an
+impression — *"fast enough not to bother me"*, which is what the first play
+session produced — is not a measurement and is not recorded as one.
+
+Four marks per load:
+
+| mark | from page load to |
+|---|---|
+| `chrome` | the header and panels painted |
+| `runtime` | Pyodide initialised |
+| `engine` | `ui.session` imported, board drawn |
+| `playable` | the opening hand rendered and clickable |
+
+Plus, on demand, the 3×3 opening solve, timed around the one `SolverAgent` call.
+
+#### Configuration
+
+Served over plain HTTP from the repository, not from GitHub Pages — the CDN is
+the same either way and the page's own bytes are 60 KB against the runtime's
+14 MB, so the host is not the variable. **Cold cache** means a hard reload with
+the cache disabled; **warm** means a normal reload. At least two browsers, at
+least one phone, **5 loads per cell**, all reported — no cell is averaged away
+and no load is dropped for looking wrong.
+
+The four marks are cumulative from navigation start, so they are reported as
+deltas *and* totals; a reader who only sees deltas cannot tell a slow runtime
+from a slow import.
+
+#### Registered predictions
+
+Written before the run, so they can be wrong:
+
+1. **Warm-cache `playable` under 3 s.** Node reached the engine in 1.9 s plus
+   0.13 s, and a warm browser cache should not be far off.
+2. **Cold cache is dominated by transfer, not compute** — the runtime is 14 MB
+   against 60 KB of FLIPHEX, so cold time should track bandwidth and barely move
+   with device speed.
+3. **The page's own bytes are under 1% of the cold transfer.**
+4. **The 3×3 browser solve lands within 1.5× of Node's 7.5 s**, since EXP-018
+   found the interpreter cost flat at 2.84–3.43× and V8 is V8.
+
+#### Falsifier
+
+If cold and warm differ by less than 2×, the cache distinction this protocol is
+built on is not real, the numbers do not mean what the rules above assume, and
+**the rules are not applied** — the protocol is rewritten instead. A measurement
+that cannot tell its own two conditions apart decides nothing.
+
+#### Amendment, 2026-09-21 — rule 3 is moot, and one observation is not the run
+
+**The third rule no longer decides anything.** adr-013's amendment of the same
+day withdraws every agent above the heuristic from the *deployed* page by
+author's decision, so whether the 3×3 browser solve clears 10 s no longer selects
+anything. Recorded as **moot**, the status EXP-004 and EXP-005 carry, rather than
+repointed at a decision it was not registered against. The solve may still be
+timed with `window.fliphexBench(3, 3)`; the number is descriptive now.
+
+Rules 1 and 2 stand unchanged — the split render and the progress indicator are
+still open, and both are about the page everyone loads.
+
+**One load reported `ready in 2.12s`.** Cache state unrecorded, one browser, one
+device, `n = 1`. It is **not** EXP-019 data and is not entered in the table. It
+is noted because it is suggestive in a direction that matters — 2.12 s is above
+rule 1's 1 s threshold, which would fire the split render — and precisely
+because it is suggestive it must not be acted on. Five loads per cell, cold and
+warm, or nothing.
+
+#### What this does not set out to establish
+
+Not that the page is pleasant to use. That is the play-testing the author is
+doing separately, and it produces different evidence which must not be pooled
+with these numbers.
+
+Not an average across devices. Five loads on one phone is a description of that
+phone. The table reports cells, not a headline.

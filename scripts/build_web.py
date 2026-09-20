@@ -39,7 +39,7 @@ PACKAGES = ("fliphex", "agents", "solver")
 
 #: Individual modules, where shipping the package would pull in more than the
 #: page needs. ``ui/cli.py`` is deliberately absent: it reads stdin.
-MODULES = ("ui/__init__.py", "ui/seats.py", "ui/web_bridge.py")
+MODULES = ("ui/__init__.py", "ui/seats.py", "ui/session.py")
 
 #: Shipped by the glob above but excluded by name. ``agents/az_agent.py`` needs
 #: torch, which has no WebAssembly build; adr-013 clause 4 refuses the learner

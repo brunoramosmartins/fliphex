@@ -1,4 +1,4 @@
-"""Tests for ui.web_bridge — the half of the web interface that has no browser.
+"""Tests for ui.session — the half of the web interface that has no browser.
 
 The point of this file is that the page's rules can be wrong *here*, where a
 test can see it, rather than only in a browser where it looks like a drawing
@@ -12,7 +12,7 @@ from fliphex.moves import legal_moves
 from fliphex.piece import N_SLOTS
 from fliphex.state import TILES, Colour, tiles_in
 from fliphex.variant import FIVE_BY_THREE, FULL_GAME, THREE_BY_THREE
-from ui.web_bridge import COL_PITCH, ROW_PITCH, WebGame, arrows_of, layout
+from ui.session import COL_PITCH, ROW_PITCH, GameSession, arrows_of, layout
 
 # -- geometry ------------------------------------------------------------------
 
@@ -99,7 +99,7 @@ def test_rotation_shifts_the_arrows():
 
 
 def test_a_game_starts_on_the_variant_it_was_asked_for():
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     geometry = game.geometry()
     assert geometry["n_cells"] == 9
     assert len(geometry["decks"]["first"]) == 5
@@ -108,18 +108,18 @@ def test_a_game_starts_on_the_variant_it_was_asked_for():
 
 
 def test_the_h2_arm_swaps_the_joker_out():
-    geometry = WebGame(3, 3, arm="h2").geometry()
+    geometry = GameSession(3, 3, arm="h2").geometry()
     assert "JOKER" not in geometry["decks"]["first"]
     assert len(geometry["decks"]["first"]) == 5
 
 
 def test_an_even_board_is_refused_by_the_variant():
     with pytest.raises(ValueError, match="odd cell count"):
-        WebGame(4, 4)
+        GameSession(4, 4)
 
 
 def test_the_opening_snapshot_is_empty_and_purple_to_move():
-    snapshot = WebGame().snapshot()
+    snapshot = GameSession().snapshot()
     assert set(snapshot["colours"]) == {"EMPTY"}
     assert snapshot["to_move"] == "PURPLE"
     assert snapshot["ply"] == 0
@@ -128,7 +128,7 @@ def test_the_opening_snapshot_is_empty_and_purple_to_move():
 
 
 def test_hands_are_reported_per_colour_and_shrink_as_they_are_played():
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     before = len(game.snapshot()["hands"]["PURPLE"])
     tile = game.snapshot()["hands"]["PURPLE"][0]["tile"]
     game.play(game.playable_cells(tile)[0], tile, 0)
@@ -137,13 +137,13 @@ def test_hands_are_reported_per_colour_and_shrink_as_they_are_played():
 
 def test_rotation_options_are_the_distinct_ones_and_no_more():
     """P6 has one orbit, not six: offering six would be six identical previews."""
-    game = WebGame()
+    game = GameSession()
     p6 = next(t for t in tiles_in(game.state.hand(1)) if TILES[t].archetype == "P6")
     assert len(game.options(game.playable_cells(p6)[0], p6)) == 1
 
 
 def test_playable_cells_come_from_the_engine_not_from_emptiness():
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     tile = next(iter(tiles_in(game.state.hand(1))))
     engine = sorted(
         {m.cell for m in legal_moves(game.board, game.state) if m.tile == tile}
@@ -155,7 +155,7 @@ def test_playable_cells_come_from_the_engine_not_from_emptiness():
 
 
 def test_a_first_move_on_an_empty_board_flips_nothing():
-    game = WebGame()
+    game = GameSession()
     p6 = next(t for t in tiles_in(game.state.hand(1)) if TILES[t].archetype == "P6")
     result = game.play(game.board.cell_id("C3"), p6, 0)
     assert result["flipped"] == []
@@ -164,7 +164,7 @@ def test_a_first_move_on_an_empty_board_flips_nothing():
 
 
 def test_an_arrow_off_the_board_is_reported_as_an_edge():
-    game = WebGame()
+    game = GameSession()
     p6 = next(t for t in tiles_in(game.state.hand(1)) if TILES[t].archetype == "P6")
     result = game.play(game.board.cell_id("A1"), p6, 0)
     assert any(e["kind"] == "edge" for e in result["effects"])
@@ -173,7 +173,7 @@ def test_an_arrow_off_the_board_is_reported_as_an_edge():
 
 def test_a_flip_is_reported_with_the_colour_it_becomes():
     """The page animates from this; if it lies, the animation lies."""
-    game = WebGame()
+    game = GameSession()
     board = game.board
     p6 = next(t for t in tiles_in(game.state.hand(1)) if TILES[t].archetype == "P6")
     game.play(board.cell_id("C3"), p6, 0)
@@ -190,7 +190,7 @@ def test_a_flip_is_reported_with_the_colour_it_becomes():
 
 def test_a_self_flip_hands_the_tile_to_the_opponent():
     """adr-007: a flip is a toggle, so your own arrow costs you the tile."""
-    game = WebGame()
+    game = GameSession()
     board = game.board
     p6 = next(t for t in tiles_in(game.state.hand(1)) if TILES[t].archetype == "P6")
     game.play(board.cell_id("C3"), p6, 0)
@@ -214,7 +214,7 @@ def test_a_self_flip_hands_the_tile_to_the_opponent():
 
 
 def test_the_snapshot_after_a_move_reflects_it():
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     tile = next(iter(tiles_in(game.state.hand(1))))
     result = game.play(game.playable_cells(tile)[0], tile, 0)
     assert result["snapshot"]["ply"] == 1
@@ -224,7 +224,7 @@ def test_the_snapshot_after_a_move_reflects_it():
 
 def test_an_illegal_move_is_refused_rather_than_applied():
     """The page offers only legal moves, so this firing means the two disagree."""
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     tile = next(iter(tiles_in(game.state.hand(1))))
     cell = game.playable_cells(tile)[0]
     game.play(cell, tile, 0)
@@ -233,7 +233,7 @@ def test_an_illegal_move_is_refused_rather_than_applied():
 
 
 def test_a_tile_not_in_hand_is_refused():
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     absent = next(
         t for t in range(len(TILES)) if t not in set(tiles_in(game.state.hand(1)))
     )
@@ -245,7 +245,7 @@ def test_a_tile_not_in_hand_is_refused():
 
 
 def test_undo_returns_the_previous_position():
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     opening = game.snapshot()
     tile = next(iter(tiles_in(game.state.hand(1))))
     game.play(game.playable_cells(tile)[0], tile, 0)
@@ -254,7 +254,7 @@ def test_undo_returns_the_previous_position():
 
 
 def test_undo_at_the_opening_is_a_no_op_not_an_error():
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     assert game.undo()["ply"] == 0
 
 
@@ -264,7 +264,7 @@ def test_undo_at_the_opening_is_a_no_op_not_an_error():
 @pytest.mark.parametrize("variant", [THREE_BY_THREE, FIVE_BY_THREE, FULL_GAME])
 def test_a_game_played_through_the_bridge_fills_the_board_and_decides(variant):
     """No draw is possible on an odd cell count, so a draw here is a bug."""
-    game = WebGame(variant.n_cols, variant.n_rows)
+    game = GameSession(variant.n_cols, variant.n_rows)
     while not game.snapshot()["terminal"]:
         move = legal_moves(game.board, game.state)[0]
         game.play(move.cell, move.tile, move.rotation)
@@ -277,7 +277,7 @@ def test_a_game_played_through_the_bridge_fills_the_board_and_decides(variant):
 def test_an_agent_can_take_a_seat_through_the_bridge():
     from ui.seats import build_seat
 
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     agent = build_seat("heuristic", variant=THREE_BY_THREE, seed=0)
     result = game.agent_move(agent)
     assert result["snapshot"]["ply"] == 1
@@ -286,7 +286,7 @@ def test_an_agent_can_take_a_seat_through_the_bridge():
 
 def test_both_hands_exhaust_exactly_so_every_tile_is_played():
     """H5's structural finding, arrived at through the interface."""
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     played = []
     while not game.snapshot()["terminal"]:
         move = legal_moves(game.board, game.state)[0]
@@ -296,7 +296,7 @@ def test_both_hands_exhaust_exactly_so_every_tile_is_played():
 
 
 def test_the_score_is_a_cell_count_and_always_sums_to_the_board():
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     while not game.snapshot()["terminal"]:
         move = legal_moves(game.board, game.state)[0]
         snapshot = game.play(move.cell, move.tile, move.rotation)["snapshot"]
@@ -306,7 +306,7 @@ def test_the_score_is_a_cell_count_and_always_sums_to_the_board():
 
 def test_colour_names_cross_the_boundary_as_strings():
     """The page is JavaScript; an enum would arrive as an opaque proxy."""
-    snapshot = WebGame(3, 3).snapshot()
+    snapshot = GameSession(3, 3).snapshot()
     assert all(isinstance(c, str) for c in snapshot["colours"])
     assert isinstance(snapshot["to_move"], str)
     assert Colour.PURPLE.name in {"PURPLE"}
@@ -317,7 +317,7 @@ def test_colour_names_cross_the_boundary_as_strings():
 
 def test_history_for_drawing_records_what_each_placed_tile_fired():
     """adr-003 throws tile identity away; this is where it survives for drawing."""
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     p6 = next(t for t in tiles_in(game.state.hand(1)) if TILES[t].archetype == "P6")
     game.play(game.playable_cells(p6)[0], p6, 0)
     drawn = game.history_for_drawing()
@@ -327,7 +327,7 @@ def test_history_for_drawing_records_what_each_placed_tile_fired():
 
 
 def test_history_for_drawing_is_empty_at_the_opening_and_grows_by_one():
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     assert game.history_for_drawing() == []
     for expected in range(1, 4):
         move = legal_moves(game.board, game.state)[0]
@@ -336,7 +336,7 @@ def test_history_for_drawing_is_empty_at_the_opening_and_grows_by_one():
 
 
 def test_history_for_drawing_survives_an_undo():
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     move = legal_moves(game.board, game.state)[0]
     game.play(move.cell, move.tile, move.rotation)
     game.undo()
@@ -344,18 +344,18 @@ def test_history_for_drawing_survives_an_undo():
 
 
 def test_a_seat_can_be_named_as_a_string_the_page_can_send():
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     result = game.agent_move_by_name("heuristic", seed=0)
     assert result["snapshot"]["ply"] == 1
 
 
 def test_naming_the_human_seat_is_refused_rather_than_silently_passing():
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     with pytest.raises(ValueError, match="human seat"):
         game.agent_move_by_name("human")
 
 
 def test_naming_a_seat_that_does_not_exist_is_refused():
-    game = WebGame(3, 3)
+    game = GameSession(3, 3)
     with pytest.raises(ValueError, match="unknown seat"):
         game.agent_move_by_name("grandmaster")
