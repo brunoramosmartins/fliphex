@@ -65,6 +65,7 @@ const state = {
   centres: new Map(),
   selectedTile: null,
   selectedCell: null,
+  armedRotation: null,
   busy: false,
 };
 
@@ -478,8 +479,27 @@ function renderHand() {
   }
 }
 
+/* Whether this device can hover.
+ *
+ * The rotation preview — the affordance this interface exists for — was wired
+ * to `mouseenter`, which a touch screen never fires. On a phone that meant
+ * tapping a rotation played it with no preview at all: the one thing a player
+ * most needs to see before committing, invisible on the device most likely to
+ * be handed to someone else. Read live rather than once, because a laptop with
+ * a touchscreen can be either and a window can move between displays. */
+function canHover() {
+  try {
+    return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  } catch {
+    return true; // no matchMedia: assume a mouse and keep the old behaviour
+  }
+}
+
 function renderRotations(options) {
   ui.rotations.textContent = "";
+  state.armedRotation = null;
+  const hovers = canHover();
+
   for (const option of options) {
     const button = document.createElement("button");
     button.type = "button";
@@ -490,12 +510,31 @@ function renderRotations(options) {
     net.className = `net ${sign}`;
     net.textContent = option.net > 0 ? `+${option.net}` : String(option.net);
     button.appendChild(net);
+
     button.addEventListener("mouseenter", () => previewRotation(option));
     button.addEventListener("focus", () => previewRotation(option));
-    button.addEventListener("click", () => playMove(option.rotation));
+    button.addEventListener("click", () => {
+      /* With a mouse the preview has already happened on hover, so a click
+       * commits. Without one, the first tap previews and arms, and only a
+       * second tap on the same rotation plays it. */
+      if (hovers || state.armedRotation === option.rotation) {
+        playMove(option.rotation);
+        return;
+      }
+      state.armedRotation = option.rotation;
+      previewRotation(option);
+      for (const other of ui.rotations.querySelectorAll("button.rot")) {
+        other.classList.toggle("armed", other === button);
+      }
+      ui.hint.textContent = "Tap it again to place, or pick another rotation.";
+    });
     ui.rotations.appendChild(button);
   }
+
   ui.rotationPanel.hidden = options.length === 0;
+  if (options.length && !hovers) {
+    ui.hint.textContent = "Tap a rotation to preview it, then tap again to place.";
+  }
 }
 
 function say(html) {

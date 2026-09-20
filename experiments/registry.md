@@ -6128,6 +6128,51 @@ badly, and the repair is this paragraph rather than a quiet reinterpretation.
 during 3.9 s that is currently blank. That is the standard remedy for a wait,
 not a speed-up, and it must not be described as one.
 
+#### Closed 2026-09-21 as partial, by decision — the remaining cells decide nothing
+
+**The phone cell and the second browser are dropped, and the entry closes
+incomplete rather than pending.** Gate 1 asks what decision turns on a quantity.
+Asked again now that the desktop pair is in, the answer for the missing cells is
+**nothing**, and running them because the protocol named them would be the habit
+the gate exists to break.
+
+Rule by rule:
+
+- **Rule 1 is spent.** The split render was decided on the warm desktop number
+  and is built. A phone cannot un-build it.
+- **Rule 2 cannot fire usefully any more.** It asked for a progress indicator if
+  cold exceeded 10 s. A phone at EXP-018's ~3× would land near 13 s and cross
+  it — but the split render already draws the board in ~100 ms and shows a
+  spinner and a status line, which *is* the remedy the 10 s limit prescribes.
+  The rule's conclusion is already in place whatever the number says.
+- **Rule 3 was made moot on 2026-09-21** by the decision to publish no agent
+  above the heuristic.
+
+So every rule this entry was registered to decide is decided or dead. What the
+missing cells would add is a sentence for the writeup, and one is available
+without them: see below.
+
+**An instrument problem would have blocked it anyway, and is recorded because it
+is the kind of thing a later reader will hit.** The device is an iPhone and the
+host is Windows. `chrome://inspect` port forwarding is Android-only, and iOS
+Safari's Web Inspector requires macOS, so there is **no supported path to a
+console on this pair**. The page's badge shows `ready in Xs` on screen, so a
+coarse figure was readable; `fliphexReport()` was not. A cell collected by
+reading a badge is not the cell the protocol describes.
+
+**What the phone did establish, qualitatively and recorded as such.** The page
+loads, fits the screen and plays. The author reports it *"works and is well
+framed"* but is **harder to play than on the desktop**. That is a judgement about
+the interface, not a timing, and it belongs with the play-testing evidence rather
+than in the table above — the entry already says the two must not be pooled.
+
+**The honest shape of this entry, for anyone reading it later.** One cell pair,
+Chrome 153 on Windows. It fired its own falsifier, refuted three of its four
+predictions, decided the one piece of work that was still open, and was then
+closed by the author before completing its own protocol because completing it
+would have decided nothing. The incompleteness is the finding's frame, not a
+footnote to it.
+
 #### Not established, and openly incomplete
 
 **One browser, one machine.** Chrome 153 on Windows x64. The protocol asks for

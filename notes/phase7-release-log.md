@@ -363,6 +363,30 @@ asserts the ordering that makes it a split render at all: `board` before
 It buys a visible board during a ~3.9 s wait. It does not make the page
 playable sooner, and the code says so where someone changing it will read it.
 
+### A defect found by planning the phone test, not by running it
+
+The rotation preview — the affordance this interface exists for — was wired to
+`mouseenter`. **A touch screen never fires it.** On a phone, tapping a rotation
+played it with no preview at all: the one thing a player most needs to see
+before committing, invisible on the device most likely to be handed to somebody
+else.
+
+Fixed by reading `(hover: hover) and (pointer: fine)` live. With a mouse nothing
+changes — hover previews, a click commits. Without one, the first tap previews
+and arms the rotation, a second tap on the same one plays it, and tapping a
+different one re-arms instead. The hint line says which mode you are in.
+
+**Testing it needed the harness to grow a capability**, and that is worth
+recording: jsdom implements **no** `matchMedia` at all, so the page's `canHover`
+fell to its "assume a mouse" branch and the touch path could not be reached.
+The harness now supplies a media query it can flip, and the suite drives the
+touch path for one move and the mouse path for the next — both ship, so both
+are checked.
+
+Worth stating plainly: this was found by *thinking about* the phone cell of
+EXP-019, before any phone ran the page. The measurement had not started and had
+already paid for itself.
+
 ### What is not done
 
 **One browser, one machine.** Chrome 153 on Windows x64 — one cell pair, not the

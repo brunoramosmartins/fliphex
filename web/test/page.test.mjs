@@ -73,6 +73,20 @@ const { window } = dom;
 /* The page makes exactly one request. If it ever makes another, this throws
  * rather than quietly returning undefined — a second fetch would be a change
  * worth noticing. */
+/* jsdom implements no `matchMedia` whatsoever, so the page's `canHover()` would
+ * fall to its "assume a mouse" branch and the touch path would never be
+ * exercised. Both paths ship, so the harness supplies a media query it can
+ * flip. */
+let hasHover = true;
+window.matchMedia = (query) => ({
+  matches: /hover: hover/.test(query) ? hasHover : false,
+  media: query,
+  addEventListener() {},
+  removeEventListener() {},
+  addListener() {},
+  removeListener() {},
+});
+
 const SERVED = { "payload.json": payload, "geometry.json": shapes };
 const fetched = [];
 
@@ -94,6 +108,7 @@ for (const key of [
   "Event",
   "navigator",
   "localStorage",
+  "matchMedia",
 ]) {
   globalThis[key] = window[key];
 }
@@ -248,9 +263,41 @@ check(
   board.querySelector("#overlay").childNodes.length > 0,
 );
 
+/* -- the touch path (EXP-019's phone cell is about to use it) ----------------- */
+
+/* Reopen the strip with hover reported absent, which is what a phone reports.
+ * Until this was fixed, a tap played the rotation with no preview at all — the
+ * affordance this whole interface exists for, missing on the device most likely
+ * to be handed to somebody else. */
+hasHover = false;
+page.onCellClick(page.state.selectedCell);
+const taps = page.ui.rotations.querySelectorAll("button.rot");
+board.querySelector("#overlay").textContent = "";
+
+taps[0].dispatchEvent(new window.Event("click"));
+check(
+  "without hover, the first tap previews instead of playing",
+  page.state.snapshot.ply === 0 &&
+    board.querySelector("#overlay").childNodes.length > 0 &&
+    taps[0].classList.contains("armed"),
+  `ply ${page.state.snapshot.ply}, armed ${taps[0].classList.contains("armed")}`,
+);
+
+if (taps.length > 1) {
+  taps[1].dispatchEvent(new window.Event("click"));
+  check(
+    "tapping a different rotation re-arms rather than playing",
+    page.state.snapshot.ply === 0 &&
+      taps[1].classList.contains("armed") &&
+      !taps[0].classList.contains("armed"),
+  );
+}
+
 // -- playing -------------------------------------------------------------------
 
-await page.playMove(0);
+/* A second tap on the armed rotation commits — the touch path in full, rather
+ * than calling `playMove` behind the interface's back. */
+[...taps].find((r) => r.classList.contains("armed")).dispatchEvent(new window.Event("click"));
 
 /* Polled, not slept. The agent's reply is scheduled on a timer so the human's
  * move paints first, and a fixed wait turns machine load into a red test — the
@@ -273,6 +320,25 @@ check(
   page.ui.commentary.textContent.includes("played"),
 );
 check("the selection is cleared after a move", page.state.selectedTile === null);
+
+/* -- the mouse path, on the next move ---------------------------------------- */
+
+hasHover = true;
+const secondPiece = page.ui.hand.querySelectorAll("button.piece")[0];
+secondPiece.dispatchEvent(new window.Event("click"));
+const secondCell = board.querySelectorAll("g.cell-group.playable")[3];
+secondCell.querySelector('[data-role="hit"]').dispatchEvent(new window.Event("click"));
+const withMouse = page.ui.rotations.querySelectorAll("button.rot");
+withMouse[0].dispatchEvent(new window.Event("click"));
+await until(() => page.state.snapshot.ply === 4, 15_000);
+check(
+  "with a mouse, one click commits — the preview already happened on hover",
+  page.state.snapshot.ply === 4,
+  `ply ${page.state.snapshot.ply}`,
+);
+
+page.onUndo();
+await until(() => page.state.snapshot.ply === 2, 5_000);
 check("undo is offered", !page.ui.undo.disabled);
 
 // -- undo ----------------------------------------------------------------------

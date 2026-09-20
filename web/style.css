@@ -357,6 +357,13 @@ g.cell-group.selected .ring { opacity: 1; stroke-width: .1; }
 }
 
 .rot:hover { border-color: var(--purple); }
+
+/* Touch only: the rotation that one more tap will play. */
+.rot.armed {
+  border-color: var(--purple);
+  border-width: 2px;
+  background: color-mix(in srgb, var(--purple) 14%, transparent);
+}
 .rot svg { width: 34px; height: 38px; }
 .rot .net { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .rot .net.up { color: var(--green-soft); }
