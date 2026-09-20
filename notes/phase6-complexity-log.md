@@ -568,6 +568,64 @@ hypothesis written without checking what its own project already permitted.
 
 ## `figures/` — the canonical figure per hypothesis, carried from Phase 5
 
+**Seven figures, one per hypothesis with a verdict plus one support panel.** The
+directory that shipped nothing in Phase 5 is now non-empty and checked.
+
+| file | for | what it shows |
+|---|---|---|
+| `complexity-landscape.png` | H4 | the two-axis plane, and the state-space strip where the data actually is |
+| `h1-first-player.png` | H1 | four exact solves in one panel, one sampled interval in another — deliberately different axes |
+| `h2-extra-tile-criticality.png` | H2 | criticality by layer, with **no threshold line**, because none was registered |
+| `h3-seeds-and-agreement.png` | H3 | both clauses failing, side by side |
+| `h5-forced-measures.png` | H5 | two quantities that could not have varied, and the confounded third |
+| `h6-perturbation-lattice.png` | H6 | every perturbation the ADRs permit, and the ones off the lattice |
+| `state-space-and-branching.png` | support | the hump is a cell-count effect, not a width effect |
+
+### The clause, made checkable
+
+Phase 6 wrote the exit criterion as *"`figures/` is non-empty and every figure
+regenerates from a tracked artefact"*. A clause nobody checks is how a directory
+ships empty twice, so the check is code:
+
+- **`figures/manifest.py`** declares each figure's sources by repository path and
+  **imports nothing but the standard library** — matplotlib is in the `figures`
+  extra, not `dev`, so CI can read the manifest without being able to plot. The
+  test parses the module with `ast` rather than grepping, because its own
+  docstring discusses matplotlib at length.
+- **`test_every_source_is_tracked_by_git`** runs `git ls-files` on every declared
+  source. This project gitignores `results/*.jsonl`, `data/` and
+  `notes/sources/`, and a figure drawn from any of them would render here and
+  nowhere else. That is the same self-containment trap `complexity/comparison.py`
+  fell into earlier in this phase.
+- **`figures/README.md` is generated** from the manifest, like
+  `docs/board-geometry.md`, with a test asserting it is current.
+
+The tracking check on the *outputs* is split: it **fails** when a figure is
+neither built nor in the repository, which is the Phase 5 failure mode, and
+**skips with instructions** when it exists but is not yet staged. Enforced where
+it matters, advisory where it would only be telling me to run `git add`.
+
+### Two conventions the figures follow
+
+**Provenance is drawn, not annotated.** Filled markers are computed here, hollow
+ones are cited, and a cell nobody could source is absent rather than
+interpolated. The landscape figure's plane has four points and its strip has
+nine, and the titles count them from the data so they cannot drift.
+
+**A threshold line appears only if one was registered.** H2's figure is the
+standing example: 17.07% is drawn, and no reference line is drawn beside it,
+because a line on a chart reads as a threshold whether or not anyone declared
+one. The chart says so in words.
+
+### What the figures caught
+
+Rendering forced three corrections that reading had not. The `state-space`
+annotation sat on top of the bars and hid the very numbers it quoted; H5's note
+rendered literal `**` because matplotlib has no markdown; and the landscape's
+first title hardcoded "eight games" over a chart with nine rows. All three are
+the same defect — prose written next to data rather than from it — and the fix
+in each case was to derive the text from the figure's own inputs.
+
 ## TIL #4 — retrograde analysis, when backwards beats forwards
 
 ## `exercises/ex05_complexity_analysis.md`
