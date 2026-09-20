@@ -9,6 +9,55 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-09-20 — Phase 7 opened: the last phase, and the first one that measures nothing
+
+Opened the same day Phase 6 closed, because nothing blocks it. The verdict table
+is complete, all three axes have shipped, and what remains is to make the work
+readable by someone who was not here for it.
+
+**Three carry-overs, one of them for the third time.**
+`exercises/ex05_complexity_analysis.md` and **TIL #4** were planned in Phase 5,
+carried to Phase 6, untouched there, and are now Phase 7's. Three phases is
+enough of a pattern to say what it is: these are author-written prose deliverables
+competing with code deliverables in the same budget, and code has won every time.
+Phase 7 is prose almost end to end, so the competition disappears — which is a
+reason to expect them to land, not a guarantee.
+
+**`ui/cli.py` already exists, and the task is not done.** 380 lines from the
+Phase 1 rule-validation work, with 35 lines of test. It runs hotseat,
+human-vs-heuristic and heuristic-vs-heuristic. The roadmap's task says
+*"human-vs-human, human-vs-AZ, watch-AZ-self-play"* — and neither the AZ agent
+nor the solver agent is wired into it. Recording this at the open rather than
+discovering it at the close: a file existing at the right path is not the gate.
+`pyproject.toml`'s package list also stops at `stats*`, so `ui/` has never been
+installed as a package; it works only from the repo root.
+
+**OPEN-1 is promoted to a task.** It has sat in `docs/rules-canonical.md` since
+Phase 0 — confirm all five columns hold five cells, against the physical board —
+blocked on the artifact rather than on code, which is why no phase ever picked it
+up. Phase 7 is the phase with the professor presentation in it, so it is the
+phase with physical access to the board. If it resolves the other way,
+`docs/board-geometry.md` is generated and every count downstream of it moves,
+including both complexity bounds. Last chance to ask.
+
+**Two stale documents found at the gate check**, both corrected today:
+`writeup/outline.md` scoped the verdicts as H1–H5 and assigned Phase 6 "H4–H5",
+written before H6 had an owner; and `README.md`'s status section still reads
+*"The engine (Phase 1) is not implemented yet"*, frozen at Phase 0 through seven
+phases of work. The README is a Phase 7 task already, so only the outline was
+edited here.
+
+**What this phase has to resist.** Every previous phase had a falsifier — a
+registered rule, a verification gate, a test. This one has none, and its
+deliverable is a narrative. The honest shape of the result is: three of six
+verdicts are *structural*, which means the rules answered them and no experiment
+could have; two of six are rejections; and H4 records a locked figure that is
+236× wrong, found by internal inconsistency rather than by measurement. A writeup
+that reads as a clean sweep would be a worse artifact than the phases it
+summarises. Writing that down at the open, while it costs nothing to say.
+
+---
+
 ## 2026-09-20 — Phase 6 closing: every quantity it set out to estimate was a closed form, and the last three verdicts went in
 
 The phase opened to estimate four things — state space, reachable correction,

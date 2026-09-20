@@ -15,7 +15,8 @@ Phase 0 so that each phase knows what it is feeding.
 5. **Axis 2: learning it from scratch** — the factored policy head and whether
    the independence assumption held.
 6. **Axis 3: where FLIPHEX sits among known games.**
-7. **Verdicts** — H1–H5, including whatever was rejected or inconclusive.
+7. **Verdicts** — H1–H6, including whatever was rejected or inconclusive. H6 was
+   adopted at the Phase 6 open, having had no owning phase at the lock.
 8. **What I would do differently** — from `decision-journal.md`.
 
 ## Feeding the writeup
@@ -27,4 +28,4 @@ Phase 0 so that each phase knows what it is feeding.
 | 3 | Section 4 |
 | 4 | Section 5 |
 | 5 | Section 7 (H1–H3) |
-| 6 | Sections 6, 7 (H4–H5) |
+| 6 | Sections 6, 7 (H4–H6) |
