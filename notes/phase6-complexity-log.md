@@ -132,7 +132,7 @@ the symmetry individual nodes break.
 ### H4's cited figure is wrong, and its own second figure proves it
 
 The locked H4 statement cites **~10⁶¹** for game-tree complexity and **~10³⁰·⁵**
-for the Knuth–Moore minimal tree. The exact count is **10^58.63**, about 240×
+for the Knuth–Moore minimal tree. The exact count is **10^58.63**, about 236×
 smaller.
 
 The two locked figures are internally inconsistent, and the minimal-tree one is
@@ -145,8 +145,12 @@ This is the second wrong number in H4's statement, after the `6^25` orientation
 factor in the state-space expression. The hypothesis is **locked** and is not
 edited: both belong in the verdict row, as deviations recorded against the
 pre-registered text — the same treatment H1's unperformed 20-seed tournament
-received. And the *claim* survives both: FLIPHEX at 10^58.6 is still far beyond
-the weak-solution route that carried checkers at ~10^31.
+received. And the *claim* survives both, at least as literally worded: FLIPHEX
+at 10^58.6 is far beyond the **~10⁴⁰** commonly attributed to checkers' game
+tree — a figure `comparison.py` **declines to print**, because the reproductions
+of van den Herik Table 1 disagree by one to two in the exponent. An earlier draft
+of this paragraph cited "~10^31" for checkers. That number appears in no source
+and in no artefact here; it was invented while writing. Corrected 2026-09-20.
 
 ### The estimator is kept, and it argues against itself
 
@@ -422,7 +426,145 @@ This is not resolved here. It belongs in the verdict, with both numbers.
 
 ## EXP-005 and EXP-007 on the 5×3 — the closure the bound depends on
 
+**Both resolved without the run. Neither needed compute; both needed reading.**
+
+The phase opened treating these as its heaviest inherited debt — two experiments
+stuck at "registered; 3×3 pilot run" since 2026-08-05, whose exact reachable
+closure the tightened state-space bound supposedly required. They dissolved on
+inspection.
+
+### The registered rules were already moot
+
+Both entries decide the same thing: whether don't-cares stay in the adr-012
+design. **adr-012 chose Option B — no materialised database.** With no database
+there is no don't-care set to drop or keep, so neither branch of either rule
+names a live choice. This is the status EXP-004 has carried since August,
+recorded there as *"rule moot"* rather than repointed at some other decision, and
+both entries now carry it the same way.
+
+**EXP-005 needed no run at all**, and its own amendment of 2026-08-07 said so:
+the quantity is a counting identity, `orphans(t) = layer(t) / 2^t`, so the
+registered 5×3 figure is **0.3428%** exactly. That amendment even wrote *"the
+hours-long run becomes a verification of the formula… not worth a day of compute
+on the 5×3."* It was sitting in the registry the whole time.
+
+### EXP-007 ran for 429.8 seconds and was stopped
+
+| layer | total | reachable | unreachable | frac | time |
+|---:|---:|---:|---:|---:|---:|
+| 0–2 | 23,761 | 13,081 | 10,680 | — | 0.0 s |
+| 3 | 713,440 | 501,876 | 211,564 | 29.7% | 0.6 s |
+| 4 | 12,841,920 | 11,069,389 | 1,772,531 | 13.8% | 18.0 s |
+| 5 | 113,008,896 | 105,552,006 | 7,456,890 | 6.6% | 411.3 s |
+
+Six layers, 0.72% of the configuration space, matching the 3×3's shape and
+extrapolating to **~0.7%** complete. The artefact records `complete: false` and
+the instrument **refused to apply the registered rule to a partial run** — the
+pre-registration working exactly as designed, with no intervention.
+
+The surviving reason to finish was H4's bound, and the closed form settles that
+too: one-step orphans are **3.2826%** on the 3×3, **0.3428%** on the 5×3 and
+**0.0079%** on the shipped board. A fourth-decimal correction cannot move FLIPHEX
+in a table spanning 10¹¹ to 5 × 10²⁰.
+
+### My cost estimate was wrong twice, in the project's signature way
+
+I told the author ~23 h per arm. That extrapolated the 3×3's runtime linearly
+over **number of configurations**, and the closure's work is not per
+configuration — it is `reachable(t−1) × empty cells`, because every marked
+configuration is expanded over every legal move. The 5×3 has more empty cells and
+larger hands, so branching enters as a multiplier a count-based extrapolation
+cannot see.
+
+Recalibrated on layer 4: **~89 h**. Recalibrated again on layer 5, whose forecast
+came in 3% high at 411.3 s against 422 s predicted: **~100 h per arm**, with
+throughput already degrading from 335k to 296k expansions/s as the bitsets grew.
+Two arms exceed eight days.
+
+This is Phase 4's first lesson — *measure the composed system, not its
+components* — recurring on a Phase 6 instrument, **with the lesson already
+written down**. Being able to quote a lesson is not the same as applying it.
+
+### The gate was answered for the measure and not for the decision
+
+EXP-007 answered gate 9 correctly for its own quantity. Its entry has carried a
+falsifier since 2026-08-07 saying the closure must not collapse onto the one-step
+identity — which is gate 9's question asked **six weeks before the gate existed**.
+
+And the run was started anyway. Nobody asked the same question about the
+*decision the number would inform*: the bound is 4.887 × 10¹⁷ with the correction
+and without it, at the precision H4 reports. The quantity was free to vary; the
+conclusion was not. `docs/measurement-gates.md` now asks both, and the second
+question is cheap — compute the conclusion at the measure's floor and at its
+ceiling and check they differ.
+
+### The debt no phase close was responsible for noticing
+
+These two sat in a non-terminal state through **three** phase closes. The
+close-mode audit walks the *closing phase's* checklist, and these belong to Phase
+3. They surfaced here only because a later phase happened to depend on them —
+which is to say, by luck. A registry entry that is neither complete nor withdrawn
+is currently nobody's job to find.
+
 ## H4 — where FLIPHEX lands on both axes
+
+**Clause 1 supported; clause 2 survives only as literally worded, and the "out of
+reach" reading it serves does not.** The two module sections above carry the
+derivations; this one carries the verdict's shape.
+
+### Clause 1 — supported, with its universal form flagged
+
+10^17.69 exceeds every strongly solved game this project could source: Nine Men's
+Morris 10¹¹ and Awari 10¹² (both quoted from Schaeffer, quotes resolved against
+the text), Connect Four (10¹⁴ cited, 4.53 × 10¹² exact — FLIPHEX exceeds either),
+and **Reversi 6×6**, which the hypothesis does not name: strongly solved, and
+bounded above by `3^36 = 1.501 × 10¹⁷` before any legality constraint, so the
+comparison uses that ceiling rather than a figure.
+
+The clause says *"every game solved by full enumeration"*. That universal form is
+**not decidable from a table of nine rows**, and the verdict says so. What is
+established is that it holds against every such game with a sourced figure.
+
+One classification caveat recorded rather than smoothed: the hypothesis lists
+Connect Four among the full-enumeration games, but Allis solved it *weakly* in
+1988, which is how this project grades it. It appears to have been strongly
+solved later by symbolic classification, not verified here. The comparison runs
+the same direction either way.
+
+### Clause 2 — the claim outgrew its test
+
+The magnitude is wrong by **236×**, and the locked statement's own second figure
+proves it without any new measurement. Against checkers specifically the clause
+holds. Against what has actually been weakly solved it does not: **Othello 8×8 at
+10^58.00, solved in 2023**, three years before the hypothesis was written and by
+a paper held in this repository and read in Phase 2. FLIPHEX is 4.2× larger — a
+factor, not an order.
+
+### The Phase 0 worry closed in H4's favour
+
+The Phase 0 amendment recorded a fear that H4 *"may already be false"* because
+4.9 × 10¹⁷ sits **below** Reversi 6×6's commonly cited ~10²⁰. That figure cannot
+exist. FLIPHEX is in fact the larger of the two, by at least **3.26×**. The worry
+was reasoning from a phantom — and the rewording it prompted was still the right
+move, for the separate reason the Phase 2 amendment gives: proximity to one game
+was the wrong *shape* of claim.
+
+### What is not established
+
+That FLIPHEX is solvable — nobody has attempted it, and clause 1 stands. Nor that
+the Othello comparison is tight: Othello's 10⁵⁸ is a `b^d` estimate over 58 ply
+while ours is an exact count, so they are the same order *as the literature
+reports them*, and the comparison inherits the estimate's uncertainty.
+
+### No experiment ID was allocated, and that is written down
+
+Both axes turned out to be exact sums: no configuration, no seed, no sampling, no
+decision rule, so the nine gates have nothing to be answered about. What replaces
+them is verification against the engine's own move generator. The cross-game half
+is a citation exercise, graded per cell rather than run. The registry's `##
+Planned` section records this rather than leaving an absence, because *"this
+planned row produced no entry"* should be a statement in the registry and not a
+gap in it.
 
 ## H5 — win contribution per archetype
 
@@ -566,6 +708,49 @@ hypothesis written without checking what its own project already permitted.
 
 ## Tile criticality — the reference distribution H2's 17.07% is waiting for
 
+**Unrun, and deliberately *not* withdrawn.** The distinction matters, because
+this phase withdrew three other planned measures and the reasons were different
+every time.
+
+H2's registered measure came out at **17.07%** — the fraction of solved 5×3
+positions whose value changes when P1's extra tile is swapped. The EXP-002
+amendment of 2026-09-18 deferred its interpretation rather than reading it as a
+verdict, because **no threshold for it was ever registered**. A magnitude with no
+decision rule attached decides nothing, and the figure's canonical plot carries
+no reference line for exactly that reason.
+
+What would make 17.07% interpretable is the same measure computed **per
+archetype**: if the joker sits inside the distribution the other twelve tiles
+produce, it is an ordinary tile on this axis; if it sits outside, it is not. That
+is the reference distribution, and it is this row.
+
+### Why it was not run, and why that is not a withdrawal
+
+It was not needed. H2's verdict rests on the four exhaustive solves, which return
+P1 on both arms of both boards; H5 closed because both halves of its locked
+measure are fixed by the rules; H6 closed because every perturbation it names is
+either forbidden by a ratified ADR or not constructible. **No verdict waited on
+this row.**
+
+But unlike the frequency half of H5, the win-contribution half, or EXP-016's root
+coverage, this measure is **not vacuous**. It is genuinely free to vary, it has
+no agent confound — it reads a solved database rather than anybody's play — and
+its null is not obvious in advance, which is what makes it worth measuring. The
+other three were withdrawn because asking the question was a mistake. This one is
+simply unasked.
+
+### What it would cost
+
+Almost nothing, which is the awkward part. It reads the existing 5×3 solution;
+**no new sweep is required**. The reason it is unrun is not expense but that
+nothing in the project currently needs the answer — and running a measurement
+because it is cheap, rather than because a decision turns on it, is the habit
+gate 1 exists to break.
+
+Left in the registry as an open, affordable and unclaimed measurement rather than
+deleted, so that a later phase or a reader can pick it up knowing exactly what it
+would settle.
+
 ## `figures/` — the canonical figure per hypothesis, carried from Phase 5
 
 **Seven figures, one per hypothesis with a verdict plus one support panel.** The
@@ -660,7 +845,36 @@ in each case was to derive the text from the figure's own inputs.
 
 ## TIL #4 — retrograde analysis, when backwards beats forwards
 
+<!--
+Carried from Phase 5, not started, and on the author's standing standby with
+TILs #2, #3 and #5. First person, not ghost-written.
+
+Material this phase added to what Phase 5 already listed: EXP-007's stopped
+closure is a *forward* sweep that was abandoned because a closed form answered
+the same question, which sharpens "when does backwards beat forwards" into "when
+does either beat a derivation". And EXP-005's identity is the cleanest example in
+the project of a retrograde quantity that turned out not to need the retrograde.
+-->
+
 ## `exercises/ex05_complexity_analysis.md`
+
+<!--
+Carried from Phase 5, not started, same standby.
+
+The roadmap's three questions are all now answerable from this phase's modules,
+and two of them have answers that differ from what the question expects:
+
+- Q1, derive an upper bound on the state space "accounting for 25 cells with 4
+  states x 6 orientations" — the 6 orientations are **wrong**, adr-006 makes
+  placed tiles inert, and the exercise should end at 4.887e17 rather than the
+  1.389e37 its own wording leads to.
+- Q2, tighten the bound by removing unreachable states — closed form, 0.0079% on
+  the shipped board, and the exercise is a good place to derive the `2^-t`
+  cancellation by hand.
+- Q3, explain why MC estimation of game-tree size is unbiased and state its
+  variance behaviour — `complexity/game_tree.rollout_estimate` has the measured
+  numbers, and the honest answer is that it is unbiased and useless here.
+-->
 
 ## Lessons Learned
 
@@ -718,9 +932,9 @@ The response was not to fill the missing cells with the most plausible numbers. 
 
 That made the table shorter, but also made its epistemic status explicit.
 
-### 7. A hypothesis can be supported by construction while remaining scientifically uninformative
+### 7. A measure can be free to vary and still be worthless
 
-H5's surviving win-contribution measure was not forced in the same way as its withdrawn frequency measure, but it was still unusable.
+H5's surviving win-contribution measure was withdrawn before registration. For the twelve archetypes the reason is exactly the one that killed the frequency half — it is a constant. The joker is the case that taught me something new.
 
 Every archetype is played once by the winner and once by the loser. The apparent 100% “win rate given archetype X was played by the winner” is therefore a tautology. The joker is even more direct: because only P1 holds it, “the joker was played by the winner” is equivalent to “P1 won.”
 
@@ -750,7 +964,7 @@ The correct response was not to rewrite the locked hypothesis after seeing the n
 
 H6 was supported across every perturbation available in the project, but the available perturbation set could not falsify the hypothesis.
 
-Board parity is fixed by ADR-011. The chiral anchor is protected by ADR-009. The only deck-level variation exposed by `Variant` is the arm swap, which is already H2.
+Board parity is fixed by adr-011. The chiral anchor is protected by adr-009. The only deck-level variation exposed by `Variant` is the arm swap, which is already H2.
 
 Thus the experiment tested robustness only within the legal design lattice defined by the ADRs.
 
@@ -798,7 +1012,7 @@ A hypothesis can be perfectly reasonable in the abstract and still be poorly mat
 
 The roadmap initially called for Monte Carlo estimation of the game tree.
 
-The implementation produced an unbiased estimate, but the exact combinatorial count was later derived. At 60,000 samples the estimate was still approximately 2% from the exact value with a relative standard deviation of about 4%.
+The implementation produced an unbiased estimate, but the exact combinatorial count was later derived. At 60,000 samples the estimate was still approximately 2% from the exact value, with a relative standard deviation of about **4.00 — four times the quantity being estimated**, not 4%.
 
 The Monte Carlo implementation was retained as a verification instrument rather than used as the primary measurement.
 
@@ -830,7 +1044,7 @@ The `t == 0` guard was corrected and the exact one-count error was pinned by a r
 
 The roadmap's original state-space expression multiplied by `6^25`, treating tile orientation as part of the state.
 
-ADR-006 had already established that placed tiles are inert, so orientation cannot affect future play. The corrected configuration space therefore removes that factor, reducing the figure by approximately `2.8 × 10^19`.
+adr-006 had already established that placed tiles are inert, so orientation cannot affect future play. The corrected configuration space therefore removes that factor, reducing the figure by approximately `2.8 × 10^19`.
 
 The inflated quantity remains in the implementation only as a documented discarded figure.
 
@@ -870,9 +1084,9 @@ The data were not used to register a game-intrinsic tile-effect hypothesis.
 
 ### 11. Treating the H6 perturbation set as broader than the engine permits
 
-The locked H6 example proposed removing `P3-y`, but ADR-009 explicitly requires `P6` and `P3-y` as anchors.
+The locked H6 example proposed removing `P3-y`, but adr-009 explicitly requires `P6` and `P3-y` as anchors.
 
-Likewise, ADR-011 excludes even-sized boards because the rules do not define a tie-break for draws.
+Likewise, adr-011 excludes even-sized boards because the rules do not define a tie-break for draws.
 
 The planned perturbation space was therefore narrower than the hypothesis wording implied. No unsupported deck variant was introduced merely to make the hypothesis testable.
 
@@ -880,7 +1094,7 @@ The planned perturbation space was therefore narrower than the hypothesis wordin
 
 The intended reduced-board comparison could not be performed with the existing AlphaZero champions.
 
-The 5×5 architecture failed on the reduced-board input shape, while the reduced-board networks had been supervised on solver labels and therefore did not satisfy ADR-004 R1 for the intended comparison.
+The 5×5 architecture failed on the reduced-board input shape, while the reduced-board networks had been supervised on solver labels and therefore did not satisfy adr-004 R1 for the intended comparison.
 
 The comparison remained an unreachable criterion rather than being replaced with a procedurally different experiment after the fact.
 
