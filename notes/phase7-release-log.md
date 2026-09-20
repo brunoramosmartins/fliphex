@@ -160,6 +160,65 @@ The harness that loads Pyodide is deliberately **not** in the repository: it
 needs `npm install` and a Node runtime. The half that must be identical on both
 sides is the half that is tracked.
 
+## `web/` — the board, in a browser, on the real engine
+
+**[adr-013](../docs/adr/adr-013-interface-targets.md).** The browser build is a
+scope addition — the roadmap named three interfaces and no way for a reader to
+play. It does not replace `ui/pygame_ui.py`; both ship.
+
+**The engine goes to the browser unported.** `fliphex/`, `solver/` and three of
+four agents are pure standard library, so Pyodide runs them with no shim and no
+second implementation. `scripts/build_web.py` bundles 24 modules into
+`web/payload.json` — 163 KB of source, **50 KB gzipped** — and the page writes
+them into the WebAssembly filesystem at boot.
+
+The bundler is the interesting part. It reads each module's **AST** rather than
+grepping, and separates imports that *execute* at module load from ones deferred
+into a function body or a `TYPE_CHECKING` guard. That distinction is what makes
+the bundle possible at all: `ui/seats.py` defers torch on purpose, and a checker
+that could not tell the two apart would either ban the file or wave through a
+real dependency. It refused the first build it was given, correctly, naming
+`agents/az_agent.py` and the two deferrals — so the exclusion list is *checked*
+rather than declared.
+
+**The page draws and nothing else.** Every legality question, flip and score
+comes back from `ui/web_bridge.py`. Cell positions come from
+`web_bridge.layout`, and `tests/test_web_bridge.py` asserts each centre lands
+exactly where `Board.neighbour` says the neighbour is — on all three boards, in
+all six directions. A cell drawn in the wrong place is a test failure, not a
+picture that looks slightly off.
+
+One thing was caught by writing it down: the first version carried a `BrowserGame`
+subclass **inside a Python string in `app.js`** — rules-adjacent code in a file
+no test can reach. Both its methods moved to `web_bridge.py` and got tests.
+
+### Verified in the target environment, not only natively
+
+The whole page bootstrap was replayed under Pyodide in Node — same payload, same
+filesystem writes, same import — and played a complete game:
+
+| | |
+|---|--:|
+| board, decks | 25 cells, 13 + 12 ✓ |
+| human move | **4 ms** |
+| heuristic reply | 17 ms |
+| complete 25-ply game | 109 ms |
+| engine ready after boot | 128 ms |
+
+The 4 ms is EXP-018's prediction arriving through the actual page code path
+rather than through the benchmark, which is the confirmation worth having.
+
+**Bug found this way:** the page wrote its modules to relative paths, and
+Emscripten's working directory is not the filesystem root. It failed with a bare
+`ErrnoError 44` naming nothing. Both sides now use an absolute `/app`.
+
+### What is not done
+
+No real browser has run this. Node is V8 with local files; a browser adds a
+different cold start and a CDN download, and adr-013 says explicitly that its
+solver rows may not survive that measurement. The page is not linked from
+anywhere until it has been.
+
 ## `ui/pygame_ui.py` — the physical palette, on screen
 
 ## `ui/replay_viewer.py` — play back saved games from `data/`

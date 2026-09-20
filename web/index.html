@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FLIPHEX</title>
+<meta name="description" content="Play FLIPHEX in the browser. The rules run on the same Python engine that produced the project's exact solutions.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"></span>
+    <h1>FLIPHEX</h1>
+  </div>
+  <div class="controls">
+    <label>Board
+      <select id="variant">
+        <option value="5x5">5&times;5 &mdash; the shipped game</option>
+        <option value="5x3">5&times;3 &mdash; solved exactly</option>
+        <option value="3x3">3&times;3 &mdash; solved exactly</option>
+      </select>
+    </label>
+    <label>Green
+      <select id="opponent">
+        <option value="human">a second player</option>
+        <option value="heuristic" selected>the heuristic agent</option>
+      </select>
+    </label>
+    <button id="new-game" type="button" class="primary" disabled>New game</button>
+  </div>
+</header>
+
+<main>
+  <section class="board-pane">
+    <div id="board-wrap" class="board-wrap">
+      <div id="boot" class="boot">
+        <div class="spinner" aria-hidden="true"></div>
+        <p id="boot-text">Starting the rules engine&hellip;</p>
+        <p class="boot-note">
+          This page runs the project&rsquo;s actual Python engine, compiled to
+          WebAssembly. The rules are never reimplemented in JavaScript.
+        </p>
+      </div>
+      <svg id="board" role="img" aria-label="FLIPHEX board" hidden></svg>
+    </div>
+
+    <div class="scoreline" id="scoreline" hidden>
+      <span class="chip purple"><b id="score-purple">0</b> purple</span>
+      <span id="turn" class="turn">Purple to move</span>
+      <span class="chip green"><b id="score-green">0</b> green</span>
+    </div>
+
+    <p id="commentary" class="commentary" aria-live="polite"></p>
+  </section>
+
+  <aside class="side">
+    <div class="panel">
+      <div class="panel-head">
+        <h2 id="hand-title">Your pieces</h2>
+        <button id="undo" type="button" disabled>Undo</button>
+      </div>
+      <div id="hand" class="hand"></div>
+      <p class="hint" id="hint">Pick a piece, then a cell.</p>
+    </div>
+
+    <div class="panel" id="rotation-panel" hidden>
+      <div class="panel-head"><h2>Rotation</h2>
+        <button id="cancel" type="button">Cancel</button>
+      </div>
+      <p class="hint">Hover to preview. <b>Net</b> is tiles gained minus tiles handed back.</p>
+      <div id="rotations" class="rotations"></div>
+    </div>
+
+    <details class="panel notes">
+      <summary>How it works</summary>
+      <p>
+        Place a tile on any empty cell at any rotation. Every arrow pointing at an
+        occupied neighbour <b>flips</b> it to your colour. Flips never chain.
+      </p>
+      <p>
+        A flip is a toggle, so an arrow aimed at <em>your own</em> tile hands it to
+        your opponent. The board shows those in red.
+      </p>
+      <p>
+        All cells fill and whoever shows more of their colour wins. The cell count
+        is odd, so a draw is impossible.
+      </p>
+    </details>
+  </aside>
+</main>
+
+<footer class="foot">
+  <span>Engine, solver and agents run unmodified under Pyodide.</span>
+  <span id="engine-badge" class="badge">booting</span>
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
