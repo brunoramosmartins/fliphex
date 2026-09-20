@@ -5683,6 +5683,31 @@ registration, not here.
 | 6 | **Mirror-optimality rate** — on solved positions where the Z/2 mirror is a valid game symmetry (both `P3-y` placed), the fraction of optimal moves whose mirror image is also optimal | H5, H6 |
 | 6 | **First-player advantage curve** — fraction of solved positions at each ply `t` won by the player to move, 5×3 | H1 |
 
+> **No ID allocated 2026-09-19 — the H4 row above was answered in closed form,
+> so there was no experiment to register.** Both axes turned out to be exact
+> sums rather than quantities needing a run: the state space because placed
+> tiles are inert ([adr-006](../docs/adr/adr-006-no-chain-reaction.md)), and the
+> game tree because every (empty cell, tile in hand, distinct rotation) triple
+> is legal, which makes the leaf count a product of three independent choices.
+> There is no configuration, no seed, no sampling and no decision rule, so the
+> nine gates have nothing to be answered about; what replaces them is
+> verification against the engine's own move generator, recorded in
+> `notes/phase6-complexity-log.md` and asserted by `tests/test_game_tree.py`
+> and `tests/test_state_space.py`.
+>
+> The cross-game half is not a computation at all — it is a citation exercise,
+> and it is graded per cell rather than run. `complexity/comparison.py` opens
+> each cited source held in this project and checks the quote; nine cells are
+> left empty with a reason, and two widely repeated figures are refused: **6×6
+> Reversi's ~10²⁰**, which exceeds the hard `3^36` ceiling by 666× and traces to
+> no primary source, and **every cell of van den Herik et al. Table 1**, whose
+> two secondary reproductions disagree by one to two in the exponent on four
+> separate rows.
+>
+> Recorded here rather than left implicit, because "this planned row produced no
+> registry entry" should be a statement in the registry and not an absence from
+> it. The verdict is in [`docs/research.md`](../docs/research.md), H4.
+
 > **Withdrawn 2026-09-18 — archetype placement frequency, before any entry was
 > written.** The quantity is forced by the rules and cannot vary: 25 cells, no
 > passing, both hands exhausting exactly, so every game places **each of the 12
