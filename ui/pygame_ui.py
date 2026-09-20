@@ -53,20 +53,25 @@ from fliphex.state import Colour
 from fliphex.variant import Arm, Variant
 from ui.seats import SEAT_KINDS, ChampionUnavailableError, build_seat, describe_seat
 from ui.session import GameSession
+from ui.theme import rgb
 
-# -- palette, matching web/style.css ------------------------------------------
+# -- palette -------------------------------------------------------------------
 
-PURPLE = (107, 63, 160)
-PURPLE_SOFT = (139, 98, 189)
-GREEN = (61, 143, 92)
-GREEN_SOFT = (95, 174, 124)
-WOOD = (243, 236, 226)
-WOOD_DEEP = (228, 216, 199)
-INK = (35, 32, 29)
-INK_SOFT = (106, 98, 90)
-LINE = (202, 191, 174)
-EMPTY = (251, 247, 241)
-DANGER = (179, 69, 58)
+# From `ui/theme.py`, which `scripts/build_web.py` also generates `web/theme.css`
+# from. These twelve used to be hand-copied hex under a comment reading
+# "matching web/style.css", and nothing checked that they did.
+
+PURPLE = rgb("purple")
+PURPLE_SOFT = rgb("purple-soft")
+GREEN = rgb("green")
+GREEN_SOFT = rgb("green-soft")
+WOOD = rgb("wood")
+WOOD_DEEP = rgb("wood-deep")
+INK = rgb("ink")
+INK_SOFT = rgb("ink-soft")
+LINE = rgb("line")
+EMPTY = rgb("empty")
+DANGER = rgb("danger")
 WHITE = (255, 255, 255)
 
 #: Flat-top hexagon: vertices every 60 degrees from due East, so the flat edges
@@ -176,6 +181,42 @@ def describe(result: dict[str, Any], cell_name: str) -> str:
 # -- drawing primitives, shared with the replay viewer -------------------------
 
 
+Corners = list[tuple[float, float]]
+
+
+def icon_halves(size: int) -> tuple[Corners, Corners]:
+    """The two halves of a flat-top hexagon split down the middle.
+
+    Pure, so the shape can be checked without a display. A vertical cut through
+    a flat-top hexagon's centre meets the top and bottom edges at their
+    midpoints, which is why the right half has five vertices rather than three.
+    """
+    centre = size / 2
+    r = size / 2 * 0.96
+    corners = hex_corners(centre, centre, r)
+    lift = r * sqrt(3.0) / 2.0
+    top_mid = (centre, centre - lift)
+    bottom_mid = (centre, centre + lift)
+    right = [top_mid, corners[5], corners[0], corners[1], bottom_mid]
+    left = [top_mid, corners[4], corners[3], corners[2], bottom_mid]
+    return left, right
+
+
+def window_icon(pygame, size: int = 32):
+    """The taskbar and title-bar icon: the split hexagon, from `ui.theme`.
+
+    pygame's default is pygame's own logo, which says the window is a pygame
+    program rather than that it is FLIPHEX — the single cheapest signal that an
+    application was assembled rather than designed. This is the same mark the
+    page uses for its favicon and its header, from the same two colours.
+    """
+    surface = pygame.Surface((size, size), pygame.SRCALPHA)
+    left, right = icon_halves(size)
+    pygame.draw.polygon(surface, PURPLE, left)
+    pygame.draw.polygon(surface, GREEN, right)
+    return surface
+
+
 def draw_hex(pygame, screen, centre, radius, fill, width=0) -> None:
     """One hexagon. Module level so ``ui.replay_viewer`` draws the same shape."""
     pygame.draw.polygon(screen, fill, hex_corners(centre[0], centre[1], radius), width)
@@ -261,6 +302,48 @@ def control_at(position: tuple[int, int], controls: dict[str, Control]) -> str |
     return None
 
 
+#: Keyboard equivalent of each on-screen control, drawn **on** the control.
+#:
+#: The window used to list these in a footer — ``n new game · b board, c
+#: colour, o opponent`` — which is a shortcut list pretending to be an
+#: interface. A shortcut is acceleration, not discovery: somebody seeing this
+#: window for the first time should be able to click, and somebody who has seen
+#: it before should not have to.
+SHORTCUTS: dict[str, str] = {
+    "board": "b",
+    "side": "c",
+    "opponent": "o",
+    "undo": "u",
+    "new": "n",
+}
+
+
+@dataclass
+class Button:
+    """One action in the strip. ``rect`` is filled when it is drawn."""
+
+    label: str
+    enabled: bool = True
+    rect: Any = None
+
+
+def button_at(position: tuple[int, int], buttons: dict[str, Button]) -> str | None:
+    """Which *enabled* action a click landed on, or ``None``.
+
+    A disabled control that still responds is worse than no control: it says
+    one thing and does another. Undo is disabled at the opening, and the hit
+    test is where that has to be true, not only the drawing.
+    """
+    for name, button in buttons.items():
+        if (
+            button.enabled
+            and button.rect is not None
+            and button.rect.collidepoint(position)
+        ):
+            return name
+    return None
+
+
 class Window:
     """Draws one :class:`~ui.session.GameSession` and reads the mouse.
 
@@ -303,6 +386,14 @@ class Window:
         self.status = "Click a piece, then a cell."
         self.hand_rects: list[tuple[Any, int]] = []
 
+        #: The two actions that are not settings. Undo's ``enabled`` follows the
+        #: snapshot on every paint, and `button_at` honours it, so a control
+        #: that looks unavailable is unavailable.
+        self.buttons: dict[str, Button] = {
+            "new": Button("New game"),
+            "undo": Button("Undo", enabled=False),
+        }
+
         #: Keyboard equivalents of the three chips, shift for backwards. Built
         #: here rather than at module level because `pygame` is imported lazily.
         self.control_keys = {
@@ -314,9 +405,11 @@ class Window:
         pygame.init()
         pygame.display.set_caption("FLIPHEX")
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_icon(window_icon(pygame))
         self.font = pygame.font.SysFont("dejavusans,arial", 15)
         self.small = pygame.font.SysFont("dejavusans,arial", 12)
-        self.big = pygame.font.SysFont("dejavusans,arial", 26, bold=True)
+        self.mid = pygame.font.SysFont("dejavusans,arial", 20, bold=True)
+        self.big = pygame.font.SysFont("dejavusans,arial", 24, bold=True)
         self.clock = pygame.time.Clock()
 
     # -- drawing ---------------------------------------------------------------
@@ -388,21 +481,85 @@ class Window:
             chip, chip.get_rect(center=(centre[0], centre[1] - placement.radius * 1.35))
         )
 
-    def _draw_controls(self, top: int) -> None:
-        """The three chips. Click cycles forward, right-click back."""
+    def _chip_width(self, caption: str, value: str, key: str) -> int:
+        return (
+            max(self.font.size(value)[0], self.small.size(caption.upper())[0])
+            + self.small.size(key.upper())[0]
+            + 34
+        )
+
+    def _chip(self, x: int, top: int, caption: str, value: str, key: str, on: bool):
+        """One chip: an optional caption, a value, and the key that also does it.
+
+        A setting needs the caption — "purple" alone does not say what it is a
+        setting *of*. An action does not: "New game" is its own caption, and
+        repeating the word ACTION above it is a label that carries no
+        information, which is the kind of thing that makes an interface look
+        busier without making it clearer.
+        """
         pygame = self.pygame
-        x = 20
-        for control in self.controls.values():
-            value = self.font.render(f"{control.value}  ›", True, INK)
-            label = self.small.render(control.label.upper(), True, INK_SOFT)
-            width = max(value.get_width(), label.get_width()) + 26
-            rect = pygame.Rect(x, top + 5, width, CONTROL_H - 14)
-            pygame.draw.rect(self.screen, WOOD, rect, border_radius=8)
-            pygame.draw.rect(self.screen, LINE, rect, 1, border_radius=8)
+        rendered = self.font.render(value, True, INK if on else INK_SOFT)
+        hint = self.small.render(key.upper(), True, INK_SOFT)
+        rect = pygame.Rect(
+            x, top + 5, self._chip_width(caption, value, key), CONTROL_H - 14
+        )
+        pygame.draw.rect(self.screen, WOOD if on else WOOD_DEEP, rect, border_radius=8)
+        pygame.draw.rect(self.screen, LINE, rect, 1, border_radius=8)
+        if caption:
+            label = self.small.render(caption.upper(), True, INK_SOFT)
             self.screen.blit(label, (rect.x + 13, rect.y + 4))
-            self.screen.blit(value, (rect.x + 13, rect.y + 17))
-            control.rect = rect
-            x += width + 10
+            self.screen.blit(rendered, (rect.x + 13, rect.y + 17))
+        else:
+            self.screen.blit(
+                rendered, rendered.get_rect(midleft=(rect.x + 13, rect.centery))
+            )
+        self.screen.blit(hint, (rect.right - hint.get_width() - 9, rect.y + 5))
+        return rect
+
+    def _draw_controls(self, top: int) -> None:
+        """Three settings on the left, two actions on the right."""
+        x = 20
+        for name, control in self.controls.items():
+            control.rect = self._chip(
+                x, top, control.label, f"{control.value}  ›", SHORTCUTS[name], True
+            )
+            x += control.rect.width + 10
+
+        self.buttons["undo"].enabled = bool(self.snapshot["can_undo"])
+        right = WIDTH - 20
+        for name in ("new", "undo"):
+            button = self.buttons[name]
+            width = self._chip_width("", button.label, SHORTCUTS[name])
+            right -= width
+            button.rect = self._chip(
+                right, top, "", button.label, SHORTCUTS[name], button.enabled
+            )
+            right -= 10
+
+    def _headline(self) -> tuple[str, tuple[int, int, int]]:
+        """Whose move it is, said in the second person where that is true.
+
+        "Purple to move" asks the player to remember which colour they hold,
+        every turn, in a window whose whole point is that the colour is now a
+        choice. The state that matters is *yours* or *not yours*, and when it is
+        not yours the useful fact is that something is running.
+        """
+        snapshot = self.snapshot
+        mover = snapshot["to_move"]
+        if snapshot["terminal"]:
+            winner = snapshot["winner"]
+            held = self.controls["side"].value.upper()
+            hotseat = self.controls["opponent"].value == "human"
+            colour = PURPLE if winner == "PURPLE" else GREEN
+            if hotseat:
+                return f"{winner.title()} wins", colour
+            return ("You win" if winner == held else "You lose"), colour
+        colour = PURPLE if mover == "PURPLE" else GREEN
+        if self._human_to_move():
+            if self.controls["opponent"].value == "human":
+                return f"{mover.title()}'s turn", colour
+            return "Your turn", colour
+        return f"{self._seat_kind(mover).title()} is thinking…", colour
 
     def _draw_panel(self) -> None:
         pygame = self.pygame
@@ -412,31 +569,36 @@ class Window:
         self._draw_controls(top)
         top += CONTROL_H
 
+        # The score is smaller than the turn indicator on purpose. It is the
+        # board's own arithmetic and the board is right there; what a player
+        # cannot read off the board is whether the window is waiting for them.
         score = self.snapshot["score"]
-        purple, green = score["PURPLE"], score["GREEN"]
-        self.screen.blit(self.big.render(str(purple), True, PURPLE), (20, top + 12))
-        self.screen.blit(self.small.render("PURPLE", True, INK_SOFT), (20, top + 44))
-        right = self.big.render(str(green), True, GREEN)
-        self.screen.blit(right, (WIDTH - 20 - right.get_width(), top + 12))
-        tag = self.small.render("GREEN", True, INK_SOFT)
-        self.screen.blit(tag, (WIDTH - 20 - tag.get_width(), top + 44))
+        for colour, tint, x in (
+            ("PURPLE", PURPLE, 20),
+            ("GREEN", GREEN, WIDTH - 20),
+        ):
+            number = self.mid.render(str(score[colour]), True, tint)
+            tag = self.small.render(colour, True, INK_SOFT)
+            span = max(number.get_width(), tag.get_width())
+            left = x if colour == "PURPLE" else x - span
+            self.screen.blit(tag, (left, top + 10))
+            self.screen.blit(number, (left, top + 24))
 
-        if self.snapshot["terminal"]:
-            headline = f"{self.snapshot['winner'].title()} wins"
-        else:
-            headline = f"{self.snapshot['to_move'].title()} to move"
-        text = self.font.render(headline, True, INK)
-        self.screen.blit(text, text.get_rect(center=(WIDTH // 2, top + 22)))
+        headline, tint = self._headline()
+        dot_x = WIDTH // 2 - self.big.size(headline)[0] // 2 - 16
+        pygame.draw.circle(self.screen, tint, (dot_x, top + 26), 6)
+        text = self.big.render(headline, True, INK)
+        self.screen.blit(text, text.get_rect(center=(WIDTH // 2, top + 26)))
 
         status = self.font.render(self.status, True, INK_SOFT)
-        self.screen.blit(status, status.get_rect(center=(WIDTH // 2, top + 46)))
+        self.screen.blit(status, status.get_rect(center=(WIDTH // 2, top + 52)))
 
-        self._draw_hand(top + 70)
+        self._draw_hand(top + 74)
 
+        # Only what no control on screen already says: the two gestures that
+        # have no button, because they act on a move you are part-way through.
         keys = self.small.render(
-            "wheel / arrows rotate   ·   click commits   ·   esc cancels   "
-            "·   u undo   ·   n new game   ·   b board, c colour, o opponent "
-            "(right-click or shift for back)",
+            "wheel or arrows rotate   ·   click to commit   ·   esc cancels",
             True,
             INK_SOFT,
         )
@@ -515,6 +677,13 @@ class Window:
     def _on_click(self, position: tuple[int, int], backwards: bool = False) -> None:
         # Checked first: the controls have to work when the game is over and
         # when it is the agent's turn, which is exactly when you want them.
+        action = button_at(position, self.buttons)
+        if action == "new":
+            self._new_game()
+            return
+        if action == "undo":
+            self._undo()
+            return
         key = control_at(position, self.controls)
         if key is not None:
             self._apply_control(key, -1 if backwards else 1)

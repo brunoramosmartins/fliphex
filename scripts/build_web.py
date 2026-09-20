@@ -37,6 +37,8 @@ ROOT = Path(__file__).resolve().parent.parent
 # the repository root. The convention the other scripts here use.
 sys.path.insert(0, str(ROOT))
 
+from ui.theme import LIGHT, stylesheet  # noqa: E402  (after the sys.path insert)
+
 OUT = ROOT / "web" / "payload.json"
 
 #: The boards the page's selector offers, and the file it reads them from
@@ -45,6 +47,12 @@ OUT = ROOT / "web" / "payload.json"
 #: later — the split render adr-013 asked for and EXP-019's rule 1 decided.
 GEOMETRY_OUT = ROOT / "web" / "geometry.json"
 PAGE_BOARDS = ((5, 5), (5, 3), (3, 3))
+
+#: The colour tokens, generated from ``ui/theme.py`` — the same module the
+#: pygame window reads. The palette used to be hand-copied into both
+#: interfaces under comments claiming they matched; generating it is what makes
+#: the claim checkable, exactly as ``geometry.json`` does for the layout.
+THEME_OUT = ROOT / "web" / "theme.css"
 
 #: Packages shipped whole. All three are pure standard library — the property
 #: adr-013 rests on, and the one :func:`verify` re-checks on every build.
@@ -227,11 +235,16 @@ def main(argv: list[str] | None = None) -> int:
     total = sum(len(s) for s in payload.values())
 
     shapes = json.dumps(geometry(), sort_keys=True, indent=1) + "\n"
+    theme = stylesheet()
 
     if args.check:
         stale = [
             path.name
-            for path, wanted in ((OUT, text), (GEOMETRY_OUT, shapes))
+            for path, wanted in (
+                (OUT, text),
+                (GEOMETRY_OUT, shapes),
+                (THEME_OUT, theme),
+            )
             if not path.exists() or path.read_text() != wanted
         ]
         if stale:
@@ -239,13 +252,16 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(f"  payload current — {len(payload)} modules, {total:,} bytes")
         print(f"  geometry current — {len(geometry())} boards")
+        print(f"  theme current — {len(LIGHT)} colour tokens")
         return 0
 
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(text)
     GEOMETRY_OUT.write_text(shapes)
+    THEME_OUT.write_text(theme)
     print(f"  wrote {OUT.relative_to(ROOT)} — {len(payload)} modules, {total:,} bytes")
     print(f"  wrote {GEOMETRY_OUT.relative_to(ROOT)} — {len(geometry())} boards")
+    print(f"  wrote {THEME_OUT.relative_to(ROOT)} — {len(LIGHT)} colour tokens")
     return 0
 
 

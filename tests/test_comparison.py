@@ -25,12 +25,14 @@ from complexity.comparison import (
     SOURCES_PRESENT,
     TAXONOMY,
     Provenance,
+    _render,
     external_rows,
     fliphex_row,
     gaps,
     reversi_6x6_ceiling,
     reversi_6x6_overshoot,
     self_check,
+    solved_status,
     table,
 )
 from complexity.game_tree import games
@@ -218,6 +220,53 @@ def test_the_shipped_board_is_not_claimed_solved():
     assert row.solved == "unsolved"
 
 
+@pytest.mark.parametrize(("cols", "rows"), [(3, 3), (5, 3)])
+def test_the_solved_reduced_boards_say_so_in_the_field_not_only_the_note(cols, rows):
+    """Until 2026-09-20 they did not, and the table contradicted itself.
+
+    ``fliphex_row`` is one factory for three boards and it hardcoded
+    ``solved="unsolved"`` on all three, while the ``solved_note`` immediately
+    below read "3×3 and 5×3 are strongly solved by exhaustive search". The
+    printed table shows the field and not the note — so the project's own
+    cross-game table called two boards it had proved unsolved, in the one place
+    that result appears beside checkers and Othello.
+    """
+    row = fliphex_row(Variant(cols, rows, Arm.H1))
+    assert row.solved == "strongly solved"
+    assert row.solved_source == "this project"
+
+
+def test_each_solved_board_names_the_run_that_solved_it():
+    """A solved status with no experiment behind it is an assertion, not a fact."""
+    for cols, rows, experiment in ((3, 3, "EXP-001"), (5, 3, "EXP-002")):
+        status, note = solved_status(Variant(cols, rows, Arm.H1))
+        assert status == "strongly solved"
+        assert experiment in note
+        assert "exhausted" in note, "the termination condition is what earns it"
+
+
+def test_a_board_nobody_solved_defaults_to_unsolved():
+    """The default has to be the safe direction, since the map is hand-kept."""
+    status, _ = solved_status(Variant(5, 1, Arm.H1))
+    assert status == "unsolved"
+
+
+def test_the_printed_table_marks_this_projects_own_solutions(capsys):
+    """ "Strongly solved" from this repo and from Gasser 1996 are different facts.
+
+    The column would print them identically, so the artifact people read would
+    flatten a peer-reviewed solution and one machine's own run into one word.
+    """
+    _render()
+    printed = capsys.readouterr().out
+    assert "strongly solved*" in printed
+    assert "not independently reimplemented" in printed
+    # The external rows are not marked: Gasser and Romein & Bal are published.
+    for line in printed.splitlines():
+        if "Nine Men's Morris" in line or "Awari" in line:
+            assert "*" not in line, line
+
+
 # -- what the table shows ---------------------------------------------------
 
 SHIPPED = next(r for r in ROWS if r.game == "FLIPHEX 5×5")
@@ -231,11 +280,21 @@ def test_checkers_has_a_larger_state_space_and_was_solved_anyway():
 
 
 def test_the_shipped_board_exceeds_every_strongly_solved_state_space():
-    """H4 clause 1, checked against the rows that are actually graded."""
+    """H4 clause 1, checked against the **published** rows.
+
+    The filter on ``solved_source`` is the point of this test, not a detail.
+    FLIPHEX's own reduced boards became "strongly solved" on 2026-09-20, when
+    the field stopped being hardcoded; without the filter they would enter the
+    comparison set, where ``10^17.69 > 10^10.24`` holds trivially and quietly
+    weakens the claim into "FLIPHEX is bigger than smaller FLIPHEX". H4 clause 1
+    is a statement about the landscape of other games.
+    """
     strong = [
         r
         for r in ROWS
-        if r.solved == "strongly solved" and r.state_space.log10 is not None
+        if r.solved == "strongly solved"
+        and r.solved_source != "this project"
+        and r.state_space.log10 is not None
     ]
     assert strong
     assert all(SHIPPED.state_space.log10 > r.state_space.log10 for r in strong)

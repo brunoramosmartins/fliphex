@@ -183,7 +183,7 @@ az/            Axis 2 — AlphaZero self-play                 (Phase 4)
 complexity/    Axis 3 — structural analysis                 (Phase 6)
 agents/        random, heuristic, solver, AZ
 stats/         Wilson intervals, bootstrap, paired tests
-ui/            CLI, pygame window, replay viewer, shared session
+ui/            CLI, pygame window, replay viewer, shared session and palette
 web/           the browser build — the engine under Pyodide (Phase 7)
 figures/       seven canonical figures, one per verdict
 scripts/       experiment entry points and doc generators
@@ -217,9 +217,15 @@ cd web && npm install && npm test
 ### Generated files
 
 `docs/board-geometry.md` and `docs/piece-archetypes.md` come from
-`scripts/build_docs.py`; `web/payload.json` and `web/geometry.json` come from
-`scripts/build_web.py`. Both refuse to be edited by hand — CI fails if the tree
-is dirty after a rebuild.
+`scripts/build_docs.py`; `web/payload.json`, `web/geometry.json` and
+`web/theme.css` come from `scripts/build_web.py`. All of them refuse to be
+edited by hand — CI fails if the tree is dirty after a rebuild.
+
+The last two are the same idea applied twice. The board's cell positions come
+from `ui/session.py` and the palette from `ui/theme.py`, so the window and the
+page **cannot** draw a different board or a different purple from each other.
+What they deliberately do not share is layout: a window and a web page owe each
+other the same answers, not the same pixels.
 
 ```bash
 python scripts/build_docs.py && python scripts/build_web.py

@@ -573,6 +573,87 @@ Recorded as adr-013's third amendment. 56 checks now run under jsdom, and the
 negative ones are the ones that matter — `example.com`, `172.32.0.1` and
 `notlocalhost.com` all have to come back restricted.
 
+## An outside design review, and what I took from it
+
+A reviewer read three screenshots and wrote a long critique. Its central claim:
+*the problem is not a lack of beauty, it is that the interface still communicates
+"development tool" rather than "finished project"* — most visibly in pygame.
+That is right, and the useful part is that it is a claim about **communication**
+rather than taste, so it can be argued with rather than only agreed with.
+
+Taken, in the order the argument is strongest:
+
+**"A shortcut is acceleration, not discovery."** The footer read `n new game ·
+b board, c colour, o opponent (right-click or shift for back)` — a shortcut list
+pretending to be an interface. Someone seeing the window for the first time had
+to read a 12px line to learn that a new game was possible at all. The keys now
+live **on** the controls they trigger, New game and Undo are chips rather than
+keystrokes, and the footer is down to the two gestures that have no button
+because they act on a move you are part-way through.
+
+**Undo has to be disabled when there is nothing to undo, in the hit test and not
+only in the drawing.** A control that looks unavailable and still fires says one
+thing and does another. `button_at` refuses disabled buttons; the test asserts
+the refusal, not the colour.
+
+**The score was 26px bold and the turn indicator was 15px, and that is
+backwards.** The score is the board's own arithmetic and the board is right
+there. What a player cannot read off the board is whether the window is waiting
+for *them*. So the headline is now the large line and it is in the second
+person: **"Your turn"**, or **"Solver is thinking…"**, or "You win". "Purple to
+move" asked the player to remember which colour they held, every turn, in a
+window whose entire recent change was making that colour a choice.
+
+**The window wore pygame's logo.** The cheapest possible signal that an
+application was assembled rather than designed. It now carries the split
+hexagon the page uses as its favicon, built from the same two colours.
+
+**"One geometry, two renderers" should extend to the palette.** This was the
+best idea in the review and it is the one with teeth. `ui/session.py` already
+held the one geometry and both interfaces scale it. The palette had no such
+rule: `ui/pygame_ui.py` carried twelve hand-copied RGB tuples under a comment
+reading *"matching web/style.css"*, and `web/style.css` carried twelve hex
+strings under a comment saying the same thing back. Two declarations and a pair
+of comments asserting they agreed.
+
+A comment is not a constraint. `ui/theme.py` now holds the palette, the window
+reads it directly, and `scripts/build_web.py` generates `web/theme.css` from it
+— the same arrangement, for the same reason, as `web/geometry.json`. It also
+removed a duplication nobody had noticed: the dark scheme was written out twice
+in the stylesheet, once under `prefers-color-scheme` and once under
+`[data-theme]`. Both now come from one dict. A drifting colour is a dirty
+working tree in CI.
+
+### What I declined, and why
+
+**A two-column pygame layout, board left and panel right.** The sketch claims it
+would give the board more prominence; it would give it *less*. `fit_board`
+already maximises the board inside the space it has, and the vertical margin the
+review read as wasted space is the aspect ratio of five columns of flat-top
+hexagons, not a design choice. Taking 300px for a sidebar shrinks the only
+object on screen that matters.
+
+**Splitting "Game" from "Research" modes.** This is the one I'd push back on
+hardest. The proposal is that a player mode and a researcher mode should be
+separate surfaces — but the whole claim of this repository is that they are the
+*same artifact*: the thing you play is the thing that produced the verdicts, and
+the opponent selector is the research control. Hiding the solver behind a
+"Research" tab would make the page look tidier and say something false about the
+project. It also contradicts the review's own best advice, which was to add
+hierarchy rather than surface.
+
+**A coordinates toggle.** More configuration, to solve a problem better solved
+by weight. The cell names are already the quietest thing on the board.
+
+**Microanimations, an About dialog, a How-to-play modal.** The page has a "How
+it works" `<details>` and both interfaces now name what they are waiting for.
+Everything else here is P4 in the review's own ordering and would be surface
+added before the structure is finished.
+
+**The boot note "is architecture text in the player's space".** Read off a
+screenshot of a loading state. It is hidden the moment the engine is ready —
+about four seconds — and while it is showing, explaining the wait *is* the job.
+
 ## `writeup/main-writeup.md` — the long-form article
 
 ## `exercises/ex05_complexity_analysis.md` — carried from Phases 5 and 6
