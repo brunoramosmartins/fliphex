@@ -93,28 +93,75 @@ def test_every_figure_has_a_caption_for_the_writeup(figure):
 
 
 @pytest.mark.parametrize("figure", FIGURES, ids=[f.name for f in FIGURES])
-def test_the_rendered_file_exists(figure):
-    """The Phase 5 failure was an empty directory, so check the output too."""
+def test_the_rendered_file_is_not_empty_when_present(figure):
+    """A fresh clone has no PNGs, by design — see the next test.
+
+    So absence is not a failure here; a rendered file that is a stub would be.
+    """
     path = FIGURES_DIR / figure.name
-    assert path.exists(), f"{figure.name} has never been built"
+    if not path.exists():
+        pytest.skip("not rendered here — run `python -m figures.build`")
     assert path.stat().st_size > 20_000, f"{figure.name} looks empty"
 
 
-@pytest.mark.parametrize("figure", FIGURES, ids=[f.name for f in FIGURES])
-def test_the_rendered_file_is_in_the_repository(figure):
-    """Enforced where it matters, advisory where it does not.
+def test_the_figures_are_ignored_because_their_inputs_are_tracked():
+    """The .gitignore rule, encoded so it stays a decision rather than a habit.
 
-    On a fresh clone and in CI the file is either committed or absent, and
-    absent must fail — that is the Phase 5 failure mode. On the machine that
-    just rebuilt it, the file exists but is not yet staged, and failing there
-    would only be telling the author to run ``git add``. So that case skips
-    with the instruction instead.
+    ``figures/*.png`` is gitignored, and the rule written above it in
+    ``.gitignore`` says why: *track the per-item record when regenerating it
+    needs something the repository does not have. Reproducibility is the test,
+    not size.* A rendered figure needs only tracked inputs and a few seconds, so
+    it stays out.
+
+    That is legitimate **exactly as long as every input is tracked**, which
+    ``test_every_source_is_tracked_by_git`` asserts. This test pins the other
+    half: that the outputs really are ignored on purpose. If someone starts
+    committing PNGs, or stops ignoring them, that is a decision worth making
+    deliberately rather than discovering.
     """
-    path = f"figures/{figure.name}"
-    if not tracked(path):
-        if (FIGURES_DIR / figure.name).exists():
-            pytest.skip(f"rebuilt but not staged — run `git add {path}`")
-        pytest.fail(f"{figure.name} is neither built nor in the repository")
+    ignored = subprocess.run(
+        ["git", "check-ignore", "figures/complexity-landscape.png"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert ignored.returncode == 0, (
+        "figures/*.png is no longer gitignored. That may be right, but it "
+        "reverses the rule written in .gitignore and should be a deliberate "
+        "change with the rationale updated."
+    )
+    assert not any(
+        name.endswith(".png")
+        for name in subprocess.run(
+            ["git", "ls-files", "figures/"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.split()
+    )
+
+
+def test_a_builder_really_produces_a_file():
+    """The actual guard against Phase 5's empty directory.
+
+    Needs the ``figures`` extra, so it skips in CI and runs for whoever has it.
+    Everything else here checks declarations; this one checks that a declaration
+    turns into a PNG.
+
+    It **writes into ``figures/``**, which is unusual for a test and is fine
+    here: that directory is gitignored output, the file it writes is the one the
+    builder would write anyway, and a build that cannot run is the failure this
+    is looking for.
+    """
+    pytest.importorskip("matplotlib", reason="figures extra not installed")
+    from figures.build import render
+
+    figure = by_name("h6-perturbation-lattice.png")
+    written = ROOT / render(figure)
+    assert written.exists()
+    assert written.stat().st_size > 20_000
 
 
 def test_the_gallery_is_current():
@@ -128,9 +175,17 @@ def test_the_gallery_is_current():
 
 
 def test_the_directory_holds_no_stray_images():
-    """Every PNG in figures/ is in the manifest, or it is not canonical."""
-    rendered = {p.name for p in FIGURES_DIR.glob("*.png")}
-    assert rendered == {f.name for f in FIGURES}
+    """Every PNG present is in the manifest — a *subset*, never an equality.
+
+    A fresh clone has none of them, because ``figures/*.png`` is gitignored and
+    nothing has run the builders yet. Requiring equality would fail there and
+    say nothing true. What must not happen is a rendered file nobody declared:
+    an unlisted PNG has no recorded source and no caption, which is the state
+    this directory's manifest exists to prevent.
+    """
+    rendered = {path.name for path in FIGURES_DIR.glob("*.png")}
+    declared = {figure.name for figure in FIGURES}
+    assert rendered <= declared, f"undeclared figures: {sorted(rendered - declared)}"
 
 
 @pytest.mark.parametrize("figure", FIGURES, ids=[f.name for f in FIGURES])
