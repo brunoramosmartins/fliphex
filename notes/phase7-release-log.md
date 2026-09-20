@@ -405,6 +405,62 @@ it would be guessing.
 
 ## `ui/replay_viewer.py` — play back saved games from `data/`
 
+## `ui/replay_viewer.py` — play back saved games
+
+**There were no saved games.** The roadmap says *"play back saved games from
+`data/`"*, so the first thing was to look for one. `results/*.json` is tracked,
+but EXP-017's `games` field is the integer **5,000**, not five thousand move
+lists; EXP-008's `moves` is a count; EXP-014's `history` is training
+generations. `data/az-runs/` and `results/*.jsonl` are gitignored. **Not one
+ordered game survives a clone of this repository.**
+
+That is the third appearance of the defect the `figures/` clause was written to
+catch, and this time it suggested the design rather than just blocking it.
+
+### A game is cheaper than a file
+
+Agents take their seed at construction — the `Agent` contract — so a game
+between two of them is a **deterministic function of variant, seats and seed**.
+A recording does not need a position per ply, or a file at all: `5x3-h1`,
+`heuristic`, `random`, `seed 7` reproduce it exactly, anywhere.
+
+So the viewer's default source is a game recorded **on the spot**. No file, no
+artefact, no network; it works on a fresh clone with no arguments. `--load`
+still reads a file when one exists.
+
+### Two refusals, because a file is data and data is not trusted
+
+`Recording.replay()` walks every move through `legal_moves` and refuses the
+first illegal one **by ply and by tile** — a corrupted or hand-edited move list
+fails there rather than being drawn as though it were a game:
+
+```
+✗ move 5 of 9 is not legal here: P1 at B1 rotation 0
+```
+
+`Recording.verify()` goes further: a recording that names seats and a seed is
+*claiming* the game is a function of them, and that claim is checkable. It
+re-derives the game and refuses one whose moves do not match. A recording
+cannot carry a provenance it did not come from. Where a seat was human, or no
+seed was kept, it says the game is not reproducible instead of pretending.
+
+### The viewer
+
+Arrow keys step, Home and End jump, space plays at 700 ms a ply, and the
+scrubber seeks — one tick per ply, so the scale is visible rather than implied.
+The tile just placed is rimmed white and the tiles it flipped are rimmed green,
+because reading a replay means seeing cause and effect rather than a board that
+changed.
+
+Seeking rebuilds from ply zero every time rather than keeping an undo stack. A
+game is at most 25 plies and the engine applies one in microseconds, so the
+simple thing is also the fast thing, and a scrubber that can land anywhere needs
+no special case.
+
+`ui/pygame_ui.py`'s `draw_hex` and `draw_arrow` moved to module level so both
+windows draw the same shapes from the same code. 34 tests for `ui/replay.py`,
+plus scrubber arithmetic and a headless window smoke under SDL's dummy driver.
+
 ## `writeup/main-writeup.md` — the long-form article
 
 ## `exercises/ex05_complexity_analysis.md` — carried from Phases 5 and 6

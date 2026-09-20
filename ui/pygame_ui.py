@@ -158,6 +158,35 @@ def describe(result: dict[str, Any], cell_name: str) -> str:
     return ", ".join(parts) + "."
 
 
+# -- drawing primitives, shared with the replay viewer -------------------------
+
+
+def draw_hex(pygame, screen, centre, radius, fill, width=0) -> None:
+    """One hexagon. Module level so ``ui.replay_viewer`` draws the same shape."""
+    pygame.draw.polygon(screen, fill, hex_corners(centre[0], centre[1], radius), width)
+
+
+def draw_arrow(pygame, screen, centre, radius, slot, colour, scale=1.0) -> None:
+    """One arrow, from just outside the centre to just inside the edge."""
+    dx, dy = direction_vector(slot)
+    cx, cy = centre
+    start = (cx + dx * radius * 0.24, cy + dy * radius * 0.24)
+    end = (cx + dx * radius * 0.64, cy + dy * radius * 0.64)
+    pygame.draw.line(screen, colour, start, end, max(2, int(radius * 0.075 * scale)))
+    tip = (cx + dx * radius * 0.86, cy + dy * radius * 0.86)
+    px, py = -dy, dx
+    wing = radius * 0.15 * scale
+    pygame.draw.polygon(
+        screen,
+        colour,
+        [
+            tip,
+            (end[0] + px * wing, end[1] + py * wing),
+            (end[0] - px * wing, end[1] - py * wing),
+        ],
+    )
+
+
 # -- the window ----------------------------------------------------------------
 
 
@@ -206,30 +235,10 @@ class Window:
     # -- drawing ---------------------------------------------------------------
 
     def _hex(self, centre: tuple[float, float], r: float, fill, width: int = 0) -> None:
-        self.pygame.draw.polygon(
-            self.screen, fill, hex_corners(centre[0], centre[1], r), width
-        )
+        draw_hex(self.pygame, self.screen, centre, r, fill, width)
 
     def _arrow(self, centre, r, slot, colour, scale=1.0) -> None:
-        dx, dy = direction_vector(slot)
-        cx, cy = centre
-        start = (cx + dx * r * 0.24, cy + dy * r * 0.24)
-        end = (cx + dx * r * 0.64, cy + dy * r * 0.64)
-        self.pygame.draw.line(
-            self.screen, colour, start, end, max(2, int(r * 0.075 * scale))
-        )
-        tip = (cx + dx * r * 0.86, cy + dy * r * 0.86)
-        px, py = -dy, dx
-        wing = r * 0.15 * scale
-        self.pygame.draw.polygon(
-            self.screen,
-            colour,
-            [
-                tip,
-                (end[0] + px * wing, end[1] + py * wing),
-                (end[0] - px * wing, end[1] - py * wing),
-            ],
-        )
+        draw_arrow(self.pygame, self.screen, centre, r, slot, colour, scale)
 
     def _draw_board(self) -> None:
         placement = self.placement

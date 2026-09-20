@@ -291,3 +291,89 @@ def test_the_window_opens_paints_and_plays_a_move():
     )
     assert result.returncode == 0, result.stderr[-2000:]
     assert "SMOKE OK" in result.stdout
+
+
+# -- the replay viewer ---------------------------------------------------------
+
+
+def test_the_scrubber_maps_its_ends_to_the_ends_of_the_game():
+    pygame = pytest.importorskip("pygame")
+    from ui.replay_viewer import ply_at, scrubber_rect
+
+    rect = scrubber_rect(pygame)
+    assert ply_at(rect.left, 25, rect) == 0
+    assert ply_at(rect.right, 25, rect) == 25
+    assert ply_at(rect.centerx, 24, rect) == 12
+
+
+def test_the_scrubber_clamps_a_click_outside_itself():
+    pygame = pytest.importorskip("pygame")
+    from ui.replay_viewer import ply_at, scrubber_rect
+
+    rect = scrubber_rect(pygame)
+    assert ply_at(rect.left - 500, 25, rect) == 0
+    assert ply_at(rect.right + 500, 25, rect) == 25
+
+
+def test_an_empty_recording_does_not_divide_by_zero():
+    pygame = pytest.importorskip("pygame")
+    from ui.replay_viewer import ply_at, scrubber_rect
+
+    assert ply_at(100, 0, scrubber_rect(pygame)) == 0
+
+
+_REPLAY_SMOKE = """
+from ui.replay import Recording, Replay
+from ui.replay_viewer import Viewer, ply_at, scrubber_rect
+from fliphex.variant import THREE_BY_THREE
+import pygame
+
+recording = Recording.from_seats(THREE_BY_THREE, "heuristic", "random", seed=2)
+recording.replay()
+viewer = Viewer(Replay(recording))
+
+viewer._paint()
+assert viewer.replay.ply == 0
+
+viewer.step(1)
+viewer._paint()
+assert viewer.replay.ply == 1 and "ply 1/9" in viewer.replay.caption()
+
+viewer.goto(9)
+viewer._paint()
+assert viewer.snapshot["terminal"]
+assert viewer.snapshot["winner"] == recording.outcome["winner"]
+
+viewer.goto(0)
+assert set(viewer.snapshot["colours"]) == {"EMPTY"}
+
+rect = scrubber_rect(pygame)
+viewer.goto(ply_at(rect.centerx, viewer.replay.total, rect))
+viewer._paint()
+assert viewer.replay.ply == 4
+
+viewer.playing = True
+viewer.goto(9)
+viewer.step(1)
+assert viewer.playing is False, "playing must stop at the end"
+print("SMOKE OK")
+"""
+
+
+def test_the_replay_viewer_opens_paints_and_seeks():
+    """The window itself, under SDL's dummy driver."""
+    import os
+    import subprocess
+    import sys
+
+    pytest.importorskip("pygame")
+    environment = {**os.environ, "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy"}
+    result = subprocess.run(
+        [sys.executable, "-c", _REPLAY_SMOKE],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+    assert "SMOKE OK" in result.stdout
