@@ -185,14 +185,23 @@ main {
 
 .playable-mark {
   fill: var(--purple-soft);
-  opacity: .5;
+  opacity: 0;
   transition: opacity .15s ease, r .15s ease;
 }
 
-g.cell-group.playable .ring { opacity: .55; }
+/* Only under the pointer, and only while a piece is held. `playable_cells`
+   returns the *empty* cells — any tile may go on any of them — so ringing all
+   24 announced what the visitor could already see, and buried the one moment
+   that carries information: "this one, if you click". */
+g.cell-group.playable .ring { opacity: 0; }
 g.cell-group.playable:hover .ring { opacity: 1; }
 g.cell-group.playable:hover .playable-mark { opacity: .9; }
 g.cell-group.selected .ring { opacity: 1; stroke-width: .1; }
+
+/* No hover to lean on, so the cells a tap can reach keep a faint mark. */
+@media (hover: none) {
+  g.cell-group.playable .ring { opacity: .28; }
+}
 
 .cell-name {
   font-size: .17px;

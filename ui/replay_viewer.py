@@ -42,6 +42,7 @@ from typing import Any
 from fliphex.state import Colour
 from fliphex.variant import Arm, Variant
 from ui.pygame_ui import (
+    ARROW_PLACED_MIX,
     COORD_EMPTY,
     COORD_FILLED,
     DANGER,
@@ -62,7 +63,7 @@ from ui.pygame_ui import (
 )
 from ui.replay import Recording, RecordingError, Replay
 from ui.seats import SEAT_KINDS
-from ui.theme import TYPE_SCALE, font_families
+from ui.theme import TYPE_SCALE, font_families, mix
 
 WIDTH = 900
 BOARD_H = 600
@@ -115,7 +116,8 @@ class Viewer:
     # -- drawing ---------------------------------------------------------------
 
     def _draw_board(self) -> None:
-        flipped = set(self.replay.flipped())
+        gained = set(self.replay.gained())
+        handed_back = set(self.replay.handed_back())
         placed = {p["cell"]: p for p in self.replay.session.history_for_drawing()}
         latest = self.replay.last["move"]["cell"] if self.replay.last else None
 
@@ -129,12 +131,17 @@ class Viewer:
             # coloured one. Reading a replay means seeing cause and effect.
             if cid == latest:
                 draw_hex(self.pygame, self.screen, centre, radius, WHITE, 3)
-            elif cid in flipped:
+            elif cid in gained:
                 draw_hex(self.pygame, self.screen, centre, radius, GREEN_SOFT, 3)
+            elif cid in handed_back:
+                # Red, as the playing window's preview draws it. Green here and
+                # red there would teach the toggle rule backwards.
+                draw_hex(self.pygame, self.screen, centre, radius, DANGER, 3)
             else:
                 draw_hex(self.pygame, self.screen, centre, radius, LINE, 2)
 
             if cid in placed:
+                tint = mix(WHITE, colour_of(state), ARROW_PLACED_MIX)
                 for slot in placed[cid]["arrows"]:
                     draw_arrow(
                         self.pygame,
@@ -142,7 +149,7 @@ class Viewer:
                         centre,
                         self.placement.radius,
                         slot,
-                        WHITE,
+                        tint,
                     )
             tint = COORD_EMPTY if state == "EMPTY" else COORD_FILLED
             label = self.small.render(cell["name"], True, tint)
@@ -200,7 +207,7 @@ class Viewer:
             self.screen,
             DANGER if self.playing else PURPLE,
             (int(head), rect.centery),
-            8,
+            6,
         )
 
     def _paint(self) -> None:

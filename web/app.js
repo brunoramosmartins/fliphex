@@ -503,7 +503,7 @@ function markPlayable(cells) {
     const playable = cells.includes(id);
     group.classList.toggle("playable", playable);
     group.querySelector('[data-role="hit"]').classList.toggle("playable", playable);
-    group.querySelector(".playable-mark").setAttribute("opacity", playable ? 1 : 0);
+    // Visibility is CSS's: the mark shows under the pointer, not on all 24.
   }
 }
 
@@ -512,7 +512,6 @@ function clearMarks() {
     const group = ui.board.querySelector(`g[data-cell="${id}"]`);
     group.classList.remove("playable", "selected");
     group.querySelector('[data-role="hit"]').classList.remove("playable");
-    group.querySelector(".playable-mark").setAttribute("opacity", 0);
   }
 }
 

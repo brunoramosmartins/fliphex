@@ -654,6 +654,66 @@ added before the structure is finished.
 screenshot of a loading state. It is hidden the moment the engine is ready —
 about four seconds — and while it is showing, explaining the wait *is* the job.
 
+## A third design pass, and the review that was reading stale code
+
+The reviewer quoted `radius * 0.075` for the arrow shaft, `radius * 0.15` for
+its head, `SysFont("dejavusans,arial", 15)` for the type and `big` for the net
+badge — all four already changed in the previous commit. Their recommended
+range for the shaft was **0.045–0.055R** and for the wing **0.09–0.11R**; the
+code was sitting at 0.05 and 0.105.
+
+That is worth recording rather than scoring a point on, because the *diagnosis
+still held against the current prints*. The screenshots were rendered after the
+change and the arrows still read heavy. So the cause was somewhere else, and
+looking for it found the actual defect.
+
+**`pygame.draw` ignores the alpha channel.** The board drew every placed tile's
+arrows with `(255, 255, 255, 190)` — an intent to draw them at 75% opacity. On a
+surface without `SRCALPHA` the draw functions do not blend, so that alpha had
+never done anything and the arrows had been fully opaque white since the file
+was written. Verified directly: drawing that colour over the purple and reading
+the pixel back gives `(255, 255, 255)`.
+
+The page had it right all along — `.arrow-placed { stroke: rgba(255,255,255,.75) }`
+and CSS *does* honour it. So the two interfaces had disagreed about this from
+the start, with the window silently losing. Fixed by mixing towards the colour
+the cell currently shows, at `ARROW_PLACED_MIX = 0.25`, which is the same
+number the stylesheet has always used.
+
+**The better catch was the second one, and it is about information rather than
+weight.** Selecting a piece ringed *every* legal cell in purple with a dot in
+the middle. `playable_cells` returns the empty cells — any tile may go on any of
+them — so on an opening board that lit 24 of 25 hexagons to tell the player
+something the colours already told them. It also buried the only moment that
+carries information: **this one, if you click**. The ring now appears under the
+cursor and on the selected cell, nowhere else, in both interfaces. The window
+gained a hover state to do it; the page had `:hover` already and needed a
+`@media (hover: none)` fallback so a phone keeps a faint mark.
+
+**And a grammar inconsistency between the three renderers.** The playing
+window's preview draws a cell you are about to capture in green and one you are
+about to hand back in red. The replay viewer drew **both green**, because
+`Replay.flipped()` returns one list. A flip is a toggle (adr-007) and handing a
+tile to your opponent is the rule a reader is most likely to get wrong — so the
+one interface built for reading a game was teaching it backwards. Split into
+`gained()` and `handed_back()`, with a test that asserts they partition
+`flipped()` and that at least one of each actually occurred.
+
+### Declined
+
+**A separate `ui/fonts.py`, beside `ui/theme.py`.** The argument is that
+typography has an asset component the palette does not. True — and the split
+becomes right the moment `assets/fonts/` exists, because then there is loading,
+fallback and licence handling to put somewhere. Today it would be three
+constants in a module of their own. The module is called `theme`, not
+`palette`.
+
+**Vendoring IBM Plex Sans.** Not a disagreement, a blocker: `fc-list` shows only
+DejaVu on this machine, and the stack in `ui/theme.py` already lists Plex, Source
+Sans 3, Inter and Noto ahead of it, so all three renderers move together the day
+the files land. It needs a download and a licence file in the repository, which
+is the author's call and not a refactor.
+
 ## `writeup/main-writeup.md` — the long-form article
 
 ## `exercises/ex05_complexity_analysis.md` — carried from Phases 5 and 6

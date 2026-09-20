@@ -263,6 +263,14 @@ ARROW_TIP = 0.88
 ARROW_WING = 0.105
 ARROW_WEIGHT = 0.05
 
+#: How far a placed tile's arrow is mixed towards the colour it sits on.
+#: 0.25 is `rgba(255, 255, 255, .75)`, which is what `web/style.css` has always
+#: drawn — so the two interfaces now agree on this as well. The window did not:
+#: it passed `(255, 255, 255, 190)`, and `pygame.draw` **ignores** the alpha
+#: channel on a surface without SRCALPHA, so the intent existed as a number and
+#: never as a picture.
+ARROW_PLACED_MIX = 0.25
+
 
 def draw_arrow(pygame, screen, centre, radius, slot, colour, scale=1.0) -> None:
     """One arrow, from just outside the centre to just inside the edge."""
@@ -429,6 +437,9 @@ class Window:
 
         self.selected_tile: int | None = None
         self.selected_cell: int | None = None
+        #: The cell under the cursor, or None. Only meaningful while a piece is
+        #: held, which is the only time it is drawn.
+        self.hover_cell: int | None = None
         self.options: list[dict[str, Any]] = []
         self.option_index = 0
         self.flash: set[int] = set()
@@ -485,10 +496,15 @@ class Window:
                 radius *= 0.86
             self._hex(centre, radius, colour_of(state))
             self._hex(centre, radius, LINE, 2)
-            if cid in playable:
+            # Only the cell under the cursor, and only while a piece is held.
+            # `playable_cells` returns the *empty* cells — a tile may go on any
+            # of them — so ringing all 24 announced what the player could
+            # already see, and the one moment that carries information, "this
+            # one, if you click", was lost inside it.
+            if cid in playable and cid == self.hover_cell:
                 self._hex(centre, radius * 0.97, PURPLE_SOFT, 3)
                 self.pygame.draw.circle(
-                    self.screen, PURPLE_SOFT, (int(centre[0]), int(centre[1])), 5
+                    self.screen, PURPLE_SOFT, (int(centre[0]), int(centre[1])), 4
                 )
             label = self.micro.render(
                 cell["name"], True, COORD_EMPTY if state == "EMPTY" else COORD_FILLED
@@ -496,9 +512,15 @@ class Window:
             self.screen.blit(label, label.get_rect(center=centre))
 
         for placed in self.session.history_for_drawing():
-            centre = placement.centre(self.cells[placed["cell"]])
+            cell = self.cells[placed["cell"]]
+            centre = placement.centre(cell)
+            # Mixed towards the colour the cell is *now*, which is what the
+            # page has always drawn and the window never did. See
+            # ARROW_PLACED_MIX.
+            state = self.snapshot["colours"][cell["id"]]
+            tint = mix(WHITE, colour_of(state), ARROW_PLACED_MIX)
             for slot in placed["arrows"]:
-                self._arrow(centre, placement.radius, slot, (255, 255, 255, 190))
+                self._arrow(centre, placement.radius, slot, tint)
 
         self._draw_preview()
 
@@ -946,6 +968,12 @@ class Window:
                     running = False
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button in (1, 3):
                     self._on_click(event.pos, backwards=event.button == 3)
+                elif event.type == pygame.MOUSEMOTION:
+                    self.hover_cell = (
+                        cell_at(event.pos, self.cells, self.placement)
+                        if event.pos[1] < BOARD_H
+                        else None
+                    )
                 elif event.type == pygame.MOUSEWHEEL:
                     self._rotate(-event.y)
                 elif event.type == pygame.KEYDOWN:

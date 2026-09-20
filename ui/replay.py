@@ -300,6 +300,23 @@ class Replay:
         """Cells the most recent step flipped, for the viewer to animate."""
         return list(self.last["flipped"]) if self.last else []
 
+    def _targets(self, kind: str) -> list[int]:
+        effects = self.last["effects"] if self.last else []
+        return [e["target"] for e in effects if e["kind"] == kind]
+
+    def gained(self) -> list[int]:
+        """Cells the last move took from the opponent."""
+        return self._targets("flip")
+
+    def handed_back(self) -> list[int]:
+        """Cells the last move handed to the opponent.
+
+        A flip is a toggle (adr-007), so an arrow pointing at your own tile
+        loses it. The viewer drew these the same green as a capture, which is
+        the one thing about this rule a reader must not be taught wrongly.
+        """
+        return self._targets("self-flip")
+
     def caption(self) -> str:
         """One line describing where the cursor is."""
         if self.at_start:

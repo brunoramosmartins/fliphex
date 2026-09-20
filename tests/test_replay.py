@@ -250,3 +250,29 @@ def test_a_caption_reports_flips_when_there_are_any(replay):
         replay.forward().get("ply") and replay.caption() for _ in range(replay.total)
     ]
     assert any("flipping" in c for c in captions if c)
+
+
+def test_a_self_flip_is_reported_apart_from_a_capture():
+    """The viewer drew both the same green until 2026-09-20.
+
+    A flip is a toggle (adr-007): an arrow aimed at your own tile hands it over.
+    Drawing that in the colour of a capture teaches the one rule a reader is
+    most likely to get wrong, backwards.
+    """
+    recording = Recording.from_seats(THREE_BY_THREE, "heuristic", "heuristic", seed=0)
+    cursor = Replay(recording)
+    seen_any = False
+    for ply in range(1, cursor.total + 1):
+        cursor.goto(ply)
+        gained, given = cursor.gained(), cursor.handed_back()
+        assert not (set(gained) & set(given)), "a cell cannot be both at once"
+        assert sorted(gained + given) == sorted(cursor.flipped())
+        seen_any = seen_any or bool(gained or given)
+    assert seen_any, "no flip happened at all, so this checked nothing"
+
+
+def test_at_the_opening_nothing_has_flipped_either_way():
+    recording = Recording.from_seats(THREE_BY_THREE, "heuristic", "heuristic", seed=0)
+    cursor = Replay(recording)
+    assert cursor.gained() == []
+    assert cursor.handed_back() == []
