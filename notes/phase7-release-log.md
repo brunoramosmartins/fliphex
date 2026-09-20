@@ -716,6 +716,50 @@ is the author's call and not a refactor.
 
 ## `writeup/main-writeup.md` — the long-form article
 
+A **skeleton with prompts**, not a draft. The piece is first person and about my
+own game, so it follows the rule the TILs already follow rather than the one the
+phase notes do. What the repository owes it is structure, and every number in
+its proper place so the writing never stops to go and look one up: the skeleton
+pins about sixty figures against `docs/research.md`, and says outright that if
+any of them disagrees with the research file, the research file wins.
+
+It follows `writeup/outline.md`'s eight sections, which have been sitting there
+since Phase 0 so each phase knew what it was feeding. Three additions the
+outline could not have had:
+
+- **A word allocation per heading**, summing to ~8,000, with a note that §§4, 5
+  and 7 are half the piece and that §§1 and 8 are the only ones nobody else
+  could write — so they must not get squeezed by the technical middle.
+- **A standing instruction about tone**, at the top, because the result is
+  *shaped* like a list of things that did not work: two rejected hypotheses, one
+  true by construction, a locked figure 236× wrong, 135 hours that came fourteen
+  points short, and a database that was never built. The instruction is to write
+  that as the finding rather than as an apology, and specifically not as a
+  redemption arc — the same warning TIL #5's skeleton carries.
+- **§8 gets "what exists now"** ahead of "what I would do differently", because
+  Phase 7 produced three interfaces on one engine and a call to action is worth
+  a paragraph in a portfolio piece — including the honest line that a clone has
+  neither the champion nor the database and falls back to search.
+
+Two structural choices worth recording. **The Phase 0 symmetry error is placed
+in §2, not §8.** "The board has no symmetry at all" was written on 2026-07-23
+and corrected six days later to a Z/2 mirror that turns out to buy nothing
+anyway, because the chiral `P3-y` breaks it at the game level. A formalisation
+section that admits one wrong structural claim is more credible than one that
+does not, and moving it to a lessons list at the end would be hiding it in the
+place readers skim.
+
+And **§7 is told to go row by row with the caveat attached**, because every one
+of the six verdicts turns on something the headline does not carry: H1's locked
+20-seed tournament was withdrawn unrun, H2's shipped-board arm cannot be built,
+H3's two unread comparison members are also unreadable, H4 carries two locked
+errors in one statement, H5's measure is forced in both halves, and H6's
+perturbation set cannot falsify it. The suggested closing for that section is
+the one I would defend: pre-registration prevented none of it and made all of it
+visible and dated.
+
+The prompts are questions to write *from*. No prose was drafted.
+
 ## `exercises/ex05_complexity_analysis.md` — carried from Phases 5 and 6
 
 Carried from Phase 5, carried again from Phase 6, written here. The delay turned
