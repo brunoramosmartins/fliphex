@@ -11,18 +11,25 @@ from fliphex.board import OFF_BOARD, Board
 from fliphex.piece import N_SLOTS
 from fliphex.variant import FIVE_BY_THREE, FULL_GAME, THREE_BY_THREE
 from ui.pygame_ui import (
+    BOARDS as STRIP_BOARDS,
+)
+from ui.pygame_ui import (
     EMPTY,
     GREEN,
     PURPLE,
+    Control,
     Placement,
+    board_values,
     cell_at,
     colour_of,
+    control_at,
     describe,
     direction_vector,
     fit_board,
     hex_corners,
     net_label,
 )
+from ui.seats import SEAT_KINDS
 from ui.session import layout
 
 BOARDS = [Board(5, 5), Board(5, 3), Board(3, 3)]
@@ -381,7 +388,76 @@ def test_the_replay_viewer_opens_paints_and_seeks():
 
 # -- which colour the person holds ---------------------------------------------
 
-_SEAT_SMOKE = '''
+# -- the control strip ---------------------------------------------------------
+
+
+def test_every_board_the_strip_offers_has_an_odd_cell_count():
+    """adr-011: an even board admits draws and has no tie-break.
+
+    The 4x4 is withdrawn rather than merely absent, and a control that cycles
+    onto it would put a player in a game the rules cannot finish.
+    """
+    for board in STRIP_BOARDS:
+        cols, _, rows = board.partition("x")
+        assert (int(cols) * int(rows)) % 2 == 1, f"{board} has an even cell count"
+
+
+def test_the_strip_keeps_a_board_named_on_the_command_line():
+    assert board_values("5x5") == STRIP_BOARDS
+    assert board_values("5x1") == ("5x1", *STRIP_BOARDS)
+    assert board_values("5x1")[0] == "5x1", "the board asked for is the one shown"
+
+
+def test_a_control_cycles_in_both_directions_and_wraps():
+    control = Control("Against", ("human", "random", "heuristic"), 2)
+    assert control.value == "heuristic"
+    assert control.step(1) == "human", "forwards from the last wraps to the first"
+    assert control.step(-1) == "heuristic", "and backwards wraps the other way"
+    assert control.step(-1) == "random"
+
+
+def test_a_control_can_hold_every_seat_the_project_builds():
+    """The window is local, so it offers what `ui.seats` offers — all six.
+
+    The browser page is the one that restricts its list, and it restricts it by
+    origin rather than by deleting a seat: `web/app.js` publishes human and
+    heuristic and widens to the solver on a local host.
+    """
+    control = Control("Against", SEAT_KINDS, 0)
+    seen = {control.step(1) for _ in SEAT_KINDS}
+    assert seen == set(SEAT_KINDS)
+
+
+class _FakeRect:
+    """Just enough of ``pygame.Rect`` to hit-test without a display."""
+
+    def __init__(self, hit: bool) -> None:
+        self.hit = hit
+
+    def collidepoint(self, _position) -> bool:
+        return self.hit
+
+
+def test_a_click_finds_the_control_it_landed_on():
+    controls = {
+        "board": Control("Board", ("3x3",), 0, _FakeRect(False)),
+        "side": Control("You play", ("purple",), 0, _FakeRect(True)),
+    }
+    assert control_at((0, 0), controls) == "side"
+
+
+def test_a_click_outside_every_control_is_not_a_control():
+    controls = {"board": Control("Board", ("3x3",), 0, _FakeRect(False))}
+    assert control_at((0, 0), controls) is None
+
+
+def test_an_undrawn_control_is_never_hit():
+    """``rect`` is filled by drawing, so before the first paint there is no
+    target — and a click must not be attributed to one that is not on screen."""
+    assert control_at((0, 0), {"board": Control("Board", ("3x3",), 0)}) is None
+
+
+_SEAT_SMOKE = """
 from ui.pygame_ui import Window
 from ui.session import GameSession
 
@@ -409,7 +485,7 @@ assert second.snapshot["ply"] == 3, f"expected ply 3, got {second.snapshot['ply'
 second._undo()
 assert second._human_to_move()
 print("SEATS OK")
-'''
+"""
 
 
 def test_the_person_can_hold_either_colour():
@@ -433,3 +509,95 @@ def test_the_person_can_hold_either_colour():
     )
     assert result.returncode == 0, result.stderr[-2000:]
     assert "SEATS OK" in result.stdout
+
+
+_CONTROL_SMOKE = """
+from ui.pygame_ui import Window
+from ui.seats import ChampionUnavailableError, SEAT_KINDS
+from ui.session import GameSession
+
+window = Window(GameSession(3, 3), "heuristic", seed=0, human="PURPLE")
+window._paint()   # rectangles are filled by drawing, so draw once
+
+rects = [c.rect for c in window.controls.values()]
+assert all(r is not None for r in rects), "a chip was drawn without a target"
+assert all(
+    not a.colliderect(b) for i, a in enumerate(rects) for b in rects[i + 1:]
+), "two chips overlap, so one click would mean two things"
+assert all(r.bottom <= window.hand_rects[0][0].top for r in rects), (
+    "the strip overlaps the hand"
+)
+
+# A position worth keeping.
+rect, _ = window.hand_rects[0]
+window._on_click(rect.center)
+cell = sorted(window._playable_cells())[0]
+window._on_click(tuple(int(v) for v in window.placement.centre(window.cells[cell])))
+window._commit()
+assert window.snapshot["ply"] == 2, window.snapshot["ply"]
+
+# Changing the opponent keeps it, and does not steal the move.
+window._on_click(window.controls["opponent"].rect.center, backwards=True)
+assert window.controls["opponent"].value == "random"
+assert window.snapshot["ply"] == 2, "changing the opponent restarted the game"
+assert window._human_to_move(), "changing the opponent took the person's turn"
+
+# Handing your colour over makes the new seat answer from that same position.
+window._on_click(window.controls["side"].rect.center)
+assert window.controls["side"].value == "green"
+assert window.snapshot["ply"] == 3, "the new seat did not answer"
+
+# Right-click cycles back.
+window._on_click(window.controls["side"].rect.center, backwards=True)
+assert window.controls["side"].value == "purple"
+
+# A seat that cannot be built is not the seat. The learner needs weights a
+# fresh clone does not have, and that is the expected failure, not a crash.
+window.controls["side"].index = 1                       # green: purple is the agent
+before = window.controls["opponent"].index
+def _no_champion(*args, **kwargs):
+    raise ChampionUnavailableError("no trained network in data/az-runs/nowhere")
+window.session.agent_move_by_name = _no_champion
+window._apply_control("opponent", 1)
+assert window.controls["opponent"].index == before, "an unbuildable seat was kept"
+assert "no trained network" in window.status, window.status
+
+# The board is the one control that does restart, and everything follows it.
+del window.session.agent_move_by_name
+window.controls["side"].index = 0
+window._on_click(window.controls["board"].rect.center)
+assert window.controls["board"].value == "5x3"
+assert window.snapshot["ply"] == 0, "a new board kept the old position"
+assert len(window.cells) == 15, len(window.cells)
+assert len(window.names) == 15, "the cell names did not follow the board"
+assert len(window.snapshot["hands"]["PURPLE"]) == 8, "the 5x3 deck is reduced"
+window._paint()   # a wrongly-sized placement would put hexagons off screen
+assert all(
+    0 <= window.placement.centre(c)[0] <= 900 for c in window.cells
+), "the placement did not follow the board"
+print("CONTROLS OK")
+"""
+
+
+def test_the_game_is_reconfigured_in_the_window_not_in_a_new_process():
+    """Until 2026-09-21 this window was configured once, on the command line.
+
+    Trying a different opponent meant quitting and losing the position, which
+    made the browser page — which has had selectors from the start — the
+    friendlier of the two interfaces by a distance nobody intended.
+    """
+    import os
+    import subprocess
+    import sys
+
+    pytest.importorskip("pygame")
+    environment = {**os.environ, "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy"}
+    result = subprocess.run(
+        [sys.executable, "-c", _CONTROL_SMOKE],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+    assert "CONTROLS OK" in result.stdout

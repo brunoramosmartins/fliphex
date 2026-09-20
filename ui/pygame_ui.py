@@ -1,10 +1,25 @@
 """The FLIPHEX board in a window, in the physical game's palette.
 
-    python -m ui.pygame_ui                          # you vs the heuristic
-    python -m ui.pygame_ui --variant 3x3 --green solver
-    python -m ui.pygame_ui --green human            # hotseat
+    python -m ui.pygame_ui                                # you vs the heuristic
+    python -m ui.pygame_ui --variant 3x3 --opponent solver
+    python -m ui.pygame_ui --play green                   # the agent opens
+    python -m ui.pygame_ui --opponent human               # hotseat
 
 Needs the ``ui`` extra: ``pip install -e ".[ui]"``.
+
+The arguments are a starting point, not a commitment
+----------------------------------------------------
+Every one of them is also a control in the window: the board, the colour you
+hold and who you are playing are three chips in the panel, and clicking one
+cycles it. The flags only say where the first game starts.
+
+That is not a convenience. Until 2026-09-21 this window was configured once, on
+the command line, so trying a different opponent meant quitting and losing the
+position — and the browser page, which has had selectors from the start, was
+the friendlier of the two by a distance nobody intended. Only the board restarts
+a game here, because a different board *is* a different game. Changing who is
+playing takes effect on the position in front of you, which is what makes
+handing a live game from the heuristic to the exact solver possible at all.
 
 How a move is made
 ------------------
@@ -190,10 +205,60 @@ def draw_arrow(pygame, screen, centre, radius, slot, colour, scale=1.0) -> None:
 # -- the window ----------------------------------------------------------------
 
 
-BOARD_H = 620
-PANEL_H = 150
+BOARD_H = 576
+CONTROL_H = 48
+PANEL_H = 150 + CONTROL_H
 WIDTH = 900
 HEIGHT = BOARD_H + PANEL_H
+
+#: Boards the strip offers. Every one has an odd cell count, per adr-011 — a
+#: board with an even one admits draws and has no tie-break, which is why the
+#: 4x4 is withdrawn rather than merely absent.
+BOARDS = ("3x3", "5x3", "5x5")
+
+SIDES = ("purple", "green")
+
+
+def board_values(current: str) -> tuple[str, ...]:
+    """The boards the strip cycles, including one named on the command line.
+
+    ``--variant 5x1`` is legal and useful — it is what `perft` runs on — so a
+    board the strip does not normally offer must not vanish from the window the
+    moment somebody asks for it.
+    """
+    return BOARDS if current in BOARDS else (current, *BOARDS)
+
+
+@dataclass
+class Control:
+    """One cycleable setting in the window's strip.
+
+    ``rect`` is filled when the control is drawn, so hit-testing and drawing
+    cannot disagree about where it is — the same reason the replay viewer keeps
+    its scrubber rectangle in one function.
+    """
+
+    label: str
+    values: tuple[str, ...]
+    index: int = 0
+    rect: Any = None
+
+    @property
+    def value(self) -> str:
+        return self.values[self.index]
+
+    def step(self, delta: int) -> str:
+        """Move by ``delta``, wrapping. Returns the new value."""
+        self.index = (self.index + delta) % len(self.values)
+        return self.value
+
+
+def control_at(position: tuple[int, int], controls: dict[str, Control]) -> str | None:
+    """Which control a click landed on, or ``None``."""
+    for key, control in controls.items():
+        if control.rect is not None and control.rect.collidepoint(position):
+            return key
+    return None
 
 
 class Window:
@@ -214,13 +279,15 @@ class Window:
 
         self.pygame = pygame
         self.session = session
-        self.opponent = opponent
         self.seed = seed
-        #: ``None`` marks the seat the person holds. Both may be agents, which
-        #: is how a game is watched rather than played.
-        self.agents: dict[str, str | None] = {
-            "PURPLE": None if human == "PURPLE" else opponent,
-            "GREEN": None if human == "GREEN" else opponent,
+        #: The three things a game is. Every one is also a command-line flag,
+        #: and every one can be changed without leaving the window.
+        board = f"{session.variant.n_cols}x{session.variant.n_rows}"
+        values = board_values(board)
+        self.controls: dict[str, Control] = {
+            "board": Control("Board", values, values.index(board)),
+            "side": Control("You play", SIDES, SIDES.index(human.lower())),
+            "opponent": Control("Against", SEAT_KINDS, SEAT_KINDS.index(opponent)),
         }
         self.cells = session.geometry()["cells"]
         self.names = {c["id"]: c["name"] for c in self.cells}
@@ -235,6 +302,14 @@ class Window:
         self.flash_until = 0
         self.status = "Click a piece, then a cell."
         self.hand_rects: list[tuple[Any, int]] = []
+
+        #: Keyboard equivalents of the three chips, shift for backwards. Built
+        #: here rather than at module level because `pygame` is imported lazily.
+        self.control_keys = {
+            pygame.K_b: "board",
+            pygame.K_c: "side",
+            pygame.K_o: "opponent",
+        }
 
         pygame.init()
         pygame.display.set_caption("FLIPHEX")
@@ -313,11 +388,29 @@ class Window:
             chip, chip.get_rect(center=(centre[0], centre[1] - placement.radius * 1.35))
         )
 
+    def _draw_controls(self, top: int) -> None:
+        """The three chips. Click cycles forward, right-click back."""
+        pygame = self.pygame
+        x = 20
+        for control in self.controls.values():
+            value = self.font.render(f"{control.value}  ›", True, INK)
+            label = self.small.render(control.label.upper(), True, INK_SOFT)
+            width = max(value.get_width(), label.get_width()) + 26
+            rect = pygame.Rect(x, top + 5, width, CONTROL_H - 14)
+            pygame.draw.rect(self.screen, WOOD, rect, border_radius=8)
+            pygame.draw.rect(self.screen, LINE, rect, 1, border_radius=8)
+            self.screen.blit(label, (rect.x + 13, rect.y + 4))
+            self.screen.blit(value, (rect.x + 13, rect.y + 17))
+            control.rect = rect
+            x += width + 10
+
     def _draw_panel(self) -> None:
         pygame = self.pygame
         top = BOARD_H
         pygame.draw.rect(self.screen, WOOD_DEEP, (0, top, WIDTH, PANEL_H))
         pygame.draw.line(self.screen, LINE, (0, top), (WIDTH, top), 2)
+        self._draw_controls(top)
+        top += CONTROL_H
 
         score = self.snapshot["score"]
         purple, green = score["PURPLE"], score["GREEN"]
@@ -342,7 +435,8 @@ class Window:
 
         keys = self.small.render(
             "wheel / arrows rotate   ·   click commits   ·   esc cancels   "
-            "·   u undo   ·   n new game",
+            "·   u undo   ·   n new game   ·   b board, c colour, o opponent "
+            "(right-click or shift for back)",
             True,
             INK_SOFT,
         )
@@ -380,6 +474,18 @@ class Window:
             return set()
         return set(self.session.playable_cells(self.selected_tile))
 
+    def _seat_kind(self, colour: str) -> str | None:
+        """Which agent holds ``colour``, or ``None`` when a person does.
+
+        Read from the controls on every call rather than fixed at construction,
+        so changing the opponent mid-game changes who answers the *next* move
+        instead of requiring a new process.
+        """
+        opponent = self.controls["opponent"].value
+        if opponent == "human":
+            return None  # hotseat: both colours are the person's
+        return None if colour == self.controls["side"].value.upper() else opponent
+
     def _human_to_move(self) -> bool:
         """Whether the side to move is a seat no agent holds.
 
@@ -388,7 +494,7 @@ class Window:
         could only ever experience the side of the board H1 says is favoured —
         in a project whose whole question is whether that side is favoured.
         """
-        return self.agents[self.snapshot["to_move"]] is None
+        return self._seat_kind(self.snapshot["to_move"]) is None
 
     def _reset_selection(self) -> None:
         self.selected_tile = None
@@ -406,7 +512,13 @@ class Window:
 
     # -- input -----------------------------------------------------------------
 
-    def _on_click(self, position: tuple[int, int]) -> None:
+    def _on_click(self, position: tuple[int, int], backwards: bool = False) -> None:
+        # Checked first: the controls have to work when the game is over and
+        # when it is the agent's turn, which is exactly when you want them.
+        key = control_at(position, self.controls)
+        if key is not None:
+            self._apply_control(key, -1 if backwards else 1)
+            return
         if self.snapshot["terminal"] or not self._human_to_move():
             return
         if position[1] >= BOARD_H:
@@ -460,32 +572,80 @@ class Window:
         self._refresh(result)
         self._agent_reply()
 
-    def _agent_reply(self) -> None:
+    def _agent_reply(self) -> bool:
+        """Let whoever holds the side to move play. ``False`` if it could not.
+
+        The one failure that is expected rather than exceptional: the learner
+        seat needs weights a fresh clone does not have. Saying so in the status
+        bar and putting the control back beats a window that dies mid-game.
+        """
         if self.snapshot["terminal"] or self._human_to_move():
-            return
-        self.status = "Thinking…"
+            return True
+        kind = self._seat_kind(self.snapshot["to_move"])
+        self.status = (
+            "The solver is searching — the window will not respond until it answers."
+            if kind == "solver"
+            else f"{kind.title()} is thinking…"
+        )
         self._paint()  # show the human's move before the search blocks
-        kind = self.agents[self.snapshot["to_move"]]
-        result = self.session.agent_move_by_name(kind, seed=self.seed)
+        try:
+            result = self.session.agent_move_by_name(kind, seed=self.seed)
+        except ChampionUnavailableError as exc:
+            self.status = str(exc).splitlines()[0]
+            return False
         self._refresh(result)
+        return True
 
     def _undo(self) -> None:
         self.session.undo()
-        if any(kind is not None for kind in self.agents.values()):
+        if self.controls["opponent"].value != "human":
             # An agent holds a seat, so one more ply belongs to it.
             self.session.undo()
         self._refresh()
         self.status = "Took it back."
 
-    def _new_game(self) -> None:
-        self.session = GameSession(
-            self.session.variant.n_cols,
-            self.session.variant.n_rows,
-            self.session.variant.arm.value,
-        )
+    def _apply_control(self, key: str, step: int) -> None:
+        """Cycle one control and act on it.
+
+        Only the board restarts the game. The other two say who answers from
+        here, and a position is worth more than a setting — swapping the
+        heuristic for the exact solver in the middle of a game you are losing is
+        the most informative thing this window can do.
+        """
+        opponent = self.controls["opponent"]
+        was = opponent.index
+        value = self.controls[key].step(step)
+
+        if key == "board":
+            played = self._new_game()
+        else:
+            self._reset_selection()
+            self.snapshot = self.session.snapshot()
+            if key == "side":
+                self.status = f"You hold {value} now. The position stands."
+            elif value == "human":
+                self.status = "Hotseat — both colours are yours."
+            else:
+                self.status = f"Playing {value} from here. The position stands."
+            played = self._agent_reply()
+
+        if not played:
+            # Whichever control was touched, the seat that could not be built is
+            # not the seat any more.
+            opponent.index = was
+
+    def _new_game(self) -> bool:
+        cols, _, rows = self.controls["board"].value.partition("x")
+        self.session = GameSession(int(cols), int(rows), self.session.variant.arm.value)
+        # All three follow the board, and until the board could change none of
+        # them needed to: a 3x3 drawn with a 5x5's cell list and placement puts
+        # every hexagon in the wrong place and every click on the wrong cell.
         self.cells = self.session.geometry()["cells"]
+        self.names = {c["id"]: c["name"] for c in self.cells}
+        self.placement = fit_board(self.cells, WIDTH, BOARD_H)
         self._refresh()
         self.status = "New game. Click a piece, then a cell."
+        return self._agent_reply()
 
     # -- loop ------------------------------------------------------------------
 
@@ -507,8 +667,8 @@ class Window:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    self._on_click(event.pos)
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button in (1, 3):
+                    self._on_click(event.pos, backwards=event.button == 3)
                 elif event.type == pygame.MOUSEWHEEL:
                     self._rotate(-event.y)
                 elif event.type == pygame.KEYDOWN:
@@ -531,6 +691,10 @@ class Window:
                         self._undo()
                     elif event.key == pygame.K_n:
                         self._new_game()
+                    elif event.key in self.control_keys:
+                        back = bool(event.mod & pygame.KMOD_SHIFT)
+                        key = self.control_keys[event.key]
+                        self._apply_control(key, -1 if back else 1)
             self._paint()
             self.clock.tick(60)
         pygame.quit()
@@ -553,9 +717,10 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--arm", choices=[a.value for a in Arm], default=Arm.H1.value)
     parser.add_argument(
         "--opponent",
-        choices=[k for k in SEAT_KINDS if k != "human"],
+        choices=SEAT_KINDS,
         default="heuristic",
-        help="the agent you play against",
+        help="who you play against; 'human' is a hotseat game. Cycle it in the "
+        "window with o, so this only names where the first game starts",
     )
     parser.add_argument(
         "--play",
@@ -574,17 +739,21 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(f"  ✗ {exc}") from None
 
     # Fail before opening a window, not after: building the learner seat can
-    # raise, and a window that appears and vanishes explains nothing.
+    # raise, and a window that appears and vanishes explains nothing. Once the
+    # window is up the same failure is recoverable — the control goes back —
+    # because by then there is somewhere to say it.
     try:
         seat = build_seat(args.opponent, variant=variant, seed=args.seed)
     except ChampionUnavailableError as exc:
         raise SystemExit(f"  ✗ opponent seat: {exc}") from None
 
     human = args.play.upper()
-    opening = "you open" if human == "PURPLE" else "the agent opens"
+    hotseat = args.opponent == "human"
+    opening = "you open" if human == "PURPLE" or hotseat else "the agent opens"
     print(
         f"  {variant.n_cols}x{variant.n_rows}  you play {args.play} against "
-        f"{describe_seat(seat)} — {opening}"
+        f"{describe_seat(seat)} — {opening}\n"
+        f"  board, colour and opponent are all changeable in the window"
     )
 
     run(variant, args.opponent, args.seed, human)

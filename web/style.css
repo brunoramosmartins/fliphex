@@ -301,6 +301,23 @@ g.cell-group.selected .ring { opacity: 1; stroke-width: .1; }
 .commentary b { color: var(--ink); }
 .commentary .bad { color: var(--danger); font-weight: 600; }
 
+/* How long a blocking seat took. Reported, not hidden: it is the one number a
+   visitor can check against adr-013's table on their own machine. */
+.commentary .took {
+  padding: 1px 7px;
+  margin-left: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The solver holds the page's only thread. Nothing animates while it searches
+   — a spinner that visibly stalls reads as a crash — so the page only dims and
+   stops inviting clicks it cannot accept. */
+body.blocked main { opacity: .6; }
+body.blocked .board-wrap, body.blocked .hand { pointer-events: none; }
+
 /* -- side panels ----------------------------------------------------------- */
 
 .side { display: flex; flex-direction: column; gap: 14px; }
@@ -402,6 +419,9 @@ g.cell-group.selected .ring { opacity: 1; stroke-width: .1; }
 
 .badge.ready { border-color: var(--green); color: var(--green-soft); }
 .badge.failed { border-color: var(--danger); color: var(--danger); }
+
+/* Empty on the published page, so it occupies nothing there. */
+.origin:not(:empty) { flex-basis: 100%; text-align: center; font-size: 11px; }
 
 /* -- narrow ---------------------------------------------------------------- */
 

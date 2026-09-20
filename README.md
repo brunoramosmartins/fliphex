@@ -105,11 +105,21 @@ Four interfaces, all driving the same engine.
 cd web && python3 -m http.server 8765
 ```
 
+Then open `http://localhost:8765`. Served locally the page offers the **exact
+solver**; the published page stops at the heuristic, per
+[adr-013](docs/adr/adr-013-interface-targets.md). Board, the colour you hold and
+who you are playing are selectors — only changing the board starts a new game,
+so you can hand a position you are losing straight to the solver and watch what
+it does instead.
+
 **In a window:**
 
 ```bash
-python -m ui.pygame_ui --variant 3x3 --green solver
+python -m ui.pygame_ui --variant 3x3 --opponent solver --play green
 ```
+
+The same three controls are chips in the panel (`b`, `c`, `o`), so the flags
+only say where the first game starts.
 
 **In the terminal:**
 
@@ -124,13 +134,19 @@ python -m ui.replay_viewer --variant 5x3 --purple solver
 ```
 
 On the **3×3 the solver plays perfectly from the first move** — you are playing
-against the truth of the game, not an approximation. On the 5×5 it is exact only
-for the last 8 plies and reports its own proved rate, because a solver that fell
-back to a heuristic for most of a game played mostly heuristic moves.
+against the truth of the game, not an approximation. It takes about 8 s to
+answer the opening there, and in the browser that freezes the tab, because
+Pyodide has one thread; the page says so before it happens. On the 5×5 the
+solver is exact only for the last 8 plies and reports its own proved rate,
+because a solver that fell back to a heuristic for most of a game played mostly
+heuristic moves.
 
-Seats are named per colour (`--purple`, `--green`) from `human`, `random`,
-`heuristic`, `solver`, `uct`, `az`. Reduced boards are dealt reduced decks, per
-[adr-011](docs/adr/adr-011-reduced-variant-parity.md).
+Seats are `human`, `random`, `heuristic`, `solver`, `uct`, `az` — named per
+colour in the terminal (`--purple`, `--green`), chosen in the interface
+everywhere else. **Try both colours.** Purple moves first and holds the joker,
+which is the side H1 says is favoured; playing green is the only way to feel
+what four exhaustive solves concluded. Reduced boards are dealt reduced decks,
+per [adr-011](docs/adr/adr-011-reduced-variant-parity.md).
 
 ---
 
@@ -192,7 +208,7 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev,ui,figures]"
 pytest tests/ && ruff check . && ruff format --check .
 ```
 
-1,208 tests. The browser build has its own suite, which needs Node:
+1,217 tests. The browser build has its own suite, which needs Node:
 
 ```bash
 cd web && npm install && npm test

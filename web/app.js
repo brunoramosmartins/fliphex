@@ -23,6 +23,64 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 /* Where the engine is unpacked inside the WebAssembly filesystem. */
 const PY_ROOT = "/app";
 
+/* -- which seats this page may offer --------------------------------------- */
+
+/* adr-013's second amendment withdrew every agent above the heuristic from the
+ * *deployed* page, and said in the same breath that "`ui/seats.py` builds all
+ * six and the local page serves them". It did not. One `index.html` served both
+ * origins, so "deployed" and "local" were the same list and that sentence was
+ * aspirational — the solver was reachable only from the pygame window.
+ *
+ * The split is enforced here, and it **fails closed**: a host this file does
+ * not recognise as local gets the published list. That way a new deployment
+ * target — a custom domain, a preview URL, somebody else's fork — is restricted
+ * by default rather than by remembering to add it.
+ */
+const PUBLISHED_SEATS = ["human", "heuristic"];
+const LOCAL_SEATS = ["human", "random", "heuristic", "solver"];
+
+/* `uct` and `az` are in `SEAT_KINDS` and are deliberately in neither list:
+ * `agents/az_agent.py` is excluded from the payload by `scripts/build_web.py`
+ * because it imports torch, which has no WebAssembly build. They are not
+ * withheld from the browser — they cannot run in one. */
+const SEAT_LABELS = {
+  human: "a second player",
+  random: "the random agent",
+  heuristic: "the heuristic agent",
+  solver: "the exact solver",
+};
+
+function isLocalHost(hostname) {
+  const host = String(hostname ?? "").toLowerCase().replace(/^\[|\]$/g, "");
+  // Empty is `file://`, which has no host at all and is as local as it gets.
+  if (host === "" || host === "localhost" || host.endsWith(".localhost")) return true;
+  if (host === "::1") return true;
+  // `.local` is reserved for mDNS and never resolves on the public internet.
+  // It is how a phone reaches a laptop on the same wifi.
+  if (host.endsWith(".local")) return true;
+  const quads = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!quads) return false;
+  const [a, b] = quads.slice(1, 5).map(Number);
+  if (quads.slice(1, 5).some((q) => Number(q) > 255)) return false;
+  // Loopback and the three RFC 1918 private ranges. A LAN address is how the
+  // page is reached from a phone on the same wifi, and that is still a local
+  // checkout being served by its own author.
+  return a === 127 || a === 10 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31);
+}
+
+function seatsFor(hostname) {
+  return isLocalHost(hostname) ? LOCAL_SEATS : PUBLISHED_SEATS;
+}
+
+/* Seats whose search blocks the only thread the page has.
+ *
+ * Pyodide runs on the main thread, so a 3x3 exhaustive solve does not merely
+ * take a while — it freezes the tab: no spinner turns, no click registers. The
+ * page therefore *names* the freeze before entering it rather than animating
+ * something that will visibly stall, which is the one thing that makes a long
+ * wait look like a crash. */
+const BLOCKING_SEATS = new Set(["solver"]);
+
 /* Flat-top hexagons: vertices every 60 degrees starting at due East, so the
  * flat edges land on top and bottom and the points on left and right. */
 const VERTEX_ANGLES = [0, 60, 120, 180, 240, 300];
@@ -55,7 +113,46 @@ const ui = {
   variant: $("variant"),
   side: $("side"),
   opponent: $("opponent"),
+  originNote: $("origin-note"),
 };
+
+/* Replace the opponent list with the one this origin is allowed. `index.html`
+ * ships the published pair as the pre-script fallback; this widens it on a
+ * local checkout and never narrows below it. */
+function fillSeats(hostname) {
+  const seats = seatsFor(hostname);
+  const keep = ui.opponent.value;
+  ui.opponent.textContent = "";
+  for (const seat of seats) {
+    const option = document.createElement("option");
+    option.value = seat;
+    option.textContent = SEAT_LABELS[seat];
+    ui.opponent.appendChild(option);
+  }
+  ui.opponent.value = seats.includes(keep) ? keep : "heuristic";
+  if (ui.originNote) {
+    ui.originNote.textContent = seats.includes("solver")
+      ? "Local checkout — the exact solver is offered here, not on the published page."
+      : "";
+  }
+  return seats;
+}
+
+/* Let the browser paint before something blocks it.
+ *
+ * Two frames and then a task: one `requestAnimationFrame` schedules work
+ * *before* the next paint, so a single one would still block on the frame it
+ * was meant to let through. */
+function nextPaint() {
+  return new Promise((resolve) => {
+    const raf = globalThis.requestAnimationFrame ?? window?.requestAnimationFrame;
+    if (typeof raf === "function") {
+      raf(() => raf(() => setTimeout(resolve, 0)));
+    } else {
+      setTimeout(resolve, 60);
+    }
+  });
+}
 
 /* Everything mutable, in one place. */
 const state = {
@@ -641,23 +738,79 @@ function placedTiles() {
 }
 
 async function maybeAgentMove() {
-  if (state.snapshot.terminal || isHumanTurn()) return;
+  if (!state.game || state.snapshot.terminal || isHumanTurn()) return;
+  const kind = ui.opponent.value;
+  const blocks = BLOCKING_SEATS.has(kind);
   state.busy = true;
   ui.undo.disabled = true;
-  // Yield once so the human's move paints before the agent's search blocks.
-  await new Promise((resolve) => setTimeout(resolve, 60));
+
+  if (blocks) {
+    /* Said before the freeze, not after. The 3x3 is solved outright from the
+     * opening — 711,963 configurations — and adr-013 measured that at 7.5 s
+     * under Node. A tab that stops responding for seven seconds with no
+     * explanation is indistinguishable from one that has crashed. */
+    say(
+      "<b>The solver is searching.</b> It runs on the page&rsquo;s only thread, " +
+        "so the tab will not respond until it answers.",
+    );
+    ui.hint.textContent = "Searching — the page is frozen until the solver replies.";
+    document.body.classList.add("blocked");
+  }
+  // Yield so the human's move — and the warning above — paint before the
+  // search takes the thread.
+  await nextPaint();
+
+  const started = performance.now();
   try {
     const result = state.game
-      .agent_move_by_name(ui.opponent.value)
+      .agent_move_by_name(kind)
       .toJs({ dict_converter: Object.fromEntries });
+    const elapsed = performance.now() - started;
     refresh(result.snapshot);
     paintArrows(placedTiles());
     animateFlips(result.flipped);
-    say(`${describe(result)}`);
+    /* The cost is reported rather than hidden. It is the one number a visitor
+     * can check against adr-013's table, on their own machine and their own
+     * browser — which is exactly what that ADR says it still owes. */
+    say(
+      blocks
+        ? `${describe(result)} <span class="took">${(elapsed / 1000).toFixed(1)} s</span>`
+        : describe(result),
+    );
+  } catch (error) {
+    /* A seat can fail to build — the learner needs weights a clone does not
+     * have. Saying so beats a dead board and a console nobody opened. */
+    say(`<span class="bad">${String(error.message ?? error).split("\n")[0]}</span>`);
+    console.error(error);
   } finally {
+    document.body.classList.remove("blocked");
     state.busy = false;
     ui.undo.disabled = !state.snapshot.can_undo;
   }
+}
+
+/* Changing who you are playing does not throw the game away.
+ *
+ * `GameSession` names a seat per move and holds no agent, precisely so this is
+ * possible — but the page restarted on every selector change anyway, which is
+ * the complaint that started this: to try a different opponent you abandoned
+ * the position. Only the board restarts now, because a different board is a
+ * different game. The opponent and the colour you hold are just who is
+ * answering from here, so the position stands and whoever now owns the move
+ * takes it. Handing a live position from the heuristic to the solver is the
+ * most interesting thing this page can do. */
+async function onSeatChange() {
+  if (!state.py || !state.game || state.busy) return;
+  resetSelection();
+  refresh(state.game.snapshot().toJs({ dict_converter: Object.fromEntries }));
+  const seat = SEAT_LABELS[ui.opponent.value] ?? ui.opponent.value;
+  const held = ui.side.value === "PURPLE" ? "purple" : "green";
+  say(
+    ui.opponent.value === "human"
+      ? "Hotseat — both colours are yours."
+      : `You hold <b>${held}</b>, against <b>${seat}</b>. The position stands.`,
+  );
+  await maybeAgentMove();
 }
 
 function onUndo() {
@@ -759,10 +912,14 @@ window.fliphexBench = timeSolverOpening;
 window.fliphexReport = fliphexReport;
 window.fliphexReset = fliphexReset;
 
+fillSeats(globalThis.location?.hostname);
+
 ui.newGame.addEventListener("click", startGame);
+// A different board is a different game, so this one restarts. The other two
+// take effect on the position in front of you — see `onSeatChange`.
 ui.variant.addEventListener("change", () => { if (state.py) startGame(); });
-ui.opponent.addEventListener("change", () => { if (state.py) startGame(); });
-ui.side.addEventListener("change", () => { if (state.py) startGame(); });
+ui.opponent.addEventListener("change", onSeatChange);
+ui.side.addEventListener("change", onSeatChange);
 ui.undo.addEventListener("click", onUndo);
 ui.cancel.addEventListener("click", resetSelection);
 
@@ -772,13 +929,17 @@ boot();
  * Harmless in a browser: this is already a module, and nothing imports it. */
 export {
   boot,
+  fillSeats,
   fliphexReport,
   fliphexReset,
+  isLocalHost,
   onCellClick,
+  onSeatChange,
   onTileClick,
   onUndo,
   playMove,
   readRuns,
+  seatsFor,
   startGame,
   state,
   ui,

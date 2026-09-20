@@ -247,6 +247,88 @@ its own verdicts refuse — H1 is `exact` on the 3×3 and `not decidable` on the
 kind of opponent. And a solver seat is the one thing on the page that can hang a
 tab, which no first impression should risk.
 
+## Amendment, 2026-09-20 — the local/deployed split is enforced by the page, and it fails closed
+
+The amendment above said the seats were not deleted and that "`ui/seats.py`
+builds all six and **the local page serves them**". It did not. There was one
+`index.html`, its `<select>` held two hard-coded options, and GitHub Pages and
+`localhost` were served the same file — so the sentence describing the local
+page was aspirational, and the exact solver was reachable only from the pygame
+window. A document and its code disagreed, which in this project means the code
+was wrong.
+
+**The seat list is now a function of the origin**, in `web/app.js`:
+
+| origin | seats |
+|---|---|
+| `localhost`, `127.0.0.0/8`, `10/8`, `192.168/16`, `172.16/12`, `*.local`, `file://` | human, random, heuristic, **solver** |
+| anything else | human, heuristic |
+
+Three properties, in the order they matter:
+
+**It fails closed.** The rule enumerates what is *local*, not what is
+published, so a host nobody anticipated — a custom domain, a preview URL, a
+fork — gets the restricted list by default. Getting this backwards would mean a
+new deployment target ships the solver until someone remembers it exists.
+
+**Private LAN addresses count as local.** The page is reached from a phone by
+its host's `192.168.x` or `172.x` address (EXP-019's phone cell used
+`172.25.201.155`), and that is still a checkout being served by its own author
+over their own wifi. It is not a published artifact and there is no first
+impression to protect.
+
+**`uct` and `az` are in neither list.** They are not withheld; they cannot run.
+`scripts/build_web.py` excludes `agents/az_agent.py` from the payload because it
+imports torch, which has no WebAssembly build. The consequence recorded above —
+that the learner needs a numpy forward pass first — is what makes this true, and
+stating it in the page keeps a missing option from reading as a withheld one.
+
+`index.html` keeps the published pair as its static content, so the file on
+disk is the published contract and JavaScript only ever widens it.
+
+### A blocking seat is announced before it blocks
+
+Pyodide runs on the page's only thread. A 3×3 exhaustive solve does not take a
+while — it **freezes the tab**: no spinner turns, no click lands. Measured from
+the page's own code path under Node, the opening takes **8.2 s** on the 3×3 and
+0.1 s on the 5×3, the latter because `search_below_k = 8` declines the attempt
+until eight cells remain. The 3×3 figure is consistent with the 7.5 s this ADR
+already carried.
+
+So the page names the freeze in the commentary *before* entering it, dims the
+board, and reports the elapsed time afterwards. A progress animation was
+rejected: it would visibly stall, and a stalled spinner reads as a crash rather
+than as a wait. The reported number is descriptive — it is what a visitor can
+check against the table above on their own machine, which is the measurement
+this ADR's last consequence says is still owed.
+
+### Changing who you play no longer discards the game
+
+`GameSession` holds no agent and names a seat per move, documented as being
+*"so a visitor can change their mind about who they are playing without
+restarting"*. Both graphical interfaces restarted anyway: the page on every
+`change` event, the pygame window by requiring a new process. Now only the
+**board** restarts, because a different board is a different game. The opponent
+and the colour you hold take effect on the position in front of you.
+
+This is not only convenience. Handing a live position from the heuristic to the
+exact solver, and watching what it does differently from the same board, is the
+most instructive thing either interface can offer — and it is the interactive
+form of the comparison the project spent three phases making numerically.
+
+### The pygame window is configured in the window
+
+The same three controls — board, the colour you hold, the opponent — are chips
+in the panel, cycled by click or by `b`/`c`/`o`. The flags now only say where
+the first game starts. Consequence, accepted: the two interfaces still share no
+rendering code, so this is the same affordance built twice. What they share is
+`ui/seats.py` and `ui/session.py`, which is where anything interesting can be
+wrong.
+
+The window offers all six seats because it is local by definition; a seat that
+cannot be built — the learner, on a clone with no weights — puts the control
+back and says why, rather than taking the window down mid-game.
+
 ## Related
 
 - [adr-003](adr-003-piece-representation.md) — inert placed tiles; why the state

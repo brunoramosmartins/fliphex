@@ -32,9 +32,11 @@
       </select>
     </label>
     <label>Against
-      <!-- adr-013's 2026-09-21 amendment: the deployed page offers nothing
-           above the heuristic. ui/seats.py still builds all six, and a local
-           checkout can add them here. -->
+      <!-- The published list, and the fallback before app.js runs. adr-013's
+           second amendment withdraws every agent above the heuristic from the
+           deployed page; `fillSeats` in app.js widens this to the random and
+           solver seats when the page is served from a local host, and never
+           narrows it. The decision is in one function there, not here. -->
       <select id="opponent">
         <option value="human">a second player</option>
         <option value="heuristic" selected>the heuristic agent</option>
@@ -109,6 +111,7 @@
 <footer class="foot">
   <span>Engine, solver and agents run unmodified under Pyodide.</span>
   <span id="engine-badge" class="badge">booting</span>
+  <span id="origin-note" class="origin"></span>
 </footer>
 
 <script type="module" src="app.js"></script>

@@ -505,6 +505,74 @@ one carrying a locked figure that is 236× wrong, stated as the result rather
 than buried. A README that read as a clean sweep would misrepresent the
 project's best work.
 
+## The interfaces were configured once, and the ADR had already said otherwise
+
+Two complaints, and they turned out to be one finding.
+
+The first: the pygame window is configured on the command line and nowhere
+else, so trying a different opponent means quitting and losing the position.
+The second: the exact solver — the thing this project actually built — is
+reachable *only* from that window, because the browser page offers human and
+heuristic and nothing more.
+
+The second half is the interesting one. adr-013's second amendment withdrew the
+stronger seats from the **deployed** page and wrote, in the same paragraph, that
+"`ui/seats.py` builds all six and the local page serves them". It did not.
+There was one `index.html` with two hard-coded `<option>`s, and GitHub Pages and
+`localhost` were served the same bytes. The sentence describing the local page
+was aspirational when it was written, and nothing since had made it true.
+
+That is the fourth time this phase a deliverable was specified against something
+that does not exist — after `figures/`, the browser champion and the replay
+viewer's saved games. The pattern is not carelessness about files. It is that a
+*restriction* and an *implementation of that restriction* are different
+artefacts, and writing the first feels like having done the second.
+
+**The seat list is now a function of `location.hostname`**, and it fails closed:
+the rule enumerates local hosts, so an origin nobody anticipated gets the
+published list rather than the local one. Private LAN addresses count as local,
+because that is how a phone reaches this laptop and EXP-019's phone cell used
+`172.25.201.155`. `uct` and `az` are in neither list and that is stated in the
+code, because they cannot run at all — `scripts/build_web.py` excludes
+`agents/az_agent.py` for importing torch, which has no WebAssembly build. A
+missing option that reads as a withheld one is its own small lie.
+
+**Measured before claiming it works.** Driving the page's own code path under
+Node, the solver opening costs **8.2 s on the 3×3** and 0.1 s on the 5×3 — the
+latter because `search_below_k = 8` declines the attempt until eight cells
+remain, so most of a 5×3 game is heuristic and the page should not pretend
+otherwise. The 3×3 figure sits beside the 7.5 s adr-013 already carried.
+
+Pyodide has one thread, so those 8 seconds are not a wait, they are a **frozen
+tab**. The page therefore says so in the commentary before entering the search,
+dims the board, and prints the elapsed time after. A spinner was rejected on
+purpose: it would stall visibly, and a stalled spinner reads as a crash.
+
+**And then the smaller finding underneath.** `GameSession` holds no agent and
+names a seat per move, with a docstring saying that exists *"so a visitor can
+change their mind about who they are playing without restarting"*. Both
+graphical interfaces restarted anyway — the page on every `change` event, the
+window by requiring a new process. The capability had been built, documented,
+and then not used by either caller.
+
+Now only the board restarts. Changing the opponent or the colour you hold acts
+on the position in front of you, which makes the best thing either interface can
+do possible for the first time: play the heuristic into a position you do not
+like, hand it to the exact solver, and watch the difference. That is the
+interactive form of a comparison the project otherwise only ever made in a
+table.
+
+The pygame window got the same three controls as chips in its panel. It offers
+all six seats, because a local window is local by definition; a seat that cannot
+be built — the learner, on a clone with no weights — puts the control back and
+says why instead of taking the window down. `ChampionUnavailableError` carrying
+its own remedy paid for itself here: the status bar gets a usable sentence for
+free.
+
+Recorded as adr-013's third amendment. 56 checks now run under jsdom, and the
+negative ones are the ones that matter — `example.com`, `172.32.0.1` and
+`notlocalhost.com` all have to come back restricted.
+
 ## `writeup/main-writeup.md` — the long-form article
 
 ## `exercises/ex05_complexity_analysis.md` — carried from Phases 5 and 6

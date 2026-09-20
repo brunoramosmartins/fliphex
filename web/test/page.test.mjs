@@ -109,6 +109,11 @@ for (const key of [
   "navigator",
   "localStorage",
   "matchMedia",
+  // The page reads `location.hostname` to decide which seats it may offer.
+  // jsdom's is `http://localhost/`, set above, so this harness is a local
+  // checkout — which is the case that has to be exercised, since the published
+  // one is the fallback already written into `index.html`.
+  "location",
 ]) {
   globalThis[key] = window[key];
 }
@@ -390,14 +395,79 @@ page.ui.side.value = "PURPLE";
 await page.startGame();
 equal("choosing purple leaves the opening to the visitor", page.state.snapshot.ply, 0);
 
-// -- the deployed seat list ----------------------------------------------------
+// -- which seats the origin is allowed -----------------------------------------
 
-const seats = [...page.ui.opponent.options].map((o) => o.value);
-check(
-  "the published page offers nothing above the heuristic (adr-013, 2026-09-21)",
-  seats.every((s) => s === "human" || s === "heuristic"),
-  `offers: ${seats.join(", ")}`,
+/* adr-013's second amendment withdrew every agent above the heuristic from the
+ * *deployed* page and said the local one still serves them. Until now both were
+ * the same `index.html`, so the second half was not true. These checks are the
+ * split, and the important ones are the negative ones: the rule fails closed,
+ * so a host nobody thought about is restricted rather than permitted. */
+const PUBLISHED = "human,heuristic";
+const LOCAL = "human,random,heuristic,solver";
+const offers = (hostname) => page.seatsFor(hostname).join(",");
+
+equal("GitHub Pages gets the published list", offers("brunoramosmartins.github.io"), PUBLISHED);
+equal("an unrecognised host fails closed", offers("example.com"), PUBLISHED);
+equal("a host that merely ends in localhost.com is not local", offers("notlocalhost.com"), PUBLISHED);
+equal("172.32 is public address space, not RFC 1918", offers("172.32.0.1"), PUBLISHED);
+equal("11.0.0.1 is public, and 10.0.0.1 is not", offers("11.0.0.1"), PUBLISHED);
+equal("an over-range quad is not an address", offers("999.0.0.1"), PUBLISHED);
+
+equal("localhost gets the exact solver", offers("localhost"), LOCAL);
+equal("loopback by address gets it too", offers("127.0.0.1"), LOCAL);
+equal("file:// has no host at all and is as local as it gets", offers(""), LOCAL);
+equal("a wifi address is a local checkout being served by its author", offers("192.168.0.14"), LOCAL);
+equal("the 172.25 WSL address a phone reached in EXP-019 is local", offers("172.25.201.155"), LOCAL);
+equal("mDNS names never resolve on the public internet", offers("bruno-laptop.local"), LOCAL);
+
+equal(
+  "served from localhost, the page itself offers the solver",
+  [...page.ui.opponent.options].map((o) => o.value).join(","),
+  LOCAL,
 );
+check(
+  "and says so, so the difference from the published page is visible",
+  page.ui.originNote.textContent.includes("Local checkout"),
+  `origin note: "${page.ui.originNote.textContent}"`,
+);
+check(
+  "the seats torch makes impossible are offered by neither origin",
+  !offers("localhost").includes("az") && !offers("localhost").includes("uct"),
+);
+
+// -- changing who you play, without losing the position ------------------------
+
+/* The complaint this answers: to try a different opponent you had to abandon
+ * the game. `GameSession` names a seat per move and holds no agent precisely so
+ * that is unnecessary, and the page restarted anyway. */
+const piece = page.ui.hand.querySelectorAll("button.piece")[0];
+piece.dispatchEvent(new window.Event("click"));
+const spot = board.querySelectorAll("g.cell-group.playable")[0];
+spot.querySelector('[data-role="hit"]').dispatchEvent(new window.Event("click"));
+page.ui.rotations.querySelectorAll("button.rot")[0].dispatchEvent(new window.Event("click"));
+await until(() => page.state.snapshot.ply === 2, 15_000);
+equal("a move on the 3x3 lands and the heuristic replies", page.state.snapshot.ply, 2);
+
+page.ui.opponent.value = "random";
+await page.onSeatChange();
+equal("changing opponent keeps the position", page.state.snapshot.ply, 2);
+equal("and does not steal the move", page.state.snapshot.to_move, "PURPLE");
+
+page.ui.side.value = "GREEN";
+await page.onSeatChange();
+await until(() => page.state.snapshot.ply === 3, 15_000);
+check(
+  "handing your colour over makes the new seat answer from that same position",
+  page.state.snapshot.ply === 3 && page.state.snapshot.to_move === "GREEN",
+  `ply ${page.state.snapshot.ply}, to move ${page.state.snapshot.to_move}`,
+);
+
+page.ui.side.value = "PURPLE";
+page.ui.opponent.value = "heuristic";
+page.ui.variant.value = "5x5";
+await page.startGame();
+equal("a different board is a different game, so that one does restart", page.state.snapshot.ply, 0);
+equal("and deals the full deck again", page.ui.hand.querySelectorAll("button.piece").length, 13);
 
 // -- done ----------------------------------------------------------------------
 
