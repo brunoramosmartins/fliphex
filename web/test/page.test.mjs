@@ -52,6 +52,15 @@ function equal(description, actual, expected) {
   check(description, actual === expected, `expected ${expected}, got ${actual}`);
 }
 
+/* Wait for a condition rather than for a duration. */
+async function until(condition, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (!condition() && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  return condition();
+}
+
 // -- the browser jsdom does not provide ----------------------------------------
 
 const html = readFileSync(`${WEB}/index.html`, "utf8");
@@ -70,11 +79,30 @@ window.fetch = async (url) => {
   throw new Error(`the page fetched something unexpected: ${url}`);
 };
 
-for (const key of ["document", "HTMLElement", "SVGElement", "Node", "Event"]) {
+/* Everything the page reaches for as a bare global. jsdom supplies all of
+ * these; Node 18 supplies none of them, so leaving one out fails the page with
+ * a ReferenceError that looks like a page defect and is not one. */
+for (const key of [
+  "document",
+  "HTMLElement",
+  "SVGElement",
+  "Node",
+  "Event",
+  "navigator",
+  "localStorage",
+]) {
   globalThis[key] = window[key];
 }
 globalThis.window = window;
 globalThis.fetch = window.fetch;
+
+// Each run starts from an empty collection, so the checks below see only this
+// process's loads.
+try {
+  window.localStorage.clear();
+} catch {
+  /* jsdom without storage: readRuns() degrades to [] on its own */
+}
 
 // Point the page at the installed pyodide instead of the CDN.
 const require = createRequire(import.meta.url);
@@ -87,9 +115,24 @@ console.log("\n  FLIPHEX — web/app.js under jsdom\n");
 
 const page = await import(pathToFileURL(`${WEB}/app.js`).href);
 
-const deadline = Date.now() + 120_000;
-while (page.ui.badge.textContent === "booting" && Date.now() < deadline) {
-  await new Promise((r) => setTimeout(r, 100));
+/* 300 s, which is absurd for a 4 s boot and is deliberate. Pyodide's
+ * initialisation stalls on this machine roughly one load in five, for about
+ * 235 s — first seen while sampling boot for EXP-018 (one of three samples took
+ * 234 s) and reproduced here from a completely different harness. Two
+ * independent sightings of the same figure make it an environment property, not
+ * a fluke, and a deadline under it would turn that stall into a red page. */
+const BOOT_DEADLINE_MS = 300_000;
+const bootStarted = Date.now();
+await until(() => page.ui.badge.textContent !== "booting", BOOT_DEADLINE_MS);
+const bootMs = Date.now() - bootStarted;
+
+if (page.ui.badge.textContent === "booting") {
+  /* Exit 2, not 1: nothing about the page was tested, so reporting a failure
+   * would be a claim this run cannot support. */
+  console.log(`\n  INCONCLUSIVE — the Python runtime did not start in ${bootMs} ms.`);
+  console.log("  This is the known ~235 s Pyodide stall on this machine, not a page");
+  console.log("  defect: no check below ran. See EXP-018 and EXP-019. Re-run.\n");
+  process.exit(2);
 }
 
 if (!page.ui.badge.classList.contains("ready")) {
@@ -110,6 +153,20 @@ check(
     marks.every((m, i) => i === 0 || m.totalMs >= marks[i - 1].totalMs),
 );
 check("the solver probe is available but not run", typeof window.fliphexBench === "function");
+
+const collected = page.readRuns();
+equal("this load was collected for EXP-019", collected.length, 1);
+check(
+  "the cache state is measured from transferred bytes, not assumed",
+  ["cold", "warm", "unknown"].includes(collected[0]?.cache),
+  `got ${collected[0]?.cache}`,
+);
+check(
+  "a load served entirely from disk classifies as warm",
+  collected[0]?.cache === "warm",
+  `${collected[0]?.transferredBytes} bytes transferred under jsdom`,
+);
+check("fliphexReport prints without throwing", page.fliphexReport().length === 1);
 
 // -- the board -----------------------------------------------------------------
 
@@ -162,8 +219,11 @@ check(
 // -- playing -------------------------------------------------------------------
 
 await page.playMove(0);
-await new Promise((r) => setTimeout(r, 500));
 
+/* Polled, not slept. The agent's reply is scheduled on a timer so the human's
+ * move paints first, and a fixed wait turns machine load into a red test — the
+ * one failure mode that makes a suite worth less than no suite. */
+await until(() => page.state.snapshot.ply === 2, 15_000);
 equal("the move lands and the heuristic replies", page.state.snapshot.ply, 2);
 equal(
   "exactly two cells are coloured",

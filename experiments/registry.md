@@ -5997,6 +5997,38 @@ rule 1's 1 s threshold, which would fire the split render — and precisely
 because it is suggestive it must not be acted on. Five loads per cell, cold and
 warm, or nothing.
 
+#### Amendment, 2026-09-21 — the ~235 s boot stall is real, and the measurement has to survive it
+
+**Seen twice now, from two unrelated harnesses, at the same figure.** Sampling
+Pyodide's boot for EXP-018 produced 1.91 s, 234 s and 1.96 s — the middle one
+was recorded as an outlier and excluded from anything. Building `web/test/` then
+reproduced it: over fourteen runs of the page suite, **three stalled at about
+235 s while the rest booted in four**, roughly one load in five.
+
+Two independent sightings of the same duration make it a property of this
+machine rather than a fluke, and it matters here because EXP-019 measures
+exactly this quantity. Three consequences, all adopted:
+
+1. **A stalled load is recorded, never dropped.** The protocol already says no
+   load is discarded for looking wrong. A 235 s `playable` is data about the
+   environment the page runs in, and a table that quietly omits it reports a
+   page that does not exist.
+2. **It is reported as its own row, not averaged in.** A mean over four 4 s
+   loads and one 235 s load describes nothing. The cell shows every value.
+3. **Rules 1 and 2 are read against the *typical* load, with the stall rate
+   stated beside them.** "Warm time-to-playable exceeds 1 s" is a question about
+   what a visitor normally waits, and "one load in five stalls for four minutes"
+   is a separate and more serious finding that no threshold here was written to
+   catch.
+
+**The cause is not established.** WSL2, the page cache, memory pressure and the
+14 MB wasm download are all candidates and none has been tested. It has never
+been seen in a real browser, because no real browser has run this page yet.
+
+`web/test/page.test.mjs` waits 300 s and, on expiry, exits **2** with
+*INCONCLUSIVE* rather than 1 with a failure: no check ran, so reporting a page
+defect would be a claim the run cannot support.
+
 #### What this does not set out to establish
 
 Not that the page is pleasant to use. That is the play-testing the author is

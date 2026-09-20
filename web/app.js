@@ -98,7 +98,108 @@ function reportMarks() {
     ui.badge.textContent = `ready in ${(playable / 1000).toFixed(2)}s`;
     ui.badge.title = rows.map((r) => `${r.mark} +${r.deltaMs}ms`).join("  ");
   }
+  recordRun(rows);
   return rows;
+}
+
+/* Bytes actually pulled over the network this load.
+ *
+ * A resource served from cache reports `transferSize` 0, so this separates a
+ * cold load from a warm one by **measuring** it rather than by trusting whoever
+ * was clicking to remember which they just did. EXP-019's falsifier says that
+ * if the two conditions do not differ, its rules are not applied — and that
+ * cannot be checked from a number that was assumed. */
+function transferredBytes() {
+  try {
+    return performance
+      .getEntriesByType("resource")
+      .reduce((total, entry) => total + (entry.transferSize || 0), 0);
+  } catch {
+    return null;
+  }
+}
+
+const RUNS_KEY = "fliphex.exp019.runs";
+
+/* Per-viewer convenience only: this survives a reload so ten loads can be
+ * collected without transcribing ten tables by hand. It is not the record —
+ * `fliphexReport()` prints what goes into the registry. Every access is
+ * guarded, because storage throws in a private window and comes back empty
+ * after a site-data clear. */
+function readRuns() {
+  try {
+    return JSON.parse(localStorage.getItem(RUNS_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+function recordRun(rows) {
+  const bytes = transferredBytes();
+  const run = {
+    at: new Date().toISOString(),
+    playableMs: rows.at(-1)?.totalMs ?? null,
+    marks: Object.fromEntries(rows.map((r) => [r.mark, r.deltaMs])),
+    transferredBytes: bytes,
+    // 1 MB is far above a warm load's stray bytes and far below the runtime's
+    // 14 MB, so nothing lands near the line.
+    cache: bytes === null ? "unknown" : bytes > 1_000_000 ? "cold" : "warm",
+    ua: globalThis.navigator?.userAgent ?? "unknown",
+  };
+  try {
+    localStorage.setItem(RUNS_KEY, JSON.stringify([...readRuns(), run]));
+  } catch {
+    /* no storage: the run is still in fliphexMarks for this page */
+  }
+  window.fliphexRun = run;
+  console.log(
+    `  EXP-019  ${run.cache}  playable ${run.playableMs} ms  ` +
+      `(${((bytes ?? 0) / 1e6).toFixed(1)} MB transferred)  — ` +
+      `${readRuns().length} run(s) collected, fliphexReport() to print`,
+  );
+}
+
+/* Print every collected load, grouped by cache state. Copy the JSON into the
+ * registry: cells are reported whole, and no load is dropped for looking
+ * wrong. */
+function fliphexReport() {
+  const runs = readRuns();
+  if (!runs.length) {
+    console.log("no runs collected — reload the page at least once");
+    return [];
+  }
+  console.table(
+    runs.map((r, i) => ({
+      "#": i + 1,
+      cache: r.cache,
+      playableMs: r.playableMs,
+      chrome: r.marks.chrome,
+      runtime: r.marks.runtime,
+      engine: r.marks.engine,
+      playable: r.marks.playable,
+      MB: ((r.transferredBytes ?? 0) / 1e6).toFixed(1),
+    })),
+  );
+  for (const state of ["cold", "warm"]) {
+    const cell = runs.filter((r) => r.cache === state).map((r) => r.playableMs);
+    if (cell.length) {
+      console.log(
+        `  ${state}: n=${cell.length}  playable ms = ${cell.join(", ")}` +
+          `  (min ${Math.min(...cell)}, max ${Math.max(...cell)})`,
+      );
+    }
+  }
+  console.log(JSON.stringify(runs, null, 1));
+  return runs;
+}
+
+function fliphexReset() {
+  try {
+    localStorage.removeItem(RUNS_KEY);
+  } catch {
+    /* nothing to clear */
+  }
+  console.log("collected runs cleared");
 }
 
 /* Timed around the one SolverAgent call, per EXP-019's third rule. Exposed on
@@ -575,6 +676,8 @@ new_game = GameSession
 /* EXP-019's console surface. `fliphexMarks` is filled at boot; the solver probe
  * is a function so that nothing expensive runs unless it is asked for. */
 window.fliphexBench = timeSolverOpening;
+window.fliphexReport = fliphexReport;
+window.fliphexReset = fliphexReset;
 
 ui.newGame.addEventListener("click", startGame);
 ui.variant.addEventListener("change", () => { if (state.py) startGame(); });
@@ -586,4 +689,16 @@ boot();
 
 /* Exported for `web/test/page.test.mjs`, which drives the page through the DOM.
  * Harmless in a browser: this is already a module, and nothing imports it. */
-export { boot, onCellClick, onTileClick, onUndo, playMove, startGame, state, ui };
+export {
+  boot,
+  fliphexReport,
+  fliphexReset,
+  onCellClick,
+  onTileClick,
+  onUndo,
+  playMove,
+  readRuns,
+  startGame,
+  state,
+  ui,
+};
