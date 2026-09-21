@@ -20,6 +20,15 @@ any rotation, and every arrow pointing at an occupied neighbour flips that
 neighbour to your colour. Flips do not chain. All 25 cells fill, and whoever
 shows more of their colour wins — 25 is odd, so there are no draws.
 
+![A full game of FLIPHEX played in the browser: tiles are placed on the hexagonal
+board, arrows fire and flip neighbouring tiles between purple and green, and the
+board fills to a final score.](docs/media/fliphex-demo.gif)
+
+*A whole game, sped up — the browser interface, running the project's real Python
+engine under WebAssembly. Each tile's arrows fire once, on the ply it is placed.
+Play it at
+[brunoramosmartins.github.io/fliphex](https://brunoramosmartins.github.io/fliphex/).*
+
 Full rules: [`docs/rules-canonical.md`](docs/rules-canonical.md).
 
 ## Research question
@@ -105,12 +114,19 @@ Four interfaces, all driving the same engine.
 cd web && python3 -m http.server 8765
 ```
 
-Then open `http://localhost:8765`. Served locally the page offers the **exact
-solver**; the published page stops at the heuristic, per
-[adr-013](docs/adr/adr-013-interface-targets.md). Board, the colour you hold and
-who you are playing are selectors — only changing the board starts a new game,
-so you can hand a position you are losing straight to the solver and watch what
-it does instead.
+Then open `http://localhost:8765` — or play the published page at
+**[brunoramosmartins.github.io/fliphex](https://brunoramosmartins.github.io/fliphex/)**,
+which is this directory deployed unchanged.
+
+Served locally the page offers every seat that can run in a browser. The
+published page offers the **exact solver on the 3×3**, where it plays perfectly
+from the first move, and stops at the heuristic on the larger boards — per
+[adr-013](docs/adr/adr-013-interface-targets.md), because there the same seat
+would freeze the tab for longer and play heuristic moves anyway.
+
+Board, the colour you hold and who you are playing are selectors — only changing
+the board starts a new game, so you can hand a position you are losing straight
+to the solver and watch what it does instead.
 
 **In a window:**
 

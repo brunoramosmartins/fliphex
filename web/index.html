@@ -12,8 +12,41 @@
      pygame window draws from. Linked first so style.css can use them. -->
 <link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="style.css">
+<!-- The portfolio's chrome, last so it wins where the two meet. See the long
+     comment at the top of site.css for why this is a copy and not an import. -->
+<link rel="stylesheet" href="site.css">
+<!-- IBM Plex, the family the portfolio already loads. Plex Sans is the first
+     name in ui/theme.py's stack and was never installed anywhere; asking for it
+     here is what finally makes the page render in the typeface the project has
+     been nominating since the stack was written. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body>
+
+<a href="#main-content" class="skip-link">Skip to content</a>
+
+<!-- The site's own header, byte-for-byte the structure every other page of
+     brunoramosmartins.github.io uses. The links are absolute paths so they work
+     from /fliphex/ once deployed; served from a local checkout they point at a
+     site that is not there, which is the honest failure and not a silent one. -->
+<header class="site-header" role="banner">
+  <div class="site-container">
+    <a href="/index.html" class="site-logo">Bruno Ramos Martins</a>
+    <button class="nav-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false" aria-controls="site-nav">
+      <span></span><span></span><span></span>
+    </button>
+    <nav id="site-nav" class="site-nav" aria-label="Main navigation">
+      <a href="/index.html">Home</a>
+      <a href="/projects.html" class="active" aria-current="page">Projects</a>
+      <a href="/articles.html">Articles</a>
+      <a href="/til.html">TIL</a>
+      <a href="/resume.html">Resume</a>
+      <a href="/about.html">About</a>
+    </nav>
+  </div>
+</header>
 
 <header class="bar">
   <div class="brand">
@@ -35,11 +68,12 @@
       </select>
     </label>
     <label>Against
-      <!-- The published list, and the fallback before app.js runs. adr-013's
-           second amendment withdraws every agent above the heuristic from the
-           deployed page; `fillSeats` in app.js widens this to the random and
-           solver seats when the page is served from a local host, and never
-           narrows it. The decision is in one function there, not here. -->
+      <!-- The narrowest list, and the fallback before app.js runs. adr-013's
+           second amendment withdrew every agent above the heuristic from the
+           deployed page; its fourth returns the solver to the deployed 3x3,
+           where the seat is exact from the first move. `fillSeats` in app.js
+           widens this by host and by board and never narrows below it, so the
+           decision is in one function there rather than in this markup. -->
       <select id="opponent">
         <option value="human">a second player</option>
         <option value="heuristic" selected>the heuristic agent</option>
@@ -49,7 +83,7 @@
   </div>
 </header>
 
-<main>
+<main id="main-content">
   <section class="board-pane">
     <div id="board-wrap" class="board-wrap">
       <svg id="board" role="img" aria-label="FLIPHEX board" hidden></svg>
@@ -111,11 +145,38 @@
   </aside>
 </main>
 
-<footer class="foot">
-  <span>Engine, solver and agents run unmodified under Pyodide.</span>
-  <span id="engine-badge" class="badge">booting</span>
-  <span id="origin-note" class="origin"></span>
+<!-- One footer. The engine badge and the origin note are the game's own status
+     line and stay; the site's copyright and links join them on the same row
+     under the site's border treatment, rather than stacking a second footer
+     underneath — which is the lean-to this whole exercise is about. -->
+<footer class="foot" role="contentinfo">
+  <span class="engine-line">
+    <span>Engine, solver and agents run unmodified under Pyodide.</span>
+    <span id="engine-badge" class="badge">booting</span>
+    <span id="origin-note" class="origin"></span>
+  </span>
+  <span class="footer-copy">&copy; 2026 Bruno Ramos Martins</span>
+  <nav class="footer-links" aria-label="Footer navigation">
+    <a href="https://github.com/brunoramosmartins/fliphex" target="_blank" rel="noopener noreferrer">Source</a>
+    <a href="https://github.com/brunoramosmartins" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <a href="/about.html">About</a>
+  </nav>
 </footer>
+
+<!-- The site's hamburger, on the site's markup. Deliberately not in app.js:
+     that module is the game, is driven by the jsdom suite, and has no business
+     knowing the page has navigation. -->
+<script>
+  (() => {
+    const toggle = document.querySelector(".nav-toggle");
+    const nav = document.getElementById("site-nav");
+    toggle?.addEventListener("click", () => {
+      const open = nav.classList.toggle("is-open");
+      toggle.classList.toggle("is-open", open);
+      toggle.setAttribute("aria-expanded", String(open));
+    });
+  })();
+</script>
 
 <script type="module" src="app.js"></script>
 </body>

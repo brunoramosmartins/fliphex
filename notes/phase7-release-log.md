@@ -714,6 +714,169 @@ Sans 3, Inter and Noto ahead of it, so all three renderers move together the day
 the files land. It needs a download and a licence file in the repository, which
 is the author's call and not a refactor.
 
+## Publishing the page under the portfolio, and the solver going public
+
+The page is being deployed so the game's original designers can play it from a
+link — it was built in a course at IME and FAU and is going to the Matemateca,
+and one of the professors had written asking what the project was for. That is
+the requirement that drove three changes.
+
+### It is a project site, not a copy
+
+`.github/workflows/pages.yml` uploads `web/` to GitHub Pages, so the page lands
+at `brunoramosmartins.github.io/fliphex/` — **the same origin as the portfolio**,
+which is what makes absolute links to the site's own pages work and is why this
+reads as part of a site rather than as a page beside one.
+
+The alternative was copying `web/` into the portfolio repository, and it is
+worth naming why it lost: `payload.json` is *generated* from `fliphex/`,
+`solver/` and `agents/`, so a copy of it in another repository goes stale in
+silence the next time the engine changes. That is the defect class this phase
+has now found five times. The workflow goes further and runs
+`scripts/build_web.py --check` **before** deploying, so a stale payload fails the
+deployment instead of publishing code this commit does not contain.
+
+### The solver returns to the deployed page, on one board
+
+adr-013's second amendment withdrew every agent above the heuristic from the
+deployed page. The fourth narrows that by one board: **the 3×3 gets the exact
+solver, and nothing else does.**
+
+The rule is not "the small board". It is the board where `solver_budget` returns
+no `search_below_k`, so the seat is exact from ply 1 instead of heuristic until
+eight cells remain — which is the only thing that justifies making a stranger
+wait. Worst case is the opening at ~8 s and it falls monotonically after. On the
+5×3 and 5×5 the same seat would block for a *variable* time and play heuristic
+moves before it: a longer freeze for a weaker claim.
+
+What made it safe was already built. `BLOCKING_SEATS` names the freeze before
+entering it, and the footer's origin line now states the wait in seconds before
+the visitor meets it. **An 8 s stall that is announced is a slow opponent; the
+same stall unannounced is a crash.**
+
+The consequence I nearly missed: `seatsFor` gained a second axis, so a seat list
+computed at load is no longer correct for the session — changing the board can
+withdraw the seat the visitor is holding. `fillSeats` is re-run on every board
+change, and when it drops the current seat `onBoardChange` **says so** rather
+than substituting quietly. Both directions are tested, and the rule still fails
+closed on both axes: an unknown host gets the narrow list, and so does an unknown
+board on a known host.
+
+### The frame matches the building, the canvas does not
+
+The brief was "não quero que fique um puxadinho", and the trap in it is to make
+the board match the website. The board is a counterpart of a laser-cut wooden
+object; the purple and the green are the tiles. So `web/site.css` takes the
+portfolio's **chrome** — fixed 64px header, the site nav with the active item
+marked, the 1100px container, the navy link colour, the footer treatment — and
+touches no game colour at all. `test_the_game_palette_does_not_leak_into_the_chrome`
+is that sentence as an assertion.
+
+**The luckiest fact in the whole exercise: both already use IBM Plex.** The
+portfolio loads Plex Serif and Plex Mono; `ui/theme.py` has led its stack with
+**IBM Plex Sans** since the day it was written, on a machine where `fc-list`
+shows only DejaVu. Asking for the family in the page head is what finally makes
+the page render in the typeface this project has been nominating and never
+receiving — and it means the chrome and the game are three weights of one
+family rather than two designs in a truce.
+
+**`site.css` is a copy, and it is labelled as one.** The tokens live in another
+repository with no build step spanning the two; linking them by absolute path
+would work deployed and 404 locally, leaving the local page with unstyled
+chrome. So the values are transcribed with their source version named, and
+`tests/test_site_chrome.py` pins all eleven against the numbers the file's own
+header records. That does not stop the portfolio from moving — nothing can — but
+it means the copy cannot be edited casually and forgotten, and the review trigger
+is written down. It is the least bad option and the file says so rather than
+pretending otherwise.
+
+One thing the portfolio has nothing to say about is **dark mode**, because it has
+none and this page does. The chrome's dark values are therefore derived from the
+game's own dark palette rather than from the site, and a test requires every
+chrome *colour* to have one — a token left at its light value would be
+white-on-white for a visitor whose system is dark.
+
+### Two bugs that cancelled each other, found by a screen recording
+
+The video recorded for the professor showed, at 22 s, a board mid-game — 6 to 3,
+"Green to move", hand rendered — with the **boot panel still on screen**,
+spinner turning, reading *"Starting the rules…"*. I checked the source frame
+against the converted one first, in case the conversion had smeared something.
+It had not. The page had been doing that under every game since the split render
+was built.
+
+**Defect one: `hidden` loses to a class.** The browser's own sheet says
+`[hidden] { display: none }` at the weakest specificity there is, so any rule
+here setting `display` on the same element wins. Three did — `.boot { display:
+flex }`, `#board { display: block }`, `.scoreline { display: flex }` — against
+`hidden` in the markup on two of them and `ui.boot.hidden = true` in `startGame`
+on the third. Fixed with `[hidden] { display: none !important; }`, where the
+`!important` is the point of the rule rather than an escape from it: outranking
+a class is the entire job.
+
+**Defect two, which the first one was hiding.** Applying that fix made the board
+disappear. `hidden` is defined on `HTMLElement`; **`SVGElement` does not carry
+it**. So `svg.hidden = false` at the end of `drawBoard` had been setting a plain
+JavaScript property nobody reads and leaving `hidden=""` in the markup — and the
+board drew anyway only because defect one was cancelling it. Fixed with
+`removeAttribute("hidden")`.
+
+**And the test was asserting the bug.** `check("the board is visible once the
+engine is ready", !board.hidden)` read back the same property the code had just
+written, so it passed by asking the page to confirm its own mistake. It now
+reads `!board.hasAttribute("hidden")` — what a browser would actually act on —
+and a probe confirms it: reverting the one-line fix turns it red.
+
+Three things worth keeping from this. **A test that reads back what the code
+wrote is not a test.** **Two defects that cancel are harder to see than either
+alone**, and the only reason this pair surfaced is that fixing one exposed the
+other loudly. And this is the third time in the phase that an intention existed
+as a value and never as a picture — after the pygame arrows asking for 75%
+opacity and drawing 100%, and the ring on all twenty-four playable cells. All
+three were found by looking at a rendering. None was found by a test, and the
+suite's own closing line says why it could not be: jsdom has no layout and no
+cascade, so `element.hidden` reads true there whatever the stylesheet says.
+
+### The README gets a demo, and it is the one binary this repository tracks
+
+A 27-second GIF of a whole game, at the top of the README. It sits opposite
+`figures/*.png` on the gitignore's own stated rule — *track the per-item record
+when regenerating it needs something the repository does not have.* A canonical
+figure needs `python -m figures.build` and a few seconds. A screen recording of
+somebody playing needs a person, a browser and a game; no seed, script or
+instrument in this tree reproduces it. Generated → ignored; not reproducible →
+committed. Two tests keep that pair honest, including a 4 MB budget, because a
+tracked binary can only grow and git cannot forget one.
+
+**The encode is worth writing down, because the obvious moves were wrong twice.**
+
+Speeding the game up 3× did **not** shrink the file. Fewer frames, but each one
+changes far more, and `diff_mode=rectangle` prices exactly that. It was kept
+anyway — 81 s is too long for a README and 27 s carries the whole arc, empty
+board to full — but as a *composition* decision, not a size one.
+
+Cropping away the dead margins made it **bigger**: 1.85 MB to 3.37 MB. Those
+margins were the cheapest pixels in the frame, static across every frame and
+compressing to nearly nothing; removing them raised the changing fraction of
+every rectangle. The crop was still right, because it makes the board 1.6×
+larger at the same rendered width, but the saving had to come from somewhere
+else.
+
+It came from the dither. `dither=none` with `max_colors=64` took it to 1.47 MB
+where `bayer` sat at 2.89 MB, and it costs nothing here: the interface is flat
+fills — purple, green, one beige — and dithering a flat fill adds noise for no
+gradient. Final at 760×470, 10 fps: **1.69 MB, smaller than the uncropped
+version and with a much bigger board.**
+
+```
+crop=754:466:266:56, setpts=PTS/3, fps=10, scale=760:-2:flags=lanczos
+palettegen=stats_mode=diff:max_colors=64   +   paletteuse=dither=none:diff_mode=rectangle
+```
+
+The crop also drops the top control bar, which is full-width and therefore
+cannot survive any horizontal crop. Losing it loses the three selectors, which
+are a real feature — the README says so in words instead.
+
 ## `writeup/main-writeup.md` — the long-form article
 
 A **skeleton with prompts**, not a draft. The piece is first person and about my

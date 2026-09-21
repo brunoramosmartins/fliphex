@@ -1,0 +1,69 @@
+# Publish web/ to GitHub Pages.
+#
+# The page ends up at https://brunoramosmartins.github.io/fliphex/ — a project
+# site served from this repository under the same origin as the portfolio, which
+# is what lets web/index.html reference the site's own pages with absolute paths
+# and lets the two read as one site rather than as a page and its lean-to.
+#
+# Branch-based Pages can publish the repository root or /docs and nothing else,
+# so the source lives in web/ and this workflow uploads that directory as the
+# artefact. That is the whole reason this file is an Actions workflow instead of
+# a setting.
+#
+# It refuses to deploy a stale payload. `scripts/build_web.py --check` compares
+# web/payload.json, web/geometry.json and web/theme.css against what the current
+# source would generate; those three are the engine, the boards and the palette,
+# so a drifted one means the published page would be running code this commit
+# does not contain. CI already fails on a dirty tree after a rebuild — this is
+# the same guarantee at the moment it matters most.
+name: Pages
+
+on:
+  push:
+    branches: ["main"]
+  # So a deployment can be re-run without an empty commit.
+  workflow_dispatch:
+
+# The page is public and static. Nothing here needs write access to contents.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and a newer push waits rather than cancelling: a
+# half-replaced site is worse than a slightly old one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: build and deploy web/
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # No extras. The generated payload is produced from fliphex/, solver/ and
+      # agents/, all of which are pure standard library — which is the same
+      # property that lets the engine run under Pyodide at all.
+      - name: Install
+        run: python -m pip install --upgrade -e "."
+
+      - name: Refuse to publish a stale payload
+        run: python scripts/build_web.py --check
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

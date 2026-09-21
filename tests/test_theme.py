@@ -121,13 +121,18 @@ def test_the_page_stylesheet_no_longer_declares_its_own_palette():
     assert not declared, f"style.css re-declares tokens: {sorted(declared)}"
 
 
-def test_the_page_links_the_generated_theme_before_the_stylesheet():
-    """Order is load-bearing: style.css uses tokens theme.css declares.
+def test_the_page_links_its_three_stylesheets_in_the_one_order_that_works():
+    """Order is load-bearing twice over, in opposite directions.
+
+    ``theme.css`` first because ``style.css`` *uses* tokens it declares, and a
+    custom property read before it is declared resolves to nothing. ``site.css``
+    last because it is the portfolio's chrome and has to *win* where the two
+    disagree — the page width and the footer are both declared in both.
 
     Matched against the ``<link>`` tags rather than the raw text, because the
-    comment above them names both files and the first version of this check
-    found the comment.
+    comment above them names the files and the first version of this check found
+    the comment.
     """
     html = (THEME_CSS.parent / "index.html").read_text()
     linked = re.findall(r'<link rel="stylesheet" href="([^"]+)"', html)
-    assert linked == ["theme.css", "style.css"], linked
+    assert linked == ["theme.css", "style.css", "site.css"], linked

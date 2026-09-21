@@ -15,6 +15,30 @@
 
 * { box-sizing: border-box; }
 
+/* `hidden` has to beat a class, and by default it does not.
+ *
+ * The browser's own sheet says `[hidden] { display: none }`, which is the
+ * weakest possible specificity — so ANY rule here that sets `display` on the
+ * same element silently wins, and the attribute becomes decorative. This page
+ * had three of them: `.boot { display: flex }`, `#board { display: block }` and
+ * `.scoreline { display: flex }`, against `hidden` on all three in the markup
+ * and `ui.boot.hidden = true` in `startGame`.
+ *
+ * The visible consequence was the boot panel — "Starting the rules…", with its
+ * spinner still turning — sitting under a game in progress for the whole
+ * session. It was found in a screen recording made for something else, not by a
+ * test, and it could not have been found by the test suite: jsdom has no layout
+ * and no cascade, so `element.hidden` reads true there no matter what the
+ * stylesheet does. That is the second time in this phase that an intention
+ * existed as a value and never as a picture — the first was the pygame window
+ * asking for 75% opacity and drawing 100%.
+ *
+ * `!important` is the point of the rule, not an escape from it: the whole job
+ * is outranking a class, and anything weaker would reintroduce the bug the next
+ * time something gains a `display`.
+ */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--wood);

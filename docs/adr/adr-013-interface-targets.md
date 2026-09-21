@@ -329,6 +329,50 @@ The window offers all six seats because it is local by definition; a seat that
 cannot be built — the learner, on a clone with no weights — puts the control
 back and says why, rather than taking the window down mid-game.
 
+## Amendment, 2026-09-20 — the solver returns to the deployed page, on one board
+
+The second amendment withdrew every agent above the heuristic from the deployed
+page, and the third enforced that split in `web/app.js` with a rule that fails
+closed. Both stand. This narrows the withdrawal by one board.
+
+**The deployed page offers the exact solver on the 3×3 and nowhere else.**
+
+The rule is not "the small board". It is the board where
+`ui.seats.solver_budget` returns no `search_below_k`, so the seat plays **exact
+from ply 1** rather than heuristic until eight cells remain. That is the whole
+justification for making a stranger wait: the wait buys perfect play. Its worst
+case is the opening at about **8 s** and it falls monotonically from there,
+because the tree shrinks with every tile placed.
+
+On the 5×3 and the 5×5 the same seat would block for a *variable* time near the
+end of the game and play heuristic moves before it — a longer freeze in exchange
+for a weaker claim. The second amendment's reasoning applies there unchanged.
+
+**What made this safe to do now** is the third amendment's machinery, not a new
+tolerance for freezing. `BLOCKING_SEATS` already names the freeze before
+entering it, and the footer's origin line now states the wait in seconds *before*
+the visitor meets it. An 8 s stall that is announced is a slow opponent; the
+same stall unannounced is a crash.
+
+### The seat list gained a second axis, so it has to be recomputed
+
+`seatsFor(hostname)` became `seatsFor(hostname, board)`, and the consequence is
+that a list computed at load is no longer correct for the session — changing the
+board can withdraw the seat the visitor is holding. `fillSeats` is therefore
+re-run on every board change, and when it drops the current seat the page
+**says so** rather than substituting quietly. Both directions are tested.
+
+It still fails closed on both axes: an unknown host gets the published list, and
+an unknown board gets the published list even on a known host.
+
+### What this is for
+
+The page is being published under the portfolio's own domain so that the game's
+original designers — it was built in a course at IME and FAU and is going to the
+Matemateca — can play it from a link. The thing worth showing them is not a
+competent opponent. It is that one of these boards is *finished*: the value of
+every position is known, and the seat opposite them is reading it.
+
 ## Related
 
 - [adr-003](adr-003-piece-representation.md) — inert placed tiles; why the state

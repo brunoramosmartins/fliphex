@@ -223,7 +223,25 @@ check("fliphexReport prints without throwing", page.fliphexReport().length === 1
 // -- the board -----------------------------------------------------------------
 
 const board = page.ui.board;
-check("the board is visible once the engine is ready", !board.hidden);
+
+/* The ATTRIBUTE, not the property, and the distinction is the whole test.
+ *
+ * `hidden` is defined on `HTMLElement`. `SVGElement` does not carry it, so
+ * `svg.hidden = false` on an `<svg>` sets a plain JavaScript property and
+ * leaves `hidden=""` in the markup. This check used to read `!board.hidden` —
+ * the same property the code had just assigned — so it passed by asking the
+ * page to confirm its own mistake, and the board only rendered because a
+ * second bug (`#board { display: block }` outranking the browser's
+ * `[hidden] { display: none }`) was cancelling the first.
+ *
+ * Fixing the stylesheet took the mask off and the board disappeared. A test
+ * that reads back what the code wrote is not a test; this one reads what the
+ * browser would act on. */
+check(
+  "the board is visible once the engine is ready",
+  !board.hasAttribute("hidden"),
+  `board still carries hidden="${board.getAttribute("hidden")}"`,
+);
 equal("25 hexagons are drawn", board.querySelectorAll("g.cell-group").length, 25);
 
 const names = [...board.querySelectorAll(".cell-name")].map((n) => n.textContent);
@@ -403,8 +421,12 @@ equal("choosing purple leaves the opening to the visitor", page.state.snapshot.p
  * split, and the important ones are the negative ones: the rule fails closed,
  * so a host nobody thought about is restricted rather than permitted. */
 const PUBLISHED = "human,heuristic";
+const PUBLISHED_3X3 = "human,heuristic,solver";
 const LOCAL = "human,random,heuristic,solver";
-const offers = (hostname) => page.seatsFor(hostname).join(",");
+// The board is the second axis, added by adr-013's fourth amendment. Anything
+// that does not name one is asking the old question and must get the old,
+// narrowest answer.
+const offers = (hostname, board = "5x5") => page.seatsFor(hostname, board).join(",");
 
 equal("GitHub Pages gets the published list", offers("brunoramosmartins.github.io"), PUBLISHED);
 equal("an unrecognised host fails closed", offers("example.com"), PUBLISHED);
@@ -420,6 +442,21 @@ equal("a wifi address is a local checkout being served by its author", offers("1
 equal("the 172.25 WSL address a phone reached in EXP-019 is local", offers("172.25.201.155"), LOCAL);
 equal("mDNS names never resolve on the public internet", offers("bruno-laptop.local"), LOCAL);
 
+/* The fourth amendment. The solver returns to the deployed page on the one
+ * board where it is exact from the first move — and nowhere else, because
+ * anywhere else it would freeze the tab for longer in exchange for heuristic
+ * play. The negative checks are again the load-bearing ones. */
+equal(
+  "the published 3x3 offers the solver, because there it is perfect",
+  offers("brunoramosmartins.github.io", "3x3"),
+  PUBLISHED_3X3,
+);
+equal("the published 5x3 does not", offers("brunoramosmartins.github.io", "5x3"), PUBLISHED);
+equal("nor the published 5x5", offers("brunoramosmartins.github.io", "5x5"), PUBLISHED);
+equal("a board nobody thought about fails closed too", offers("example.com", "9x9"), PUBLISHED);
+equal("and so does no board at all", offers("example.com", undefined), PUBLISHED);
+equal("locally the board is irrelevant — every seat, every board", offers("localhost", "5x5"), LOCAL);
+
 equal(
   "served from localhost, the page itself offers the solver",
   [...page.ui.opponent.options].map((o) => o.value).join(","),
@@ -433,6 +470,47 @@ check(
 check(
   "the seats torch makes impossible are offered by neither origin",
   !offers("localhost").includes("az") && !offers("localhost").includes("uct"),
+);
+
+/* The footer line explains the *absence* where the seat is missing and the
+ * *wait* where it is offered, because an 8 s freeze that arrives unannounced
+ * reads as a crash. Three origins, three different sentences. */
+check(
+  "the published 3x3 warns about the wait before the visitor meets it",
+  page.originNote("brunoramosmartins.github.io", "3x3").includes("8 s"),
+  page.originNote("brunoramosmartins.github.io", "3x3"),
+);
+check(
+  "the published 5x5 says where the solver can be found instead",
+  page.originNote("brunoramosmartins.github.io", "5x5").includes("3×3"),
+  page.originNote("brunoramosmartins.github.io", "5x5"),
+);
+check(
+  "a local checkout says it is one",
+  page.originNote("localhost", "5x5").includes("Local checkout"),
+  page.originNote("localhost", "5x5"),
+);
+
+/* `fillSeats` now depends on the board as well as the host, so a visitor who
+ * picked the solver on the published 3x3 and then changed board must not be
+ * left holding a seat that is no longer in the list. jsdom's own hostname is
+ * localhost, so the published case is driven by argument rather than by
+ * pretending to be somewhere else. */
+page.fillSeats("brunoramosmartins.github.io", "3x3");
+page.ui.opponent.value = "solver";
+page.fillSeats("brunoramosmartins.github.io", "5x5");
+equal("leaving the 3x3 withdraws the solver option", page.ui.opponent.value, "heuristic");
+equal(
+  "and the list narrows with it",
+  [...page.ui.opponent.options].map((o) => o.value).join(","),
+  PUBLISHED,
+);
+// Put the harness back where it was: local, with every seat available.
+page.fillSeats("localhost", page.ui.variant.value);
+equal(
+  "restoring the local origin restores the full list",
+  [...page.ui.opponent.options].map((o) => o.value).join(","),
+  LOCAL,
 );
 
 // -- changing who you play, without losing the position ------------------------
@@ -465,7 +543,7 @@ check(
 page.ui.side.value = "PURPLE";
 page.ui.opponent.value = "heuristic";
 page.ui.variant.value = "5x5";
-await page.startGame();
+await page.onBoardChange();
 equal("a different board is a different game, so that one does restart", page.state.snapshot.ply, 0);
 equal("and deals the full deck again", page.ui.hand.querySelectorAll("button.piece").length, 13);
 

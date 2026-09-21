@@ -39,6 +39,21 @@ const PY_ROOT = "/app";
 const PUBLISHED_SEATS = ["human", "heuristic"];
 const LOCAL_SEATS = ["human", "random", "heuristic", "solver"];
 
+/* Boards on which the *published* page also offers the exact solver.
+ *
+ * The 3x3 and only the 3x3 — and the rule is not "the small one". It is the
+ * board where `ui.seats.solver_budget` returns no `search_below_k`, so the seat
+ * is exact from ply 1 instead of heuristic until eight cells remain. That is
+ * what justifies making a visitor wait: the wait buys *perfect play*, its worst
+ * case is the opening at about 8 s, and it falls monotonically from there.
+ *
+ * On the 5x3 and the 5x5 the same seat plays heuristic for most of the game and
+ * then blocks for a variable time near the end — a longer freeze in exchange
+ * for a weaker claim, which is the wrong trade to offer a stranger. adr-013's
+ * fourth amendment is this paragraph.
+ */
+const PUBLISHED_SOLVER_BOARDS = new Set(["3x3"]);
+
 /* `uct` and `az` are in `SEAT_KINDS` and are deliberately in neither list:
  * `agents/az_agent.py` is excluded from the payload by `scripts/build_web.py`
  * because it imports torch, which has no WebAssembly build. They are not
@@ -68,8 +83,11 @@ function isLocalHost(hostname) {
   return a === 127 || a === 10 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31);
 }
 
-function seatsFor(hostname) {
-  return isLocalHost(hostname) ? LOCAL_SEATS : PUBLISHED_SEATS;
+function seatsFor(hostname, board) {
+  if (isLocalHost(hostname)) return LOCAL_SEATS;
+  return PUBLISHED_SOLVER_BOARDS.has(board)
+    ? [...PUBLISHED_SEATS, "solver"]
+    : PUBLISHED_SEATS;
 }
 
 /* Seats whose search blocks the only thread the page has.
@@ -116,11 +134,17 @@ const ui = {
   originNote: $("origin-note"),
 };
 
-/* Replace the opponent list with the one this origin is allowed. `index.html`
- * ships the published pair as the pre-script fallback; this widens it on a
- * local checkout and never narrows below it. */
-function fillSeats(hostname) {
-  const seats = seatsFor(hostname);
+/* Replace the opponent list with the one this origin and this board allow.
+ * `index.html` ships the published pair as the pre-script fallback; this widens
+ * it on a local checkout, or on the one published board the solver is exact on,
+ * and never narrows below it.
+ *
+ * It depends on the board as well as the host, so it must be re-run whenever
+ * the board changes — see the `variant` listener. A seat list that was correct
+ * only at load is the same defect as a palette that was correct only when it
+ * was copied. */
+function fillSeats(hostname, board) {
+  const seats = seatsFor(hostname, board);
   const keep = ui.opponent.value;
   ui.opponent.textContent = "";
   for (const seat of seats) {
@@ -130,12 +154,25 @@ function fillSeats(hostname) {
     ui.opponent.appendChild(option);
   }
   ui.opponent.value = seats.includes(keep) ? keep : "heuristic";
-  if (ui.originNote) {
-    ui.originNote.textContent = seats.includes("solver")
-      ? "Local checkout — the exact solver is offered here, not on the published page."
-      : "";
-  }
+  if (ui.originNote) ui.originNote.textContent = originNote(hostname, board);
   return seats;
+}
+
+/* One line in the footer saying what the solver seat is doing on this board.
+ *
+ * It used to explain only why a local checkout was offered more, which is the
+ * less useful direction. What a visitor needs is the *absence* explained where
+ * the seat is missing, and the *wait* explained where it is offered — since on
+ * the 3x3 that wait is the page's best moment and looks like a crash if it
+ * arrives unannounced. */
+function originNote(hostname, board) {
+  if (isLocalHost(hostname)) {
+    return "Local checkout — every seat is offered, on every board.";
+  }
+  if (PUBLISHED_SOLVER_BOARDS.has(board)) {
+    return "The solver plays this board perfectly. It needs about 8 s for the opening.";
+  }
+  return "The exact solver is offered on the 3×3, where it plays perfectly from the first move.";
 }
 
 /* Let the browser paint before something blocks it.
@@ -432,7 +469,17 @@ function drawBoard(geometry) {
     hit.addEventListener("click", () => onCellClick(cell.id));
   }
   svg.appendChild(overlay);
-  svg.hidden = false;
+  // `removeAttribute`, not `svg.hidden = false`, and the difference is not
+  // style. `hidden` is defined on `HTMLElement`; `SVGElement` does not carry
+  // it. So assigning to `.hidden` on an `<svg>` sets a plain JavaScript
+  // property nobody reads and leaves `hidden=""` sitting in the markup.
+  //
+  // It went unnoticed because a second defect hid it: `#board { display: block }`
+  // outranked the browser's `[hidden] { display: none }`, so the board drew
+  // anyway. Fixing the specificity in style.css took the mask off and the board
+  // vanished. Two bugs that cancelled, which is the hardest kind to see and the
+  // reason the test below asserts the *attribute* rather than the property.
+  svg.removeAttribute("hidden");
 }
 
 function paintBoard(snapshot) {
@@ -817,6 +864,25 @@ async function onSeatChange() {
   await maybeAgentMove();
 }
 
+/* A different board is a different game, so this restarts — but it may also
+ * change *who you are playing*, because the published page offers the solver on
+ * the 3x3 and nowhere else. Leaving a visitor on the 5x5 wondering why their
+ * opponent quietly became the heuristic is the kind of silent substitution this
+ * page is otherwise careful not to make, so the swap is announced after the new
+ * game is dealt. */
+async function onBoardChange() {
+  const before = ui.opponent.value;
+  fillSeats(globalThis.location?.hostname, ui.variant.value);
+  const after = ui.opponent.value;
+  if (!state.py) return;
+  await startGame();
+  if (before !== after) {
+    const gone = SEAT_LABELS[before] ?? before;
+    const now = SEAT_LABELS[after] ?? after;
+    say(`This board does not offer ${gone}, so you are playing <b>${now}</b>.`);
+  }
+}
+
 function onUndo() {
   if (state.busy) return;
   // Two plies when an agent holds a seat, so the human gets their turn back.
@@ -916,12 +982,12 @@ window.fliphexBench = timeSolverOpening;
 window.fliphexReport = fliphexReport;
 window.fliphexReset = fliphexReset;
 
-fillSeats(globalThis.location?.hostname);
+fillSeats(globalThis.location?.hostname, ui.variant.value);
 
 ui.newGame.addEventListener("click", startGame);
 // A different board is a different game, so this one restarts. The other two
 // take effect on the position in front of you — see `onSeatChange`.
-ui.variant.addEventListener("change", () => { if (state.py) startGame(); });
+ui.variant.addEventListener("change", onBoardChange);
 ui.opponent.addEventListener("change", onSeatChange);
 ui.side.addEventListener("change", onSeatChange);
 ui.undo.addEventListener("click", onUndo);
@@ -937,10 +1003,12 @@ export {
   fliphexReport,
   fliphexReset,
   isLocalHost,
+  onBoardChange,
   onCellClick,
   onSeatChange,
   onTileClick,
   onUndo,
+  originNote,
   playMove,
   readRuns,
   seatsFor,
