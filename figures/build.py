@@ -73,6 +73,14 @@ def gallery() -> str:
         "Rebuild everything with `python -m figures.build`, which needs the",
         '`figures` extra: `pip install -e ".[figures]"`.',
         "",
+        "> **The images below are absent from a fresh clone**, and on GitHub they",
+        "> render as broken links until you run that command. `figures/*.png` is",
+        "> gitignored deliberately: a rendered figure needs only tracked inputs",
+        "> and a few seconds, so the generator is the artefact and the PNG is not.",
+        "> `test_the_figures_are_ignored_because_their_inputs_are_tracked` pins",
+        "> that decision so it stays a decision. Saying so here is cheaper than",
+        "> letting a reader discover it as a broken image.",
+        "",
     ]
     for figure in FIGURES:
         tag = figure.hypothesis or "support"

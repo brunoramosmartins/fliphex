@@ -141,6 +141,22 @@ solver is exact only for the last 8 plies and reports its own proved rate,
 because a solver that fell back to a heuristic for most of a game played mostly
 heuristic moves.
 
+**On the 5×3 you can play the database instead of the search.** Give the window
+or the terminal `--sweep` and the solver seat reads the completed retrograde
+sweep instead of searching, so
+every move is a table lookup and `proved_rate` is 1.0 from the opening rather
+than from the last eight cells — Allis's *strongly solved*, made playable:
+
+```bash
+python -m ui.pygame_ui --variant 5x3 --opponent solver --sweep
+```
+
+It costs what knowing costs: peak resident **3.0 GB**, a worst single move of
+**4.9 s** (layer 9 alone is 1.2 GB), and 4.1 GB read from disk across sixteen
+plies. `data/checkpoints/` is gitignored, so without the sweep the flag is a
+*preference* rather than a requirement — the seat falls back to search and the
+header says which backend it got.
+
 Seats are `human`, `random`, `heuristic`, `solver`, `uct`, `az` — named per
 colour in the terminal (`--purple`, `--green`), chosen in the interface
 everywhere else. **Try both colours.** Purple moves first and holds the joker,
@@ -185,7 +201,7 @@ agents/        random, heuristic, solver, AZ
 stats/         Wilson intervals, bootstrap, paired tests
 ui/            CLI, pygame window, replay viewer, shared session and palette
 web/           the browser build — the engine under Pyodide (Phase 7)
-figures/       seven canonical figures, one per verdict
+figures/       seven figure *scripts* — the PNGs are generated, not tracked
 scripts/       experiment entry points and doc generators
 experiments/   the experiment registry
 writeup/       decision journal and portfolio article
@@ -208,7 +224,7 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev,ui,figures]"
 pytest tests/ && ruff check . && ruff format --check .
 ```
 
-1,217 tests. The browser build has its own suite, which needs Node:
+1,242 tests. The browser build has its own suite, which needs Node:
 
 ```bash
 cd web && npm install && npm test
@@ -233,12 +249,28 @@ python scripts/build_docs.py && python scripts/build_web.py
 
 ### What a clone does not get
 
-`data/az-runs/`, `data/checkpoints/` and `results/*.jsonl` are gitignored, so a
-fresh clone has the solved reduced boards and the experiment summaries but **no
-trained network and no recorded games**. Everything in this repository is built
-to work without them: the AZ seat explains what is missing and how to train one,
-and the replay viewer records a game from a seed rather than reading a file
-nobody has.
+`data/az-runs/`, `data/checkpoints/`, `results/*.jsonl` and `figures/*.png` are
+gitignored, so a fresh clone has the solved reduced boards and the experiment
+summaries but **no trained network, no recorded games, no endgame database and
+no rendered figures**. Everything in this repository is built to work without
+them: the AZ seat explains what is missing and how to train one, the solver seat
+falls back to search and says which backend it got, and the replay viewer
+records a game from a seed rather than reading a file nobody has.
+
+Three of the four are gitignored for size — 5.7 MB per champion, 4.1 GB for one
+5×3 sweep. The figures are 880 KB and are gitignored on a different principle:
+a rendered figure needs only tracked inputs and a few seconds, so the generator
+is the artefact and the PNG is not. Rebuild the gallery in under a minute:
+
+```bash
+pip install -e ".[figures]" && python -m figures.build
+```
+
+That principle is only legitimate while **every** input is tracked, so it is
+asserted rather than assumed: `python -m figures.build --check` verifies the
+manifest without importing a plotting library, and `tests/test_figures.py` runs
+it, along with a test that pins the gitignore decision itself so it stays a
+decision rather than becoming an accident.
 
 ## Credits
 

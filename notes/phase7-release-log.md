@@ -831,7 +831,81 @@ to, and the price of perfect play turned out to be memory bandwidth.
 
 ## TILs #1–#6 — polish and publish
 
-## `README.md` — the reproducibility pass, and the status section frozen at Phase 0
+## `README.md` — the reproducibility pass
+
+The stale Phase 0 status section this heading was written for no longer exists;
+the README was rewritten at the top of the phase. So the task collapsed to its
+other half, which is the one that matters: **run everything the README tells a
+visitor to run, and check every number it states.**
+
+All four documented commands accept their documented flags — `ui.cli`,
+`ui.pygame_ui`, `ui.replay_viewer` and the `web/` server — and both generators
+leave a clean tree. Three things were wrong.
+
+**The test count was stale: 1,217 against 1,242.** Twenty-five tests were added
+by this phase's own work and the headline number did not move with them. Small,
+and the kind of thing that makes a reader stop trusting the larger numbers.
+
+**`figures/` was described as something a clone gets, and it is not.**
+`figures/*.png` is gitignored, and the README's "What a clone does not get"
+listed the champion, the checkpoints and the results but not the figures. Worse,
+the *generated* `figures/README.md` embeds all seven with `![...](...)`, so on
+GitHub a visitor sees seven broken images and no explanation. That is exactly
+the pattern this phase has now found five times — a tracked file depending on a
+path the repository does not carry.
+
+What it is **not** is a mistake in the gitignore. The decision is deliberate and
+already pinned by a test with the reason in its name —
+`test_the_figures_are_ignored_because_their_inputs_are_tracked` — and the
+principle is sound: a rendered figure needs only tracked inputs and a few
+seconds, so the generator is the artefact and the PNG is not. I went looking to
+recommend tracking 880 KB and found the question already answered, better than I
+was about to answer it. The fix was therefore to *say so*, in both places: the
+README now lists the figures among what a clone lacks with the one-minute
+rebuild command, and the gallery generator emits a blockquote telling a GitHub
+visitor why the images below are broken. Saying it is cheaper than the surprise.
+
+**`--sweep` was undocumented.** The largest capability this phase added — the
+solver seat reading the completed 5×3 sweep, so `proved_rate` is 1.0 from the
+opening rather than from the last eight cells — appeared nowhere in "Play it",
+while the section next to it explained at length that the 5×5 solver is exact
+only for the final plies. Added, with its price attached (peak resident 3.0 GB,
+worst move 4.9 s, 4.1 GB read) and the note that `data/checkpoints/` is
+gitignored, so the flag is a *preference*: the seat falls back to search and the
+header says which backend it got.
+
+## `docs/paper-track-decision.md` — open, and gated on an event
+
+The deliverable is "either *not pursued* or a link to the fork", and neither is
+available: the policy gates the decision on the presentation to the original
+professor, which has not happened. So the file records the gate rather than
+faking a verdict, and closes with one of two dated edits.
+
+What it *can* do now is cost the decision, which is the part that was worth
+writing. The assessment is mine; the decision is not.
+
+**Four things are already at publication standard**, and the ranking is not the
+one the project looks like it should produce. First is the pair of literature
+corrections — Reversi 6×6's ~10²⁰ is impossible against a `3^36` ceiling, a 666×
+overshoot with no primary source, and Connect Four's 10¹⁴ is 22× Tromp's exact
+count. Both are one-line checkable, both are negative results about numbers that
+circulate, and **neither requires a reviewer to accept anything about an
+unpublished game.** Second is EXP-011: 400 PUCT simulations closed about an
+eighth of the factored-vs-flat deficit, measured against exact ground truth,
+which is a limit on the standard justification for that shortcut. The two
+exactly solved boards come *third*, not first, because the obstacle there is not
+rigour but audience.
+
+**Six things are not**, and two of them are the decision: re-running EXP-015 at
+the policy's ten seeds is ~270 h on the author's workstation, and isolating any
+cause for the H3 failure is ~270 h again per axis. Everything else on the list
+is weeks of writing. The asterisk on our own solved rows is the item no compute
+removes — it needs a second party and a second implementation.
+
+The reading offered, non-binding: if the answer is yes, the strongest submission
+uses FLIPHEX as the *instrument* rather than the subject. That version needs no
+additional compute and is a considerably smaller paper than the one the
+repository advertises.
 
 ## OPEN-1 — five columns of five, confirmed against the board
 
