@@ -130,6 +130,26 @@ def test_a_manifest_without_an_architecture_is_refused(tmp_path):
         load_champion(tmp_path, FULL_GAME)
 
 
+def test_the_missing_champion_is_reported_through_the_seat_as_well(tmp_path):
+    """The three checks above call ``load_champion`` directly, and that gap is
+    what let the defect ship.
+
+    ``load_champion`` was always correct — it inspects the filesystem before it
+    imports torch, so it can explain itself in a torch-free interpreter.
+    ``build_seat`` then imported ``agents.az_agent`` *before* calling it, which
+    made the explanation unreachable in exactly the configuration it was written
+    for: the CI ``check`` job raised ``ModuleNotFoundError: No module named
+    'torch'`` out of ``az/network.py`` instead.
+
+    With torch installed this test passes either way, because the import
+    succeeds and ``load_champion`` is reached regardless. The ordering is
+    enforced by the torch-free CI job, and this test is the contract that job
+    checks.
+    """
+    with pytest.raises(ChampionUnavailableError, match="gitignored"):
+        build_seat("az", variant=FULL_GAME, run_root=tmp_path / "absent")
+
+
 # -- import cost ---------------------------------------------------------------
 
 _PROBE = """

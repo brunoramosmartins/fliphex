@@ -259,11 +259,24 @@ def build_seat(
             seed=seed,
         )
 
-    from agents.az_agent import AZAgent, UCTAgent  # local: see the module docstring
-
     if kind == "uct":
+        from agents.az_agent import UCTAgent  # local: see the module docstring
+
         return UCTAgent(simulations=simulations, seed=seed)
+
+    # `load_champion` first, and the order is the whole point. It checks the
+    # filesystem before it touches torch, so a clone with no champion gets
+    # `ChampionUnavailableError` — which names the path and the remedy — rather
+    # than a `ModuleNotFoundError` traceback out of `az/network.py`.
+    #
+    # Importing `agents.az_agent` above this line made that unreachable in the
+    # torch-free configuration, which `agents/__init__.py` and the CI `check`
+    # job both exist to support. `load_champion` was always right; `build_seat`
+    # was asking for the learner before asking whether there was one to load.
     net = load_champion(run_root, variant)
+
+    from agents.az_agent import AZAgent  # local: see the module docstring
+
     return AZAgent(net, simulations=simulations, seed=seed)
 
 
