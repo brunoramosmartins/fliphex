@@ -1078,4 +1078,255 @@ repository advertises.
 
 ## Lessons Learned
 
+### 1. A deliverable is not complete when the implementation exists; it is complete when its boundary is executable
+
+Phase 7 repeatedly exposed a difference between something being specified and something being present.
+
+The replay viewer was supposed to consume saved games, but the repository contained no ordered games. The browser was described as exposing local seats that the page did not actually expose. The README described capabilities and figures that a fresh clone could not see. The figures clause existed, but the directory had previously shipped empty.
+
+The recurring failure was not missing code in isolation. It was a mismatch between the artefact a document claimed existed and the artefact a reader could actually reach.
+
+A useful completion criterion therefore became: the claim made by the repository must be testable through the same path a reader or user would follow.
+
+### 2. A test that reads back what the code wrote is not testing the browser state
+
+The browser visibility test passed because it inspected `element.hidden` after the code had assigned that JavaScript property. The browser does not act on that property for an SVG element; it acts on the `hidden` attribute.
+
+The test therefore confirmed the program's internal assignment rather than the observable state that mattered.
+
+This is a general testing boundary: a test should observe the state consumed by the system under test, not merely the value most recently produced by the code being tested.
+
+### 3. Two defects can cancel each other and make both harder to detect
+
+The browser's boot panel remained visible because CSS rules overrode the `hidden` attribute. Correcting that exposed a second defect: the SVG board was never actually removing its `hidden` attribute.
+
+The first defect had been masking the second. The same pattern appeared elsewhere in the phase: visual intent could be represented in source values while being cancelled by a rendering rule or ignored by the target environment.
+
+When two independent defects cancel, a partially working artifact can be more misleading than a completely broken one. Verification therefore has to exercise the final observable state, not merely intermediate conditions.
+
+### 4. Cross-environment interfaces require verification in the target environment
+
+Native execution established that the engine worked. Pyodide execution established that the same engine could boot under WebAssembly. jsdom established that the page logic could be driven.
+
+None of those alone established that the shipped browser page worked.
+
+The first real page bootstrap exposed a null snapshot, relative filesystem paths, and later a hidden SVG state that the test environment did not model correctly. The useful boundary was the actual page, with the actual payload, in the environment in which the reader would run it.
+
+A test suite that verifies only the source environment can establish portability only by assumption.
+
+### 5. Performance measurements need a registered decision rule, not just a number
+
+EXP-018 was run before registration, which meant the slowdown was known before the threshold that would have made it actionable. EXP-019 corrected that order.
+
+The browser measurements then showed that the registered falsifier fired, but for a reason different from the one initially imagined. Time barely separated the two conditions, while transferred bytes differed by roughly 19,000×.
+
+The important result was not simply that a threshold was crossed. It was that the measurement dimensions used to distinguish experimental conditions can behave differently from the outcome dimension used by the decision rule.
+
+A registered experiment should therefore specify both what constitutes a meaningful condition difference and what observation actually changes the decision.
+
+### 6. A falsifier can fire correctly while its interpretation is wrong
+
+EXP-019's time ratio did not reach the registered 2× floor. That part of the falsifier was correctly applied.
+
+But the explanation initially assumed that the two loading conditions were insufficiently separated. The instrument itself showed that they differed dramatically in transferred bytes; the difference simply did not dominate boot time.
+
+The falsifier therefore produced a valid rejection of the written rule while simultaneously revealing that the author's causal interpretation of that rule was incomplete.
+
+This is a useful distinction: a falsifier can be operationally correct without validating the mechanism imagined when it was written.
+
+### 7. Registration should precede measurement when the measurement controls a decision
+
+EXP-018 was registered retrospectively. EXP-019 was registered before its first run.
+
+The difference mattered because EXP-019 had explicit thresholds for split rendering, a byte indicator, and the exhaustive solver seat. Once the measurements existed, the decision could be made against those rules rather than against an impression of what felt fast enough.
+
+The experiment should freeze the decision boundary before the number becomes visible.
+
+### 8. A benchmark can answer a performance question without answering a product question
+
+EXP-018 showed a fairly uniform Pyodide slowdown of roughly 3× across six workloads. That established a useful execution cost.
+
+It did not establish that the product was usable.
+
+The later page test exposed the distinction: a heuristic move at roughly 4 ms is operationally different from an exhaustive 3×3 solver opening at roughly 8 seconds, and the latter becomes a UX question even though both are merely execution timings.
+
+Performance instrumentation should therefore measure the unit that corresponds to the user's experience, not only the underlying function's throughput.
+
+### 9. Determinism can turn missing data into a missing-file problem rather than a missing-evidence problem
+
+The replay viewer initially appeared blocked because the repository contained no saved games.
+
+The deeper inspection showed that games between seeded agents are deterministic functions of variant, seats, and seed. That made a recorded file unnecessary for the default viewer: the game itself could be reconstructed on demand, while externally supplied recordings could still be verified against their claimed provenance.
+
+The lesson is broader than FLIPHEX: before introducing a persistent artifact to preserve reproducibility, determine whether the generating process is already a compact, deterministic specification of that artifact.
+
+### 10. Generated artifacts need a reproducibility policy, not simply a gitignore rule
+
+The figures were deliberately ignored because their inputs are tracked and regeneration is cheap. The problem was not the policy; it was that the README failed to tell a fresh clone that the figures were generated and unavailable until rebuilt.
+
+The same distinction appeared with the champion, checkpoints, replay data, and the 5×3 sweep.
+
+A repository should make explicit whether an artifact is tracked because it is the evidence, ignored because it is derivable, or unavailable because it depends on an external computation. Reproducibility is partly a property of the repository and partly a property of the reader's expectations.
+
+### 11. Interface state should be derived from capabilities, not duplicated assumptions
+
+The two graphical interfaces assumed the human was always Purple. The solver itself had no such assumption; the interface introduced it.
+
+The same pattern appeared in seat availability, board changes, and the local/deployed distinction. Once seat construction became a shared capability and the page recomputed seats when the board changed, the interfaces stopped carrying their own copies of game-state policy.
+
+The lesson is not simply “avoid hardcoded colours.” Shared domain rules should have one executable source of truth, while interfaces consume that source rather than reconstructing it.
+
+### 12. Documentation is part of the interface when the repository is the product
+
+The README's stale test count, missing figure explanation, and undocumented `--sweep` flag were small defects individually. Together they changed what a new reader could understand about the repository.
+
+The same applied to the long-form writeup: its structure had to preserve caveats beside the verdicts rather than turning a complicated experimental record into a clean narrative.
+
+For a research repository intended to be read by others, documentation is not metadata around the artifact. It is one of the artifact's interfaces.
+
+### 13. Visual verification can reveal failures that structural tests cannot observe
+
+The phase found the pygame alpha-channel defect, the excessive playable-cell highlighting, the replay viewer's incorrect flip colours, the browser boot-panel defect, and the board visibility defect through rendered output or screen recording.
+
+Several of these properties were not represented in the test environment at all.
+
+The resulting rule is not that visual inspection replaces automated testing. It is that rendered state is itself an output that requires verification when appearance carries semantic information.
+
+### 14. A release phase should preserve inconvenient results rather than clean them up
+
+Phase 7 produced a repository with rejected hypotheses, structural rather than experimental verdicts, a locked figure known to be wrong, expensive unrun experiments, unavailable generated artifacts, and a paper-track decision that remains open.
+
+The temptation in a portfolio release is to compress these into a cleaner success narrative. The project is more accurately represented by preserving the boundaries of what was established, what was rejected, and what remains unresolved.
+
+The release is therefore not a retrospective that makes the seven phases look linear. It is the first artifact that allows another person to inspect where the research actually ended.
+
 ## Failed Attempts
+
+### EXP-018 — Measuring before registering the decision rule
+
+The first Pyodide benchmark was run before EXP-018 was registered. The performance result was therefore available before the experiment had declared what slowdown would matter.
+
+The benchmark was subsequently retained as evidence, but its retrospective registration was recorded as a process failure rather than silently treated as equivalent to a pre-registered measurement.
+
+The measured slowdown was approximately 3× across six workloads, with all six between 2.84× and 3.43×. The result was useful for design, but the experiment could not retroactively recover the decision boundary that should have existed before measurement.
+
+### EXP-019 — The falsifier fired for an unanticipated reason
+
+EXP-019 was registered before measurement with a 2× time-ratio floor separating the relevant browser conditions.
+
+Ten Chrome loads produced median time-to-playable values of 4,293 ms cold and 3,925 ms warm, only 1.09× apart. The registered falsifier therefore fired.
+
+The initial interpretation would have been that the instrument failed to separate the conditions. The measurement showed otherwise: transferred bytes differed by approximately 19,000×, while boot time was dominated by the runtime step. Roughly 90% of the cold boot was attributable to runtime rather than transfer.
+
+The falsifier was therefore correctly triggered, but the mechanism it had been intended to diagnose was not the mechanism that controlled the measured outcome.
+
+Three of four registered predictions were also wrong: the warm-load prediction, the transfer-dominated cold-load prediction, and the predicted share of page-owned bytes. The fourth prediction remained unrun.
+
+### Browser bootstrap — The first page was not tested as a page
+
+The Python side had 111 tests while the JavaScript side had none capable of exercising the shipped page.
+
+The first real bootstrap failed because `startGame` reached `resetSelection` before the initial snapshot had been installed. A separate defect had previously placed a `BrowserGame` subclass inside a Python string in `app.js`, where the Python test suite could not reach it.
+
+Both defects had the same underlying shape: code existed in the delivered interface but outside the test surface.
+
+The fix was not only to patch the two defects, but to add a jsdom test that boots the actual page against the actual Pyodide path and drives the DOM through a complete game.
+
+### Browser filesystem — Relative paths worked in one environment and failed in another
+
+The page initially wrote bundled modules to relative paths. Emscripten's working directory was not the filesystem root, so the browser build failed with `ErrnoError 44`.
+
+Native execution had not exposed the problem because the native filesystem had different path semantics.
+
+The fix was to make both sides use the same absolute `/app` path and to replay the complete bootstrap under the target runtime.
+
+### Browser visibility — The test passed the bug
+
+The first visibility test checked `!board.hidden`.
+
+The application had set `board.hidden = false`, but `board` was an SVG element and the browser does not use that JavaScript property to remove the `hidden` attribute. The test therefore passed while the board remained hidden.
+
+The defect was exposed only after fixing the CSS rule that had been masking it. The test was changed to inspect `hasAttribute("hidden")`, which corresponds to the state the browser actually uses.
+
+This was retained as a failed test design, not merely as a browser bug.
+
+### Touch interaction — Designing for mouse input hid the phone failure
+
+Rotation preview was initially implemented with `mouseenter`. The desktop interaction worked, but a touch device never emitted the event.
+
+The defect was discovered while planning the phone cell of EXP-019 rather than during a phone run. The interaction was changed so hover-capable devices retain hover preview while touch devices preview on the first tap and commit on the second.
+
+The test harness initially could not reach the new path because jsdom does not implement `matchMedia`. The harness itself therefore had to gain a controllable media-query capability before the touch behavior could be tested.
+
+### Replay viewer — The repository did not contain the data the roadmap assumed
+
+The roadmap specified playback of saved games, but no ordered game recordings survived a clone. The apparent implementation requirement therefore depended on an artifact that did not exist.
+
+Instead of fabricating a sample recording or weakening the provenance model, the viewer was changed to reconstruct deterministic seeded games on demand and to retain `--load` for externally supplied recordings.
+
+Recordings with seeds and seats are independently verified against regenerated games; recordings without sufficient provenance are explicitly marked non-reproducible.
+
+### Graphical interfaces — Both interfaces hardcoded the first player
+
+The solver and CLI already supported arbitrary first-player assignment, but both graphical interfaces assumed Purple was always the human.
+
+This was particularly misleading because the project itself studies first-player advantage. A reader could only interact with the game from one side of the very asymmetry being studied.
+
+Both interfaces were changed to derive the human turn from the configured seats. The web interface gained a player selector, and the pygame interface gained `--play purple|green`.
+
+### Local/deployed seat configuration — The ADR described an implementation that did not exist
+
+An amendment to adr-013 stated that the local page exposed all six seats while the deployed page exposed a restricted subset. The actual `index.html` had only two hard-coded options, so the distinction existed in the decision record but not in the implementation.
+
+The seat list was moved into executable policy based on the origin, with fail-closed behavior for unknown hosts. The test suite now checks both allowed and restricted origins.
+
+This was another case where a design restriction had been mistaken for an implementation of that restriction.
+
+### Pygame rendering — Alpha was specified but never applied
+
+The pygame renderer used RGBA values intended to produce 75% opacity for placed-tile arrows. The target surface did not blend the alpha channel, so the arrows were rendered fully opaque.
+
+Reading the source made the intended value look correct. Reading a rendered pixel showed that the behavior was different.
+
+The fix mixes the arrow toward the underlying cell colour using the same effective 25% contribution used by the browser stylesheet.
+
+### Replay rendering — The viewer collapsed two semantically different outcomes
+
+`Replay.flipped()` returned one list for both tiles gained and tiles handed back. The replay viewer rendered both green, although the playing interface distinguished the two cases.
+
+Because a flip is a toggle, the two outcomes carry different semantic meaning. The replay viewer was therefore teaching the rule incorrectly.
+
+The API was split into `gained()` and `handed_back()`, with a test asserting that the two partition the original flip set.
+
+### README — The documented repository was stale even after the implementation was current
+
+The README reported 1,217 tests while the suite contained 1,242. It also failed to explain that generated figures were intentionally ignored and did not document the new `--sweep` solver capability.
+
+None of these prevented execution. They did, however, make a fresh reader receive an incorrect model of the repository.
+
+The release pass therefore treated the README as an executable claim set: every documented command was run and every reported number was checked against the current repository.
+
+### GIF generation — The obvious compression optimizations were not the useful ones
+
+Increasing playback speed reduced the number of frames but increased per-frame changes and did not reduce the file sufficiently. Cropping the dead margins unexpectedly increased the file from 1.85 MB to 3.37 MB because the static margins were cheap to compress.
+
+The effective reduction came from disabling dithering for the flat-color interface and limiting the palette to 64 colours. The final 760×470, 10 fps recording was 1.69 MB.
+
+The failed attempts were retained because file size was controlled by the structure of the image differences, not by the intuitive measures of frame count or crop area.
+
+### README figure gallery — A generated artifact exposed a reproducibility contradiction
+
+The figure PNGs were correctly gitignored because they can be regenerated from tracked inputs. The generated `figures/README.md`, however, embedded those absent PNGs as though they were repository artifacts.
+
+A fresh GitHub reader therefore encountered seven broken images without knowing that this was intentional.
+
+The solution was not to track the generated images. The README and gallery generator were changed to state that the figures are generated, explain why they are absent, and provide the rebuild path.
+
+### Paper-track decision — The final decision was deliberately not fabricated
+
+The paper-track deliverable was designed to end either with a decision not to pursue the track or with a link to the resulting fork. Neither condition had occurred because the policy gates the decision on the presentation to the original professor.
+
+The phase therefore did not manufacture a provisional verdict. It recorded the gate and separated the present cost/feasibility assessment from the eventual decision.
+
+This is a deliberate non-completion rather than a failed experiment: the correct terminal state is “awaiting the specified event.”
+

@@ -9,6 +9,97 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-09-21 — Phase 7 closing: everything left is one external event
+
+**Written at the close, covering decisions taken on 2026-09-20 and 2026-09-21.**
+The phase ran with a single journal entry — its own opening — while ten
+non-trivial decisions were taken in the notes and the ADRs and never reached
+here. That is a process failure and is recorded as one rather than backfilled as
+ten contemporaneous entries. Each item below is dated to the day it was decided.
+
+**The deliverables that remain open all chain to the same event.** TILs #1–#6
+published, the presentation to the original professor, OPEN-1, and the
+paper-track decision are four items and one gate: the presentation. Nothing
+engineering-shaped is outstanding. That is why the phase closes rather than
+carrying tasks forward — there is no Phase 8 to carry them to, and inventing one
+to hold four author-driven items would be bookkeeping.
+
+### Decisions taken, by date
+
+**2026-09-20 — the local/deployed seat split is executable, not declarative.**
+adr-013's second amendment said the local page served all six seats and the
+deployed one stopped at the heuristic. One `index.html` served both origins, so
+the sentence was aspirational. Now `seatsFor(hostname)` decides it and fails
+closed on any host it does not recognise. Third amendment.
+
+**2026-09-20 — one palette, generated rather than copied.** Twelve RGB tuples in
+`ui/pygame_ui.py` under a comment reading "matching web/style.css", and twelve
+hex strings in the stylesheet saying it back. `ui/theme.py` is now the source and
+`scripts/build_web.py` generates `web/theme.css` from it. A comment is not a
+constraint; CI failing on a dirty tree is.
+
+**2026-09-20 — the `solved` column stopped contradicting its own note.**
+`complexity/comparison.py` printed `unsolved (solved here)` for boards this
+project had strongly solved. It now prints the grade with an asterisk and a
+footnote naming what the asterisk means: solved by this project's own runs, not
+independently reimplemented.
+
+**2026-09-20 — the 5×3 database is offered, not required.** `--sweep` prefers the
+completed retrograde sweep and falls back to search when it is absent, with the
+interface reporting which backend it got. Measured cost of the preferred path:
+peak resident 3.0 GB, worst move 4.9 s, 4.1 GB read across sixteen plies.
+
+**2026-09-20 — two design-review declines, recorded with reasons.** A separate
+`ui/fonts.py` (three constants today; the split becomes right when
+`assets/fonts/` exists) and vendoring IBM Plex (blocked on a download and a
+licence file, which is an author decision rather than a refactor). The second
+was overtaken the next day, from an unexpected direction.
+
+**2026-09-21 — the demo GIF is tracked and the figures are not.** Both follow the
+rule `.gitignore` already states: track the record when regenerating it needs
+something the repository does not have. A figure needs `python -m figures.build`
+and seconds. A screen recording needs a person, a browser and a game. Opposite
+sides of one rule, each for the right reason, with two tests keeping the pair
+honest and a 4 MB budget because a tracked binary can only grow.
+
+**2026-09-21 — the page is published from this repository, not copied into the
+portfolio.** `web/payload.json` is generated from `fliphex/`, `solver/` and
+`agents/`; a copy in another repository goes stale in silence. GitHub Pages from
+the `fliphex` repo lands at `brunoramosmartins.github.io/fliphex/` — the same
+origin as the portfolio, so the two read as one site — and the workflow runs
+`build_web.py --check` before deploying, so a stale payload fails the deployment
+rather than shipping code the commit does not contain.
+
+**2026-09-21 — the frame matches the building, the canvas does not.** `web/site.css`
+takes the portfolio's chrome and touches no game colour. Purple and green are the
+physical tiles, not a website's accent. It is a **copy** of tokens from another
+repository with no build step spanning the two, so it is labelled as one, pinned
+by test against the version it was transcribed from, and carries a written review
+trigger. The least bad option, said out loud rather than pretended away.
+
+**2026-09-21 — the solver returns to the deployed page, on one board.** Not "the
+small board": the board where `solver_budget` returns no `search_below_k`, so the
+seat is exact from ply 1 rather than heuristic until eight cells remain. The
+8-second opening is announced before it blocks. adr-013's fourth amendment.
+
+**2026-09-21 — the paper track is left open rather than decided.** The policy
+gates it on the presentation, which has not happened. `docs/paper-track-decision.md`
+records the gate and costs the decision — the two 270-hour entries are the
+decision; everything else on the list is weeks of writing — and names the
+strongest submission as the one that uses FLIPHEX as the instrument rather than
+the subject. A deliberate non-completion, whose correct terminal state is
+"awaiting the specified event".
+
+### On the tag
+
+The roadmap carries two: `v0.9-writeup-draft` and `v1.0.0`. They are not being
+taken together. **OPEN-1 is still open** — whether all five columns hold five
+cells, unconfirmed against the physical board since Phase 0 — and it is a
+question about the *rules*, which every other artefact is built on. Tagging
+`v1.0.0` over an open rules question would be asserting something no one has
+checked. `v0.9-writeup-draft` now; `v1.0.0` when the presentation closes OPEN-1
+and the paper-track decision.
+
 ## 2026-09-20 — Phase 7 opened: the last phase, and the first one that measures nothing
 
 Opened the same day Phase 6 closed, because nothing blocks it. The verdict table

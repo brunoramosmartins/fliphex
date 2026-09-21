@@ -24,10 +24,16 @@ shows more of their colour wins — 25 is odd, so there are no draws.
 board, arrows fire and flip neighbouring tiles between purple and green, and the
 board fills to a final score.](docs/media/fliphex-demo.gif)
 
-*A whole game, sped up — the browser interface, running the project's real Python
-engine under WebAssembly. Each tile's arrows fire once, on the ply it is placed.
-Play it at
-[brunoramosmartins.github.io/fliphex](https://brunoramosmartins.github.io/fliphex/).*
+### ▶ [Play it in your browser](https://brunoramosmartins.github.io/fliphex/)
+
+**No install, works on a phone.** On the 3×3 your opponent is the *exact solver* —
+that board is strongly solved, so you are playing against the proven value of the
+game rather than against an approximation.
+
+*The recording above is a whole game, sped up: the browser interface running this
+project's real Python engine under WebAssembly, with the rules never
+reimplemented in JavaScript. Each tile's arrows fire once, on the ply it is
+placed.*
 
 Full rules: [`docs/rules-canonical.md`](docs/rules-canonical.md).
 
@@ -189,6 +195,7 @@ what you came for.
 
 | If you want | Read |
 |---|---|
+| the whole story, in one sitting | [`writeup/main-writeup.md`](writeup/main-writeup.md) |
 | the verdicts, with intervals and caveats | [`docs/research.md`](docs/research.md) |
 | why a decision was live at the time, including the wrong turns | [`writeup/decision-journal.md`](writeup/decision-journal.md) |
 | what a phase actually did, in its own words | `notes/phase<N>-*.md` |
@@ -197,11 +204,13 @@ what you came for.
 | how a number is allowed to become a claim | [`docs/measurement-gates.md`](docs/measurement-gates.md) |
 | the rules, authoritatively | [`docs/rules-canonical.md`](docs/rules-canonical.md) |
 
-Two of those are worth singling out. The **decision journal** records what was
-believed on the day, including the parts that turned out wrong; the **measurement
-gates** are nine questions every quantity has to survive before it is reported,
-and the ninth — *what is this quantity free to be?* — was added after the first
-eight let the same defect through three times.
+Three of those are worth singling out. The **long-form article** is the one to
+read if you are only going to read one thing: it carries the caveats beside the
+verdicts rather than turning the record into a clean narrative. The **decision
+journal** records what was believed on the day, including the parts that turned
+out wrong. The **measurement gates** are nine questions every quantity has to
+survive before it is reported, and the ninth — *what is this quantity free to
+be?* — was added after the first eight let the same defect through three times.
 
 ---
 
@@ -220,7 +229,10 @@ web/           the browser build — the engine under Pyodide (Phase 7)
 figures/       seven figure *scripts* — the PNGs are generated, not tracked
 scripts/       experiment entry points and doc generators
 experiments/   the experiment registry
-writeup/       decision journal and portfolio article
+writeup/       the long-form article and the decision journal
+exercises/     five problem sets, from formalising the rules to complexity
+tils/          six short pieces on techniques this project needed
+notes/         one log per phase, plus the literature notes
 ```
 
 `fliphex/` imports nothing from the project. `solver/`, `az/` and `complexity/`
