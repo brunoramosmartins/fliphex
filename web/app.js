@@ -11,6 +11,12 @@
  * picture that looks slightly off.
  */
 
+/* Every string a visitor reads comes from here. The page ships in Portuguese
+ * for the Matemateca and switches to English from the control in its own bar;
+ * `i18n.js` carries both dictionaries and the reasoning. Nothing below builds a
+ * user-visible sentence out of a literal. */
+import { DEFAULT_LANG, applyStatic, getLang, setLang, storedLang, t } from "./i18n.js";
+
 /* The CDN, unless something overrides it before this module loads. The
  * override exists for `web/test/page.test.mjs`, which points it at a local
  * pyodide package so the suite needs no network — and so that the test can
@@ -58,12 +64,16 @@ const PUBLISHED_SOLVER_BOARDS = new Set(["3x3"]);
  * `agents/az_agent.py` is excluded from the payload by `scripts/build_web.py`
  * because it imports torch, which has no WebAssembly build. They are not
  * withheld from the browser — they cannot run in one. */
-const SEAT_LABELS = {
-  human: "a second player",
-  random: "the random agent",
-  heuristic: "the heuristic agent",
-  solver: "the exact solver",
-};
+
+/* The seat's label, read through `t` rather than held in a constant: it has to
+ * be in the language selected *now*, and a module-level object would freeze
+ * whichever one was current when this file was first evaluated. */
+const seatLabel = (seat) => t(`seat.${seat}`);
+
+/* The colour names, and the one place that knows the engine spells them in
+ * capitals. `snapshot.to_move` and `result.placed_as` are `"PURPLE"`/`"GREEN"`
+ * and stay that way — only what a human reads is translated. */
+const colourName = (colour) => t(`colour.${colour}`);
 
 function isLocalHost(hostname) {
   const host = String(hostname ?? "").toLowerCase().replace(/^\[|\]$/g, "");
@@ -132,6 +142,7 @@ const ui = {
   side: $("side"),
   opponent: $("opponent"),
   originNote: $("origin-note"),
+  langSwitch: document.querySelector(".lang-switch"),
 };
 
 /* Replace the opponent list with the one this origin and this board allow.
@@ -150,7 +161,7 @@ function fillSeats(hostname, board) {
   for (const seat of seats) {
     const option = document.createElement("option");
     option.value = seat;
-    option.textContent = SEAT_LABELS[seat];
+    option.textContent = seatLabel(seat);
     ui.opponent.appendChild(option);
   }
   ui.opponent.value = seats.includes(keep) ? keep : "heuristic";
@@ -166,13 +177,41 @@ function fillSeats(hostname, board) {
  * the 3x3 that wait is the page's best moment and looks like a crash if it
  * arrives unannounced. */
 function originNote(hostname, board) {
-  if (isLocalHost(hostname)) {
-    return "Local checkout — every seat is offered, on every board.";
+  if (isLocalHost(hostname)) return t("origin.local");
+  if (PUBLISHED_SOLVER_BOARDS.has(board)) return t("origin.solverHere");
+  return t("origin.solverElsewhere");
+}
+
+/* -- switching language ----------------------------------------------------- */
+
+/* Everything a visitor can read, rebuilt in the chosen language.
+ *
+ * Three populations, and all three have to move together or the page ends up
+ * half-translated in a way that looks like a bug in one of them:
+ *
+ *   - the static markup, which `applyStatic` rewrites from `data-i18n`;
+ *   - the opponent list, which `fillSeats` builds from `t("seat.*")`;
+ *   - everything derived from the position, which `refresh` re-renders.
+ *
+ * The commentary line is *cleared* rather than translated. It is the one piece
+ * of text built from a past event rather than from present state, so rendering
+ * it again would mean storing the key and the variables of every sentence the
+ * page has said. It is a transient status line and the next move refills it;
+ * carrying a translation cache for it would cost more than it is worth. */
+function applyLanguage(lang) {
+  setLang(lang, document);
+  applyStatic(document);
+
+  for (const button of ui.langSwitch?.querySelectorAll("button[data-lang]") ?? []) {
+    const chosen = button.dataset.lang === getLang();
+    button.classList.toggle("is-current", chosen);
+    button.setAttribute("aria-pressed", String(chosen));
   }
-  if (PUBLISHED_SOLVER_BOARDS.has(board)) {
-    return "The solver plays this board perfectly. It needs about 8 s for the opening.";
-  }
-  return "The exact solver is offered on the 3×3, where it plays perfectly from the first move.";
+
+  fillSeats(globalThis.location?.hostname, ui.variant.value);
+  if (state.badge) setBadge(state.badge.key, state.badge.vars);
+  if (state.snapshot) refresh(state.snapshot);
+  say("");
 }
 
 /* Let the browser paint before something blocks it.
@@ -202,7 +241,18 @@ const state = {
   selectedCell: null,
   armedRotation: null,
   busy: false,
+  /* The engine badge, as a key rather than as the words it currently shows.
+   * `index.html` gives it `data-i18n="badge.booting"` so it reads correctly
+   * before this module loads, which means `applyStatic` would reset a booted
+   * page to "booting" on every language change. Recording what the badge was
+   * last asked to say is what lets it be rendered again. */
+  badge: null,
 };
+
+function setBadge(key, vars) {
+  state.badge = { key, vars };
+  ui.badge.textContent = t(key, vars);
+}
 
 /* -- instrumentation (EXP-019) --------------------------------------------- */
 
@@ -232,7 +282,7 @@ function reportMarks() {
 
   const playable = marks.get("playable");
   if (playable !== undefined) {
-    ui.badge.textContent = `ready in ${(playable / 1000).toFixed(2)}s`;
+    setBadge("badge.readyIn", { seconds: (playable / 1000).toFixed(2) });
     ui.badge.title = rows.map((r) => `${r.mark} +${r.deltaMs}ms`).join("  ");
   }
   recordRun(rows);
@@ -608,7 +658,10 @@ function renderHand() {
   if (!snapshot) return;
   const mover = snapshot.to_move;
   const hand = snapshot.hands[mover];
-  ui.handTitle.textContent = `${mover === "PURPLE" ? "Purple" : "Green"} — ${hand.length} left`;
+  ui.handTitle.textContent = t("hand.title", {
+    colour: colourName(mover),
+    count: hand.length,
+  });
   ui.hand.textContent = "";
 
   const interactive = !snapshot.terminal && isHumanTurn();
@@ -618,7 +671,11 @@ function renderHand() {
     button.className = "piece";
     button.disabled = !interactive;
     button.setAttribute("aria-pressed", String(state.selectedTile === piece.tile));
-    button.title = `${piece.archetype} — ${piece.arrows.length} arrow(s), ${piece.rotations.length} distinct rotation(s)`;
+    button.title = t("piece.title", {
+      archetype: piece.archetype,
+      arrows: piece.arrows.length,
+      rotations: piece.rotations.length,
+    });
     button.appendChild(tileGlyph(piece.arrows, mover));
     const name = document.createElement("span");
     name.textContent = piece.archetype;
@@ -675,14 +732,14 @@ function renderRotations(options) {
       for (const other of ui.rotations.querySelectorAll("button.rot")) {
         other.classList.toggle("armed", other === button);
       }
-      ui.hint.textContent = "Tap it again to place, or pick another rotation.";
+      ui.hint.textContent = t("hint.tapAgain");
     });
     ui.rotations.appendChild(button);
   }
 
   ui.rotationPanel.hidden = options.length === 0;
   if (options.length && !hovers) {
-    ui.hint.textContent = "Tap a rotation to preview it, then tap again to place.";
+    ui.hint.textContent = t("hint.tapPreview");
   }
 }
 
@@ -693,12 +750,23 @@ function say(html) {
 function describe(result) {
   const flips = result.effects.filter((e) => e.kind === "flip").length;
   const selfs = result.effects.filter((e) => e.kind === "self-flip").length;
-  const who = result.placed_as === "PURPLE" ? "Purple" : "Green";
   const cell = state.centres.get(result.move.cell).name;
-  const parts = [`<b>${who}</b> played <b>${result.archetype}</b> on <b>${cell}</b>`];
-  if (flips) parts.push(`flipping ${flips}`);
-  if (selfs) parts.push(`<span class="bad">handing back ${selfs}</span>`);
-  if (!flips && !selfs) parts.push("with nothing to flip");
+  /* A comma-separated clause list, which is the one construction both
+   * languages share here — "Roxo jogou P3-y em C3, virando 2, devolvendo 1"
+   * has the same shape as its English original, so the sentence survives
+   * translation without a per-language assembler. */
+  const parts = [
+    t("say.played", {
+      who: colourName(result.placed_as),
+      archetype: result.archetype,
+      cell,
+    }),
+  ];
+  if (flips) parts.push(t("say.flipping", { count: flips }));
+  if (selfs) {
+    parts.push(`<span class="bad">${t("say.handingBack", { count: selfs })}</span>`);
+  }
+  if (!flips && !selfs) parts.push(t("say.nothing"));
   return `${parts.join(", ")}.`;
 }
 
@@ -710,15 +778,19 @@ function refresh(snapshot) {
   ui.undo.disabled = !snapshot.can_undo || state.busy;
 
   if (snapshot.terminal) {
-    ui.turn.textContent = `${snapshot.winner === "PURPLE" ? "Purple" : "Green"} wins`;
+    ui.turn.textContent = t("turn.wins", { colour: colourName(snapshot.winner) });
     ui.turn.classList.add("win");
-    ui.hint.textContent = "The board is full. 25 is odd, so there is never a draw.";
+    /* The cell count comes from the position, not from a literal. It read 25
+     * on every board, which is right on the shipped one and wrong on both
+     * boards this project actually solved — the 5x3 has 15 cells and the 3x3
+     * has 9. On a full board the two scores account for every cell, so the sum
+     * is the count, and adr-011 is why it is always odd. */
+    const cells = snapshot.score.PURPLE + snapshot.score.GREEN;
+    ui.hint.textContent = t("hint.full", { cells });
   } else {
     ui.turn.classList.remove("win");
-    ui.turn.textContent = `${snapshot.to_move === "PURPLE" ? "Purple" : "Green"} to move`;
-    ui.hint.textContent = isHumanTurn()
-      ? "Pick a piece, then a cell."
-      : "The agent is thinking…";
+    ui.turn.textContent = t("turn.toMove", { colour: colourName(snapshot.to_move) });
+    ui.hint.textContent = isHumanTurn() ? t("hint.pick") : t("hint.thinking");
   }
   renderHand();
 }
@@ -754,7 +826,7 @@ function onTileClick(tile) {
   ui.rotationPanel.hidden = true;
   markPlayable(state.game.playable_cells(tile).toJs());
   renderHand();
-  ui.hint.textContent = "Now pick a highlighted cell.";
+  ui.hint.textContent = t("hint.cell");
 }
 
 function onCellClick(cell) {
@@ -768,7 +840,7 @@ function onCellClick(cell) {
   const options = state.game.options(cell, state.selectedTile).toJs({ dict_converter: Object.fromEntries });
   renderRotations(options);
   if (options.length) previewRotation(options[0]);
-  ui.hint.textContent = "Choose a rotation.";
+  ui.hint.textContent = t("hint.rotation");
 }
 
 async function playMove(rotation) {
@@ -800,11 +872,8 @@ async function maybeAgentMove() {
      * opening — 711,963 configurations — and adr-013 measured that at 7.5 s
      * under Node. A tab that stops responding for seven seconds with no
      * explanation is indistinguishable from one that has crashed. */
-    say(
-      "<b>The solver is searching.</b> It runs on the page&rsquo;s only thread, " +
-        "so the tab will not respond until it answers.",
-    );
-    ui.hint.textContent = "Searching — the page is frozen until the solver replies.";
+    say(t("say.searching"));
+    ui.hint.textContent = t("hint.searching");
     document.body.classList.add("blocked");
   }
   // Yield so the human's move — and the warning above — paint before the
@@ -854,12 +923,12 @@ async function onSeatChange() {
   if (!state.py || !state.game || state.busy) return;
   resetSelection();
   refresh(state.game.snapshot().toJs({ dict_converter: Object.fromEntries }));
-  const seat = SEAT_LABELS[ui.opponent.value] ?? ui.opponent.value;
-  const held = ui.side.value === "PURPLE" ? "purple" : "green";
+  const seat = seatLabel(ui.opponent.value);
+  const held = t(ui.side.value === "PURPLE" ? "colour.purple" : "colour.green");
   say(
     ui.opponent.value === "human"
-      ? "Hotseat — both colours are yours."
-      : `You hold <b>${held}</b>, against <b>${seat}</b>. The position stands.`,
+      ? t("say.hotseat")
+      : t("say.standing", { held, seat }),
   );
   await maybeAgentMove();
 }
@@ -877,9 +946,7 @@ async function onBoardChange() {
   if (!state.py) return;
   await startGame();
   if (before !== after) {
-    const gone = SEAT_LABELS[before] ?? before;
-    const now = SEAT_LABELS[after] ?? after;
-    say(`This board does not offer ${gone}, so you are playing <b>${now}</b>.`);
+    say(t("say.withdrawn", { gone: seatLabel(before), now: seatLabel(after) }));
   }
 }
 
@@ -931,12 +998,12 @@ async function boot() {
   try {
     mark("chrome");
     await drawInertBoard();
-    ui.bootText.textContent = "Downloading the Python runtime…";
+    ui.bootText.textContent = t("boot.runtime");
     const { loadPyodide } = await import(`${PYODIDE}pyodide.mjs`);
     const py = await loadPyodide({ indexURL: PYODIDE });
     mark("runtime");
 
-    ui.bootText.textContent = "Unpacking the engine…";
+    ui.bootText.textContent = t("boot.unpack");
     const payload = await (await fetch("payload.json")).json();
     // Absolute paths: Emscripten's working directory is not the filesystem
     // root, and a relative mkdirTree fails with a bare ENOENT that says
@@ -950,7 +1017,7 @@ async function boot() {
     // No Python is defined here. Everything the page calls lives in
     // `ui/session.py`, where the test suite can reach it — a rule the page
     // broke once already by carrying its own subclass in this string.
-    ui.bootText.textContent = "Starting the rules…";
+    ui.bootText.textContent = t("boot.rules");
     await py.runPythonAsync(`
 import sys
 sys.path.insert(0, ${JSON.stringify(PY_ROOT)})
@@ -960,16 +1027,16 @@ new_game = GameSession
 
     state.py = py;
     mark("engine");
-    ui.badge.textContent = "ready";
+    setBadge("badge.ready");
     ui.badge.classList.add("ready");
     ui.newGame.disabled = false;
     await startGame();
     mark("playable");
     reportMarks();
   } catch (error) {
-    ui.badge.textContent = "failed";
+    setBadge("badge.failed");
     ui.badge.classList.add("failed");
-    ui.bootText.textContent = "The engine did not start.";
+    ui.bootText.textContent = t("boot.failed");
     const note = ui.boot.querySelector(".boot-note");
     note.textContent = String(error).slice(0, 300);
     console.error(error);
@@ -982,7 +1049,14 @@ window.fliphexBench = timeSolverOpening;
 window.fliphexReport = fliphexReport;
 window.fliphexReset = fliphexReset;
 
-fillSeats(globalThis.location?.hostname, ui.variant.value);
+/* The language, before anything renders. `applyLanguage` also fills the seat
+ * list, so this replaces the bare `fillSeats` that used to stand here: the two
+ * were never independent — a seat list is a list of translated labels. */
+applyLanguage(storedLang() ?? DEFAULT_LANG);
+
+for (const button of ui.langSwitch?.querySelectorAll("button[data-lang]") ?? []) {
+  button.addEventListener("click", () => applyLanguage(button.dataset.lang));
+}
 
 ui.newGame.addEventListener("click", startGame);
 // A different board is a different game, so this one restarts. The other two
@@ -998,8 +1072,11 @@ boot();
 /* Exported for `web/test/page.test.mjs`, which drives the page through the DOM.
  * Harmless in a browser: this is already a module, and nothing imports it. */
 export {
+  applyLanguage,
   boot,
   fillSeats,
+  getLang,
+  seatLabel,
   fliphexReport,
   fliphexReset,
   isLocalHost,

@@ -9,6 +9,59 @@ Raw material for `writeup/main-writeup.md`.
 
 ---
 
+## 2026-09-21 — The published page is bilingual, after the phase closed
+
+Taken after the Phase 7 close and recorded here on the day, which is the point
+of the entry above.
+
+The page went out in English and the audience it was published for reads
+Portuguese. The Matemateca is in São Paulo; the professor who is putting the
+physical game on display is the reason the link exists. English was inherited
+from the portfolio that frames the page, which is a real claim on it and a
+weaker one — somebody arriving from an English site is already somewhere they
+can read. Portuguese is now the default and English is one click away.
+
+**What made this cheap** was `scripts/build_web.py`: it generates
+`payload.json`, `geometry.json` and `theme.css` and nothing else, so `app.js`,
+`index.html` and the new `i18n.js` are outside every staleness guard. Fifty-odd
+strings and an afternoon. The full reasoning — why the default is stated rather
+than read from `navigator.language`, why the site navigation stays English, why
+the markup ships in Portuguese rather than being rewritten on load — is adr-013's
+fifth amendment.
+
+**Three things worth keeping, none of them about translation.**
+
+*The extraction found a bug that had nothing to do with language.* Pulling the
+strings out put every sentence in one file, where "25 is odd, so there is never
+a draw" sat next to a board selector offering three boards. 25 is right on the
+5×5 and wrong on both boards this project actually solved. It had been shipped,
+screen-recorded and published. Nobody reads a hint on a board they have just
+finished losing; a list of every sentence the page can say is read differently
+from the sentences themselves.
+
+*Four existing checks were asserting an English literal.* Including the one that
+waits for the engine to boot — `until(badge.textContent !== "booting")`, which
+became true on its first tick the moment the badge learned to say `subindo`. A
+green suite that had stopped waiting for anything. The fix is the same one the
+`hidden` defect needed in the same phase: watch the class, which carries the
+state, not the words, which are presentation.
+
+*The scan for missing keys matched its own explanation.* A comment in `app.js`
+says the seat list is built from `t("seat.*")`; the regex found `seat.*` and
+reported a missing translation for a key that does not exist. Third time in this
+project — the stylesheet link-order check and the `[hidden]` check both did it
+first. The Python half of the same check had stripped comments and was clean,
+which is the only reason the pattern was visible at all. **A check written twice
+in two languages is a check compared against itself.**
+
+**Where the tests live.** `web/test/page.test.mjs` covers this properly and CI
+does not run it: there is no npm step in `ci.yml`. The structural half is
+duplicated in `tests/test_i18n.py`. Phase 7 closed on two defects that were both
+"the verification existed and was not in the path", and adding a third in the
+first change after the close would have been hard to explain.
+
+---
+
 ## 2026-09-21 — Phase 7 closing: everything left is one external event
 
 **Written at the close, covering decisions taken on 2026-09-20 and 2026-09-21.**

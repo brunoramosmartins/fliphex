@@ -28,7 +28,8 @@ board fills to a final score.](docs/media/fliphex-demo.gif)
 
 **No install, works on a phone.** On the 3×3 your opponent is the *exact solver* —
 that board is strongly solved, so you are playing against the proven value of the
-game rather than against an approximation.
+game rather than against an approximation. The page opens in Portuguese, for the
+Matemateca; there is an **EN** switch in its header.
 
 *The recording above is a whole game, sped up: the browser interface running this
 project's real Python engine under WebAssembly, with the rules never
@@ -252,7 +253,8 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev,ui,figures]"
 pytest tests/ && ruff check . && ruff format --check .
 ```
 
-1,242 tests. The browser build has its own suite, which needs Node:
+1,257 tests. The browser build has its own suite, which needs Node — and CI does
+not run it, so it is worth running before touching anything under `web/`:
 
 ```bash
 cd web && npm install && npm test
