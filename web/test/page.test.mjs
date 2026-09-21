@@ -52,6 +52,21 @@ function equal(description, actual, expected) {
   check(description, actual === expected, `expected ${expected}, got ${actual}`);
 }
 
+/* A sentence the page builds, as a pattern rather than as a literal.
+ *
+ * The page is bilingual, so a check that quotes English prose passes in one
+ * language and fails in the other for no reason a reader could guess. This
+ * turns the template into a regular expression — tags dropped, `{placeholders}`
+ * widened — so the check is "the page said this sentence, with something in
+ * each slot" in whichever language is current. */
+function shapeOf(key) {
+  const template = STRINGS[page.getLang()][key]
+    .replace(/<[^>]*>/g, "")
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\\\{\w+\\\}/g, ".+");
+  return new RegExp(template);
+}
+
 /* Wait for a condition rather than for a duration. */
 async function until(condition, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
@@ -66,6 +81,11 @@ async function until(condition, timeoutMs) {
 const html = readFileSync(`${WEB}/index.html`, "utf8");
 const payload = readFileSync(`${WEB}/payload.json`, "utf8");
 const shapes = readFileSync(`${WEB}/geometry.json`, "utf8");
+
+/* Imported directly as well as through the page, so the checks below can name a
+ * string by key instead of by a literal that would have to be kept in step with
+ * the dictionary — which is the specific mistake the bilingual page makes easy. */
+const { STRINGS, LANGS, DEFAULT_LANG } = await import(pathToFileURL(`${WEB}/i18n.js`).href);
 
 const dom = new JSDOM(html, { url: "http://localhost/", pretendToBeVisual: true });
 const { window } = dom;
@@ -147,10 +167,17 @@ const page = await import(pathToFileURL(`${WEB}/app.js`).href);
  * a fluke, and a deadline under it would turn that stall into a red page. */
 const BOOT_DEADLINE_MS = 300_000;
 const bootStarted = Date.now();
-await until(() => page.ui.badge.textContent !== "booting", BOOT_DEADLINE_MS);
+/* Watched through the class, not the words. The badge is translated, so the
+ * literal this used to compare against — "booting" — stopped being what the
+ * badge says the moment the page gained a second language, and the wait would
+ * have returned true on its first tick with nothing booted. The class is what
+ * actually carries the state. */
+const settled = () =>
+  page.ui.badge.classList.contains("ready") || page.ui.badge.classList.contains("failed");
+await until(settled, BOOT_DEADLINE_MS);
 const bootMs = Date.now() - bootStarted;
 
-if (page.ui.badge.textContent === "booting") {
+if (!settled()) {
   /* Exit 2, not 1: nothing about the page was tested, so reporting a failure
    * would be a claim this run cannot support. */
   console.log(`\n  INCONCLUSIVE — the Python runtime did not start in ${bootMs} ms.`);
@@ -250,7 +277,11 @@ equal("every hexagon carries a name", new Set(names).size, 25);
 
 equal("purple holds 13 pieces", page.ui.hand.querySelectorAll("button.piece").length, 13);
 equal("the score starts at zero", page.ui.scorePurple.textContent, "0");
-check("purple moves first", page.ui.turn.textContent.includes("Purple"));
+check(
+  "purple moves first",
+  page.ui.turn.textContent.includes(STRINGS[page.getLang()]["colour.PURPLE"]),
+  page.ui.turn.textContent,
+);
 
 // -- choosing a move -----------------------------------------------------------
 
@@ -340,7 +371,7 @@ check(
 );
 check(
   `commentary describes the move — "${page.ui.commentary.textContent.trim()}"`,
-  page.ui.commentary.textContent.includes("played"),
+  shapeOf("say.played").test(page.ui.commentary.textContent),
 );
 check("the selection is cleared after a move", page.state.selectedTile === null);
 
@@ -405,7 +436,7 @@ check(
 );
 equal(
   "the hand shown is the one the visitor holds",
-  page.ui.handTitle.textContent.startsWith("Green"),
+  page.ui.handTitle.textContent.startsWith(STRINGS[page.getLang()]["colour.GREEN"]),
   true,
 );
 
@@ -464,7 +495,7 @@ equal(
 );
 check(
   "and says so, so the difference from the published page is visible",
-  page.ui.originNote.textContent.includes("Local checkout"),
+  page.ui.originNote.textContent === STRINGS[page.getLang()]["origin.local"],
   `origin note: "${page.ui.originNote.textContent}"`,
 );
 check(
@@ -487,7 +518,7 @@ check(
 );
 check(
   "a local checkout says it is one",
-  page.originNote("localhost", "5x5").includes("Local checkout"),
+  page.originNote("localhost", "5x5") === STRINGS[page.getLang()]["origin.local"],
   page.originNote("localhost", "5x5"),
 );
 
@@ -546,6 +577,133 @@ page.ui.variant.value = "5x5";
 await page.onBoardChange();
 equal("a different board is a different game, so that one does restart", page.state.snapshot.ply, 0);
 equal("and deals the full deck again", page.ui.hand.querySelectorAll("button.piece").length, 13);
+
+// -- two languages, one page ---------------------------------------------------
+
+/* The page ships in Portuguese for the Matemateca and offers English. What can
+ * go wrong here is not a wrong translation — nothing automatic can judge that —
+ * but a page that is *half* translated: a key that exists in one dictionary and
+ * not the other, a string the markup asks for that nobody wrote, or an element
+ * that keeps its old words because whoever added it forgot the marker.
+ *
+ * All three are structural, and all three are checked below. jsdom is enough
+ * for every one of them: this is text and attributes, not layout. */
+
+const [ptKeys, enKeys] = LANGS.map((lang) => Object.keys(STRINGS[lang]).sort());
+equal("the two dictionaries are the same size", ptKeys.length, enKeys.length);
+check(
+  "and carry exactly the same keys",
+  ptKeys.join("|") === enKeys.join("|"),
+  `only in pt: ${ptKeys.filter((k) => !enKeys.includes(k))} / ` +
+    `only in en: ${enKeys.filter((k) => !ptKeys.includes(k))}`,
+);
+
+/* Every key the markup names. `data-i18n-attr` holds `attr: key` pairs, so the
+ * key is what follows the colon. */
+const markupKeys = new Set();
+for (const match of html.matchAll(/data-i18n(?:-html)?="([^"]+)"/g)) markupKeys.add(match[1]);
+for (const match of html.matchAll(/data-i18n-attr="([^"]+)"/g)) {
+  for (const pair of match[1].split(",")) markupKeys.add(pair.split(":")[1].trim());
+}
+check("the markup names keys to translate", markupKeys.size > 20, `${markupKeys.size} found`);
+const strayMarkup = [...markupKeys].filter((key) => LANGS.some((l) => !(key in STRINGS[l])));
+check("and every one of them is in both dictionaries", strayMarkup.length === 0, strayMarkup);
+
+/* Every key `app.js` looks up as a literal. `seat.${seat}` and `colour.${colour}`
+ * are built at runtime and cannot be scanned, so they are named explicitly —
+ * missing one of those is exactly the kind of gap this check exists to close,
+ * and a regex that silently skipped them would report a clean sweep. */
+/* Comments stripped first, and the first version of this check is why. A
+ * comment in `app.js` explains that `fillSeats` builds its labels from
+ * `t("seat.*")` — so the scan found the key `seat.*`, which no dictionary has
+ * and no code asks for, and reported a missing translation that did not exist.
+ * The same trap as the stylesheet link-order check and the `[hidden]` check,
+ * both of which matched their own explanation before they matched the code. */
+const appSource = readFileSync(`${WEB}/app.js`, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const codeKeys = new Set(
+  [...appSource.matchAll(/\b(?:t|setBadge)\("([^"]+)"/g)].map((m) => m[1]),
+);
+for (const seat of ["human", "random", "heuristic", "solver"]) codeKeys.add(`seat.${seat}`);
+for (const colour of ["PURPLE", "GREEN"]) codeKeys.add(`colour.${colour}`);
+const strayCode = [...codeKeys].filter((key) => LANGS.some((l) => !(key in STRINGS[l])));
+check("every key app.js asks for exists in both dictionaries", strayCode.length === 0, strayCode);
+
+/* Nothing in either dictionary is unreachable. A key no page and no module ever
+ * names is either a translation of something that was deleted or a marker
+ * somebody forgot to add, and both are worth a failing check rather than a
+ * growing file. */
+const orphans = ptKeys.filter(
+  (key) => !markupKeys.has(key) && !codeKeys.has(key) && key !== "html.lang",
+);
+check("no dictionary entry is unreachable", orphans.length === 0, orphans);
+
+equal("Portuguese is the default", DEFAULT_LANG, "pt");
+equal("and it is what the page starts in", page.getLang(), "pt");
+equal("with the document declaring it", window.document.documentElement.lang, "pt-BR");
+
+/* The terminal hint used to read "25 is odd" on every board, which is right on
+ * the shipped one and wrong on both boards this project actually solved. The
+ * count now comes from the position, and the placeholder is what proves the
+ * sentence can still say it — a hint.full with the number written back in would
+ * pass every other check here. */
+for (const lang of LANGS) {
+  check(`the full-board hint takes its cell count as a variable (${lang})`,
+    STRINGS[lang]["hint.full"].includes("{cells}"), STRINGS[lang]["hint.full"]);
+}
+
+// -- switching -----------------------------------------------------------------
+
+const boardLabelPt = page.ui.variant.options[0].textContent;
+const seatLabelPt = page.ui.opponent.options[0].textContent;
+const badgePt = page.ui.badge.textContent;
+
+page.applyLanguage("en");
+equal("switching moves the page", page.getLang(), "en");
+equal("and the document with it", window.document.documentElement.lang, "en");
+equal(
+  "static markup is rewritten",
+  page.ui.variant.options[0].textContent,
+  STRINGS.en["board.5x5"],
+);
+check("and it really did change", page.ui.variant.options[0].textContent !== boardLabelPt);
+equal(
+  "the opponent list is rebuilt, not just relabelled once",
+  page.ui.opponent.options[0].textContent,
+  STRINGS.en[`seat.${page.ui.opponent.options[0].value}`],
+);
+check("which is a different string than before", seatLabelPt !== page.ui.opponent.options[0].textContent);
+check(
+  "text derived from the position follows too",
+  page.ui.turn.textContent === `${STRINGS.en["colour.PURPLE"]} to move`,
+  page.ui.turn.textContent,
+);
+
+/* The regression `setBadge` exists for. `index.html` marks the badge
+ * `data-i18n="badge.booting"` so it reads correctly before the module loads,
+ * which means a naive re-apply tells a booted page it is booting again. */
+check(
+  "a booted badge does not go back to booting",
+  page.ui.badge.textContent !== STRINGS.en["badge.booting"] &&
+    page.ui.badge.textContent !== STRINGS.pt["badge.booting"],
+  page.ui.badge.textContent,
+);
+check("and it did change language", page.ui.badge.textContent !== badgePt, page.ui.badge.textContent);
+
+/* The boundary from i18n.js's header: the game is bilingual, the site chrome is
+ * not, because every link in it leads to a page that exists only in English. */
+const nav = html.split('id="site-nav"', 2)[1].split("</nav>", 2)[0];
+check("the site navigation carries no translation markers", !nav.includes("data-i18n"), nav.trim());
+check("and still reads in English", nav.includes(">Projects<") && nav.includes(">About<"));
+
+page.applyLanguage("pt");
+equal("switching back restores Portuguese", page.getLang(), "pt");
+equal("and the markup with it", page.ui.variant.options[0].textContent, boardLabelPt);
+equal("and the document language", window.document.documentElement.lang, "pt-BR");
+
+/* The choice survives a reload, which is the only thing `localStorage` is used
+ * for here. Reading it back through the page's own accessor rather than through
+ * the key keeps the storage key an implementation detail. */
+equal("the choice is remembered", window.localStorage.getItem("fliphex.lang"), "pt");
 
 // -- done ----------------------------------------------------------------------
 

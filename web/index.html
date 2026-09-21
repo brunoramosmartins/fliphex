@@ -1,10 +1,15 @@
 <!doctype html>
-<html lang="en">
+<!-- The page ships in Portuguese and switches to English on request. The game
+     is going on display at the Matemateca, IME-USP's mathematics exhibition
+     space, so Portuguese is the default; `web/i18n.js` carries both dictionaries
+     and the long form of the reasoning, including why the static markup is
+     authored in the default language rather than rewritten on load. -->
+<html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FLIPHEX</title>
-<meta name="description" content="Play FLIPHEX in the browser. The rules run on the same Python engine that produced the project's exact solutions.">
+<meta id="meta-description" name="description" data-i18n-attr="content: meta.description" content="Jogue FLIPHEX no navegador. As regras rodam no mesmo motor Python que produziu as soluções exatas do projeto.">
 <!-- Inline, so the page needs no extra request and a bare `http.server` stops
      answering 404 for it. A flat-top hexagon split along the game's two colours. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3CclipPath id='h'%3E%3Cpolygon points='75,50 62.5,71.65 37.5,71.65 25,50 37.5,28.35 62.5,28.35'/%3E%3C/clipPath%3E%3C/defs%3E%3Cg clip-path='url(%23h)'%3E%3Crect x='0' y='0' width='50' height='100' fill='%236b3fa0'/%3E%3Crect x='50' y='0' width='50' height='100' fill='%233d8f5c'/%3E%3C/g%3E%3C/svg%3E">
@@ -25,16 +30,21 @@
 </head>
 <body>
 
-<a href="#main-content" class="skip-link">Skip to content</a>
+<a href="#main-content" class="skip-link" data-i18n="skip.link">Pular para o conteúdo</a>
 
 <!-- The site's own header, byte-for-byte the structure every other page of
      brunoramosmartins.github.io uses. The links are absolute paths so they work
      from /fliphex/ once deployed; served from a local checkout they point at a
-     site that is not there, which is the honest failure and not a silent one. -->
+     site that is not there, which is the honest failure and not a silent one.
+
+     The nav labels are NOT translated, and that is deliberate: every one of
+     them leads to a page that exists only in English. A Portuguese label on a
+     link to an English page promises something the destination does not keep.
+     Only the game is bilingual — see the header comment in i18n.js. -->
 <header class="site-header" role="banner">
   <div class="site-container">
     <a href="/index.html" class="site-logo">Bruno Ramos Martins</a>
-    <button class="nav-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false" aria-controls="site-nav">
+    <button class="nav-toggle" type="button" data-i18n-attr="aria-label: nav.toggle" aria-label="Abrir e fechar a navegação" aria-expanded="false" aria-controls="site-nav">
       <span></span><span></span><span></span>
     </button>
     <nav id="site-nav" class="site-nav" aria-label="Main navigation">
@@ -54,56 +64,69 @@
     <h1>FLIPHEX</h1>
   </div>
   <div class="controls">
-    <label>Board
+    <label><span data-i18n="label.board">Tabuleiro</span>
       <select id="variant">
-        <option value="5x5">5&times;5 &mdash; the shipped game</option>
-        <option value="5x3">5&times;3 &mdash; solved exactly</option>
-        <option value="3x3">3&times;3 &mdash; solved exactly</option>
+        <option value="5x5" data-i18n="board.5x5">5&times;5 &mdash; o jogo publicado</option>
+        <option value="5x3" data-i18n="board.5x3">5&times;3 &mdash; resolvido exatamente</option>
+        <option value="3x3" data-i18n="board.3x3">3&times;3 &mdash; resolvido exatamente</option>
       </select>
     </label>
-    <label>You play
+    <label><span data-i18n="label.side">Você joga</span>
       <select id="side">
-        <option value="PURPLE" selected>purple &mdash; moves first</option>
-        <option value="GREEN">green &mdash; moves second</option>
+        <option value="PURPLE" data-i18n="side.purple" selected>roxo &mdash; joga primeiro</option>
+        <option value="GREEN" data-i18n="side.green">verde &mdash; joga depois</option>
       </select>
     </label>
-    <label>Against
+    <label><span data-i18n="label.opponent">Contra</span>
       <!-- The narrowest list, and the fallback before app.js runs. adr-013's
            second amendment withdrew every agent above the heuristic from the
            deployed page; its fourth returns the solver to the deployed 3x3,
            where the seat is exact from the first move. `fillSeats` in app.js
            widens this by host and by board and never narrows below it, so the
-           decision is in one function there rather than in this markup. -->
+           decision is in one function there rather than in this markup.
+
+           These two carry no data-i18n: `fillSeats` rebuilds the list from
+           `t("seat.*")` on every language change, so a marker here would be
+           overwritten by the same string it asked for. -->
       <select id="opponent">
-        <option value="human">a second player</option>
-        <option value="heuristic" selected>the heuristic agent</option>
+        <option value="human">um segundo jogador</option>
+        <option value="heuristic" selected>o agente heurístico</option>
       </select>
     </label>
-    <button id="new-game" type="button" class="primary" disabled>New game</button>
+    <button id="new-game" type="button" class="primary" data-i18n="button.newGame" disabled>Novo jogo</button>
+    <!-- The switch lives in the *game's* bar, not in the site header above.
+         That header is shared structure: no other page of the portfolio has a
+         language control, and adding one here alone would be the lean-to
+         site.css exists to avoid. The game is what is bilingual, so the game's
+         own bar is where the choice belongs. -->
+    <div class="lang-switch" role="group" data-i18n-attr="aria-label: lang.group" aria-label="Idioma">
+      <button type="button" class="lang is-current" data-lang="pt" data-i18n-attr="title: lang.pt" title="Ler em português" aria-pressed="true">PT</button>
+      <button type="button" class="lang" data-lang="en" data-i18n-attr="title: lang.en" title="Read in English" aria-pressed="false">EN</button>
+    </div>
   </div>
 </header>
 
 <main id="main-content">
   <section class="board-pane">
     <div id="board-wrap" class="board-wrap">
-      <svg id="board" role="img" aria-label="FLIPHEX board" hidden></svg>
+      <svg id="board" role="img" data-i18n-attr="aria-label: board.aria" aria-label="Tabuleiro do FLIPHEX" hidden></svg>
       <div id="boot" class="boot" role="status">
         <div class="spinner" aria-hidden="true"></div>
         <div>
-          <p id="boot-text">Starting the rules engine&hellip;</p>
-          <p class="boot-note">
-            This board is real; it is not playable until the engine starts. The
-            page runs the project&rsquo;s actual Python, compiled to WebAssembly
-            &mdash; the rules are never reimplemented in JavaScript.
+          <p id="boot-text" data-i18n="boot.engine">Iniciando o motor de regras&hellip;</p>
+          <p class="boot-note" data-i18n="boot.note">
+            Este tabuleiro é de verdade; ele só não é jogável até o motor subir.
+            A página roda o Python real do projeto, compilado para WebAssembly
+            &mdash; as regras nunca são reimplementadas em JavaScript.
           </p>
         </div>
       </div>
     </div>
 
     <div class="scoreline" id="scoreline" hidden>
-      <span class="chip purple"><b id="score-purple">0</b> purple</span>
-      <span id="turn" class="turn">Purple to move</span>
-      <span class="chip green"><b id="score-green">0</b> green</span>
+      <span class="chip purple"><b id="score-purple">0</b> <span data-i18n="colour.purple">roxo</span></span>
+      <span id="turn" class="turn">Roxo joga</span>
+      <span class="chip green"><b id="score-green">0</b> <span data-i18n="colour.green">verde</span></span>
     </div>
 
     <p id="commentary" class="commentary" aria-live="polite"></p>
@@ -112,34 +135,35 @@
   <aside class="side">
     <div class="panel">
       <div class="panel-head">
-        <h2 id="hand-title">Your pieces</h2>
-        <button id="undo" type="button" disabled>Undo</button>
+        <h2 id="hand-title" data-i18n="panel.hand">Suas peças</h2>
+        <button id="undo" type="button" data-i18n="button.undo" disabled>Desfazer</button>
       </div>
       <div id="hand" class="hand"></div>
-      <p class="hint" id="hint">Pick a piece, then a cell.</p>
+      <p class="hint" id="hint" data-i18n="hint.pick">Escolha uma peça, depois uma célula.</p>
     </div>
 
     <div class="panel" id="rotation-panel" hidden>
-      <div class="panel-head"><h2>Rotation</h2>
-        <button id="cancel" type="button">Cancel</button>
+      <div class="panel-head"><h2 data-i18n="panel.rotation">Rotação</h2>
+        <button id="cancel" type="button" data-i18n="button.cancel">Cancelar</button>
       </div>
-      <p class="hint">Hover to preview. <b>Net</b> is tiles gained minus tiles handed back.</p>
+      <p class="hint" data-i18n-html="hint.net">Passe o cursor para pré-visualizar. <b>Saldo</b> é peças ganhas menos peças devolvidas.</p>
       <div id="rotations" class="rotations"></div>
     </div>
 
     <details class="panel notes">
-      <summary>How it works</summary>
-      <p>
-        Place a tile on any empty cell at any rotation. Every arrow pointing at an
-        occupied neighbour <b>flips</b> it to your colour. Flips never chain.
+      <summary data-i18n="notes.summary">Como funciona</summary>
+      <p data-i18n-html="notes.p1">
+        Coloque uma peça em qualquer célula vazia, em qualquer rotação. Toda
+        seta apontando para um vizinho ocupado <b>vira</b> aquela peça para a
+        sua cor. Viradas nunca encadeiam.
       </p>
-      <p>
-        A flip is a toggle, so an arrow aimed at <em>your own</em> tile hands it to
-        your opponent. The board shows those in red.
+      <p data-i18n-html="notes.p2">
+        Virar é alternar, então uma seta apontada para uma peça <em>sua</em>
+        entrega ela ao adversário. O tabuleiro mostra essas em vermelho.
       </p>
-      <p>
-        All cells fill and whoever shows more of their colour wins. The cell count
-        is odd, so a draw is impossible.
+      <p data-i18n-html="notes.p3">
+        Todas as células se enchem e vence quem mostrar mais da sua cor. O
+        número de células é ímpar, então empate é impossível.
       </p>
     </details>
   </aside>
@@ -148,11 +172,14 @@
 <!-- One footer. The engine badge and the origin note are the game's own status
      line and stay; the site's copyright and links join them on the same row
      under the site's border treatment, rather than stacking a second footer
-     underneath — which is the lean-to this whole exercise is about. -->
+     underneath — which is the lean-to this whole exercise is about.
+
+     The three links keep their English labels for the reason the nav does: two
+     go to GitHub and the third to an English page of the site. -->
 <footer class="foot" role="contentinfo">
   <span class="engine-line">
-    <span>Engine, solver and agents run unmodified under Pyodide.</span>
-    <span id="engine-badge" class="badge">booting</span>
+    <span data-i18n="footer.engine">Motor, solver e agentes rodam sem modificação sob Pyodide.</span>
+    <span id="engine-badge" class="badge" data-i18n="badge.booting">subindo</span>
     <span id="origin-note" class="origin"></span>
   </span>
   <span class="footer-copy">&copy; 2026 Bruno Ramos Martins</span>

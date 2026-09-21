@@ -116,6 +116,44 @@ button.primary {
 
 button.primary:not(:disabled):hover { background: var(--purple-soft); }
 
+/* -- the language switch ---------------------------------------------------- */
+
+/* Two segments rather than one toggle. A toggle labelled "EN" has to be read as
+   either the current language or the one it would switch to, and there is no
+   label that settles it; two buttons with one of them marked current cannot be
+   read the other way round. The labels are language names and are the same text
+   in both dictionaries, so this control never translates itself.
+
+   It sits in the game's own bar, not in the site header — see the comment on
+   the markup in index.html. */
+.lang-switch {
+  display: flex;
+  align-self: end;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.lang-switch button.lang {
+  border: 0;
+  border-radius: 0;
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  color: var(--ink-soft);
+  background: transparent;
+}
+
+.lang-switch button.lang + button.lang { border-left: 1px solid var(--line); }
+
+.lang-switch button.lang:not(.is-current):hover { color: var(--ink); }
+
+.lang-switch button.lang.is-current {
+  background: var(--purple);
+  color: #fff;
+}
+
 /* -- layout ---------------------------------------------------------------- */
 
 main {

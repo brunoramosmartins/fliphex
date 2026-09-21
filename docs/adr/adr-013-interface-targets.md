@@ -373,6 +373,77 @@ Matemateca — can play it from a link. The thing worth showing them is not a
 competent opponent. It is that one of these boards is *finished*: the value of
 every position is known, and the seat opposite them is reading it.
 
+## Amendment, 2026-09-21 — the published page is bilingual, and Portuguese is the default
+
+The previous amendment closes on who this page is for: the people who designed
+the game in a course at IME and FAU, and the Matemateca, where the physical game
+is going on display. Everything about the page was in English.
+
+That is the wrong way round. The visitors at an exhibition in São Paulo read
+Portuguese; the reason this page exists at all is that audience. English is the
+language of the *portfolio* the page is framed by, which is a different claim on
+it and a weaker one — a visitor arriving from an English site is already
+somewhere they can read, and can switch in one click.
+
+So `web/index.html` is authored in Portuguese and declares `lang="pt-BR"`, and
+`web/i18n.js` carries both dictionaries and a switch. Three things follow, and
+all three are decisions rather than mechanics.
+
+### The default is stated, not sniffed
+
+`navigator.language` is deliberately not consulted. Portuguese is the default
+because of the exhibition, not because of a guess about a browser setting the
+visitor never made for this site — and a page whose language is chosen by a
+rule nobody can see is harder to reason about than one with a stated default and
+a visible control. `localStorage` remembers a choice somebody actually made
+here, and nothing else.
+
+### The game is translated; the chrome is not
+
+The site header's navigation and the footer's links keep their English labels,
+because every one of them leads to a page of brunoramosmartins.github.io that
+exists only in English. A Portuguese label on a link to an English page promises
+something the destination does not keep.
+
+This is the third amendment's frame/canvas rule from `web/site.css` arrived at
+from a new direction: **the frame belongs to the building.** The building is in
+English. The same reasoning puts the language switch in the *game's* bar rather
+than in the site header — no other page of the portfolio has one, and a control
+that exists on this copy of a shared header alone is exactly the lean-to that
+whole layer was built to avoid.
+
+### The static markup is written in the default language
+
+A module script is deferred, so a page that shipped English and rewrote itself
+on load would show every Portuguese-speaking visitor a flash of English — on the
+default path, which is the one that has to be right. Shipping Portuguese puts
+the repaint on the English path instead. The cost is that the Portuguese copy
+lives both in the markup and in the dictionary and the two can drift, which is
+why a test asserts that every key the markup names exists in both dictionaries.
+
+### What this cost, and one thing it found
+
+About fifty strings. The only sentence that needed thought was the move
+commentary, which is assembled from clauses — "Roxo jogou P3-y em C3, virando 2,
+devolvendo 1" keeps the shape of its English original, so no per-language
+assembler was needed.
+
+Pulling the strings out surfaced a defect that had nothing to do with language:
+the end-of-game hint read **"25 is odd, so there is never a draw"** on every
+board. 25 is right on the shipped 5×5 and wrong on both boards this project
+actually solved — the 5×3 has 15 cells and the 3×3 has 9. The count now comes
+from the position. adr-011 is why it is always odd whatever the board, which is
+the claim the sentence was making and the only part of it that was ever general.
+
+### Where the tests live, and why in two places
+
+`web/test/page.test.mjs` checks all of this against the running page, and **CI
+does not run that suite** — `.github/workflows/ci.yml` has no npm step. The
+structural half is therefore duplicated in `tests/test_i18n.py`, parsed out of
+the JavaScript as text, because that is the suite CI actually runs. Phase 7
+closed on two defects of exactly this shape; this amendment does not add a
+third.
+
 ## Related
 
 - [adr-003](adr-003-piece-representation.md) — inert placed tiles; why the state
