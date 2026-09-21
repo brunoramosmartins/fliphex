@@ -41,6 +41,23 @@ jobs:
           git diff --exit-code docs/ \
             || (echo "::error::docs/ is stale — rerun scripts/build_docs.py" && exit 1)
 
+      # The other half of the same rule, and it was missing.
+      #
+      # `web/payload.json`, `web/geometry.json` and `web/theme.css` are generated
+      # from `fliphex/`, `solver/`, `agents/` and `ui/theme.py` exactly as
+      # `docs/` is generated from the engine — but only the Pages workflow was
+      # checking them, and that runs on `main` *after* a merge. So a stale
+      # payload passed every branch check and failed at deploy, which is the
+      # wrong end of the pipeline to find out that the published page would be
+      # running code this commit does not contain.
+      #
+      # It happened: `ui/seats.py` is one of the 24 bundled modules, a fix to it
+      # merged green, and the deployment was the first thing to object.
+      - name: Generated web bundle is up to date
+        run: |
+          python scripts/build_web.py --check \
+            || (echo "::error::web/ is stale — rerun scripts/build_web.py" && exit 1)
+
   # Everything the first job skips. Torch is installed from the CPU-only index:
   # the default wheel carries a CUDA runtime worth hundreds of megabytes, and no
   # GPU is reachable here or on the author's machine (R8 — the 462-series
