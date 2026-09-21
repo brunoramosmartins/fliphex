@@ -257,6 +257,46 @@ def reversi_6x6_overshoot() -> float:
 # -- FLIPHEX's own rows -----------------------------------------------------
 
 
+#: Boards this project solved exhaustively, keyed by ``(n_cols, n_rows)``, with
+#: Allis's term and what earned it. A board absent from this map is unsolved.
+#:
+#: **Declared, not derived.** The layer files carrying these solutions live in
+#: ``data/checkpoints/``, which is gitignored, so reading the status off disk
+#: would make a fresh clone print a different table from the machine that ran
+#: the sweeps. The table is the artifact; the bytes are not.
+#:
+#: Both boards earn *strongly* rather than *weakly*: a retrograde sweep computes
+#: the value of every configuration in every layer, and
+#: ``agents.solver_agent.SolverAgent`` turns that into a strategy for any
+#: position by lookup — which is exactly Allis's condition, "for all legal
+#: positions".
+SOLVED_BOARDS: dict[tuple[int, int], tuple[str, str]] = {
+    (3, 3): (
+        "strongly solved",
+        "EXP-001, both arms, termination: exhausted. 711,963 configurations by "
+        "retrograde sweep and independently by unpruned forward alpha-beta. The "
+        "two agree on 604,347 positions, which is every position the forward "
+        "method reaches — the other 15.1% are configurations no game reaches at "
+        "all. The only board here with two independent witnesses. P1 wins.",
+    ),
+    (5, 3): (
+        "strongly solved",
+        "EXP-002, both arms, termination: exhausted. 1.75e10 configurations by "
+        "retrograde sweep, adr-010 V0–V6 with coverage stated rather than "
+        "assumed (V4 has no search evidence at t = 0..5, V6 covers t >= 2). One "
+        "method, not two. P1 wins.",
+    ),
+}
+
+
+def solved_status(variant: Variant) -> tuple[str, str]:
+    """Allis's term for this board, and the note recording what earned it."""
+    return SOLVED_BOARDS.get(
+        (variant.n_cols, variant.n_rows),
+        ("unsolved", "not solved on any axis; no exhaustive solve is reachable"),
+    )
+
+
 def fliphex_row(variant: Variant) -> Row:
     """Build FLIPHEX's row from the modules that compute it.
 
@@ -267,6 +307,7 @@ def fliphex_row(variant: Variant) -> Row:
     space = profile(variant)
     leaves = games(variant)
     nodes = sum(prefixes(variant, t) for t in range(variant.n_cells + 1))
+    solved, solved_note = solved_status(variant)
     return Row(
         game=f"FLIPHEX {variant.n_cols}×{variant.n_rows}",
         state_space=Figure(
@@ -291,12 +332,9 @@ def fliphex_row(variant: Variant) -> Row:
                 f"counted not estimated; all nodes would be 10^{log10(nodes):.2f}"
             ),
         ),
-        solved="unsolved",
+        solved=solved,
         solved_source="this project",
-        solved_note=(
-            "3×3 and 5×3 are strongly solved by exhaustive search "
-            "(EXP-001, EXP-002); the shipped 5×5 is not solved on any axis"
-        ),
+        solved_note=solved_note,
     )
 
 
@@ -624,15 +662,26 @@ def _render() -> None:
     rows = table()
     print("\n  === Cross-game complexity, log10 ===\n")
     print("    game                  state space   game tree   grade       solved")
+    own = False
     for row in rows:
         grade = f"{row.state_space.provenance.value}/{row.game_tree.provenance.value}"
+        # A solution this project ran is not the same kind of fact as one the
+        # literature reports, and the column would otherwise print them
+        # identically. The asymmetry is in `solved_source`; the marker is what
+        # makes it visible in the artifact people actually read.
+        mark = row.solved_source == "this project" and row.solved != "unsolved"
+        own = own or mark
         print(
             f"    {row.game:<21} {row.state_space.printable:>11} "
-            f"{row.game_tree.printable:>11}   {grade:<19} {row.solved}"
+            f"{row.game_tree.printable:>11}   {grade:<19} "
+            f"{row.solved}{'*' if mark else ''}"
         )
     print()
     print("    exact = counted here;  verified = quote resolved in notes/sources;")
     print("    reported = named source not held;  absent/refuted = not printed.")
+    if own:
+        print("    * solved by this project's own runs, verified under adr-010 and")
+        print("      not independently reimplemented.")
 
 
 def main() -> int:

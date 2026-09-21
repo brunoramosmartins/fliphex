@@ -34,6 +34,8 @@ Freely editable (append-only in practice).
 | EXP-015 | 2026-09-04 | H3 | 2 | The H3 training run: five seeds against the prior-free UCT floor | Shipped 5×5-`h1`, `ConvRotationNet`, 5 seeds × 30 generations × 200 games, gate every 5 at 400 games | 1–5 | **complete** | **Instability recorded; H3's clause 1 is not satisfied.** Four seeds clear the floor and one does not — seed 4 at **56.0% [49.1%, 62.7%]**, two games short. The five rates are 64.0 / 76.0 / 63.0 / 56.0 / 62.0%, a between-seed `sd` of **7.3%** against the **3.4%** sampling alone predicts, and homogeneity `χ² = 18.52` on 4 df **rejects a common rate**. 135.0 h, against ≈146 h projected. [`exp015-h3-training-5x5.json`](../results/exp015-h3-training-5x5.json) |
 | EXP-016 | 2026-09-18 | H1 | 1 + 2 | H1's shipped-board arm: the first-player rate under named, imperfect play | Shipped 5×5-`h1`. Primary: prior-free UCT self-play, 400 simulations, **20 seeds × 250 = 5,000 games** (20.5 h at a measured 14.77 s/game). Secondary: the five EXP-015 champions, 250 games each | 1–20 | **withdrawn before running** | **Withdrawn 2026-09-18, same day, by red-team.** Prior-free UCT at 400 simulations visits **10–18 of 325** root children (4%) and the coverage is seat-dependent, so the design measured cell-enumeration order. Six further blocking findings, including a seed schedule sharing **975 of 5,000** player seeds. No data collected. Superseded by **EXP-017**. |
 | EXP-017 | 2026-09-18 | H1 | 1 + 2 | H1's shipped-board arm: the first-player rate under exact endgame play | Shipped 5×5-`h1`. `SolverAgent` both seats (`max_nodes` 2M, `search_below_k` 8, heuristic fallback), **5,000 games, one match seed**, 11.0 h single-worker at a measured 7.95 s/game. Diversity from the heuristic's random tie-break; `proved_rate` ~31% | 1 | **complete** | **First player wins 2,712/5,000 = 54.2% [52.9%, 55.6%]**, interval entirely above 50%, under play that is heuristic for ~17 plies and **exact for the last 8** (`proved_rate` **32.0%**, and no rate may be quoted without it). 5,000/5,000 games distinct; ply accounting closes at 125,000 exactly. All three registered predictions held. **Corroborates H1's direction on a board no solver reaches; does not demonstrate it** — H1's evidence is the four exhaustive solves. [`exp017-first-player-5x5.json`](../results/exp017-first-player-5x5.json) |
+| EXP-018 | 2026-09-21 | — | 3 | Engine cost under Pyodide (CPython on WebAssembly) against native CPython, for the browser-build decision | Same tracked instrument both sides — `scripts/bench_engine.py`, pure stdlib, unmodified under Emscripten. Six workloads, 1 s budget each, shipped 5×5 plus the 3×3 solve | — | **complete (registered retrospectively — see the entry)** | **WebAssembly costs ~3×, not the order of magnitude assumed.** Slowdown is 2.84–3.43× across all six workloads: `legal_moves` 3.43×, `apply_move` 2.97×, random playout 3.30×, heuristic game 2.96×, UCT 2.93×, 3×3 solve 2.84×. In the browser a heuristic move costs **4 ms** and a whole heuristic game 99 ms, so the planned web v1 is free; the 3×3 opening solve costs **7.5 s** once; UCT at the trained 400-simulation budget costs **11.8 s per move**, which is not interactive. Pyodide boot ~1.9 s from local disk in node — **not** a browser-over-network figure and not to be quoted as one. |
+| EXP-019 | 2026-09-21 | — | 3 | Browser cold- and warm-cache cost of the web build, against adr-013's declared response-time limits | `web/` served over HTTP, instrumented by `web/app.js` itself. Four marks per load, cold and warm cache, 5 loads per cell. **Chrome 153 / Windows x64 only — the second browser and the phone are unrun** | — | **partial (one cell pair); the falsifier fired** | **Boot is compute-bound, not transfer-bound, and three of four registered predictions are wrong.** Cold median **4,293 ms** (n=5, 4,218–4,474), warm **3,925 ms** (n=5, 3,842–4,211) — a ratio of **1.09×** against the falsifier's 2× floor, so **the rules are not applied as written**. The cache conditions were cleanly separated (**5,775,367** bytes transferred cold against **300** warm), so what collapsed is the distinction's *relevance to time*, not the ability to tell the conditions apart — the falsifier's trigger fired while its stated reason did not. Of a cold boot, only **~423 ms (10%)** is download; the rest is WASM compilation and Python start. `chrome` paints in ~120 ms, `engine` costs ~300 ms, `playable` ~9 ms. **Zero stalls in 10 browser loads**, against ~1 in 5 under Node/WSL2. |
 
 **Registration basis.** EXP-001 through EXP-005 are registered against the H1/H2
 text at tag `v0.3-hypotheses`. Any post-lock amendment to that text is recorded
@@ -5790,3 +5792,399 @@ registration, not here.
 > **Win contribution survives** — it is not forced — and so do placement
 > *timing*, cell choice and rotation choice. Each needs a dominance threshold
 > declared before looking. See `docs/research.md`, H5.
+
+---
+
+### EXP-018 — what WebAssembly costs this engine
+
+**Registered 2026-09-21, retrospectively — the run came first, and that is the
+wrong order.** This project's rule is that an entry exists before a run, and
+EXP-003 and EXP-014 are the precedent: both are performance measurements feeding
+a design decision, and both were registered first. This one was not. It is
+recorded as backfilled rather than dated to look contemporaneous, and the cost of
+the violation is stated below rather than waved away.
+
+**What the violation actually cost here.** Little, and the reason is worth
+writing down instead of used as an excuse. A registration's work is to fix the
+decision rule before the number is visible, so the number cannot pick the rule.
+The decision this feeds — whether the browser build may carry the solver and the
+learner — has no threshold anyone had declared, so there was none to protect.
+That is itself the finding: **the entry should have been written to force the
+threshold, not to record the measurement.** Gate 1 asks what decision turns on
+the quantity; the honest answer on the day was "we will see", and "we will see"
+is what a registration exists to refuse.
+
+#### Objective
+
+Measure the slowdown of the FLIPHEX engine under Pyodide — CPython compiled to
+WebAssembly — against native CPython, so the browser interface is designed
+against a number. Phase 4's first lesson is *measure the composed system, not its
+components*, and EXP-007 repeated it at a factor of four. A guess of "3–10×
+slower" was on the table; this replaces it.
+
+#### Why one instrument, not two
+
+`scripts/bench_engine.py` is **pure standard library** and imports only
+`fliphex`, `solver` and `az.mcts`. Pyodide runs that file unmodified. Nothing is
+extrapolated across the boundary, because extrapolating a cost across a boundary
+is exactly what this project has now got wrong twice.
+
+The harness that loads Pyodide is **not** in the repository: it needs an `npm
+install` and a Node runtime, and the repo is self-contained by rule. The half
+that must be identical on both sides is the half that is tracked.
+
+#### Configuration
+
+Node 18.19.1, `pyodide@0.26.4`, CPython 3.12.1 on Emscripten, against CPython
+3.12.3 on Linux. Six workloads, 1 s budget each, shipped 5×5 except the solve.
+`az.mcts` is driven directly with uniform priors and random-rollout leaves — the
+prior-free floor — because the *search* is pure stdlib and only the network
+evaluator needs torch.
+
+#### Result
+
+| workload | native | pyodide | slowdown |
+|---|---:|---:|---:|
+| `legal_moves` at the opening | 1,558,544 moves/s | 454,579 moves/s | **3.43×** |
+| `apply_move` | 89,159 moves/s | 29,987 moves/s | **2.97×** |
+| random playout (full game) | 110.6 games/s | 33.5 games/s | **3.30×** |
+| heuristic game (full game) | 29.9 games/s | 10.1 games/s | **2.96×** |
+| UCT move, 100 simulations | 1.0 moves/s | 0.34 moves/s | **2.93×** |
+| 3×3 opening solve | 2.6 s | 7.5 s | **2.84×** |
+
+**The spread is 2.84–3.43× across six workloads that stress different things** —
+bit manipulation, object construction, dictionary-heavy tree search, recursion.
+A slowdown that uniform says the cost is the interpreter itself rather than any
+one operation hitting a WASM pathology, which is the useful form of the answer:
+it transfers to code not measured here.
+
+#### What follows for the browser build
+
+- **A heuristic move costs 4 ms** and a complete heuristic game 99 ms. The
+  planned web v1 — human versus human and human versus heuristic — has no
+  performance question in it at all.
+- **The 3×3 opening solve costs 7.5 s**, once, after which the transposition
+  table makes the rest of the game fast. A browser can play the 3×3 *perfectly*
+  for the price of one visible wait.
+- **UCT at the trained 400-simulation budget costs 11.8 s per move** — linear in
+  simulations, so this is a projection from the 100-simulation measurement and
+  carries that assumption. Not interactive. The learner in a browser needs a
+  smaller budget, a worker thread, or both, and the budget change makes it a
+  *different agent* from the one EXP-015 measured.
+
+#### What this does not establish
+
+Not the boot cost in a browser. The ~1.9 s measured here is Node loading a
+package from local disk; a browser adds a download over a network, and one of
+three samples took 234 s under load on this machine, so even the local figure has
+a tail. **No browser-facing claim may quote it.**
+
+Not the cost of network inference. Only the tree search was measured; a learned
+agent adds a forward pass per simulation on top, and no numpy port exists yet to
+measure.
+
+Not that 3× holds on other hardware, other browsers, or WASM engines other than
+V8. One machine, one runtime.
+
+---
+
+### EXP-019 — what the browser build costs a first-time visitor
+
+**Registered 2026-09-21, before the run.** EXP-018 was not, and its own entry
+records what that cost: a registration's work is to fix the decision rule before
+the number is visible, and there was no rule to protect. This entry exists to
+carry one.
+
+#### The decision, named first
+
+Three pieces of work are pending on this measurement, and each has a threshold
+declared here **before anything is measured**:
+
+1. **The split render.** [adr-013](../docs/adr/adr-013-interface-targets.md)'s
+   consequences say the page "must be designed to render the board *before*
+   Python is ready". It does not: the board appears only once the engine
+   imports. Building it means generating the three boards' layouts at bundle
+   time so the page can draw an inert board immediately.
+   **Rule: build it if warm-cache time-to-playable exceeds 1 s.** Otherwise it
+   is recorded as work *not done* rather than work forgotten.
+2. **A byte-counting progress indicator**, and revisiting the CDN.
+   **Rule: build it if cold-cache time-to-playable exceeds 10 s.**
+3. **The exhaustive solver seat on the 3×3.** adr-013 clause 4 ships it on a
+   7.5 s opening solve — which is a *Node* figure.
+   **Rule: the seat does not ship if the browser solve exceeds 10 s.**
+
+The two limits are adr-013's, taken from Nielsen's response-time thresholds:
+1 s preserves flow of thought, 10 s is the limit of held attention. They are
+external to this engine and published in 1993, which is the whole reason they
+can judge a number measured in 2026. Provenance: **cited, not verified**.
+
+#### Why the quantity is free to vary — gate 9
+
+Boot cost depends on download bandwidth, WASM engine, device class and cache
+state, none of which this project controls. It is not fixed by the rules the way
+H5's measures were, and the three rules above resolve differently across the
+plausible range rather than all landing the same way. Checked by computing each
+conclusion at the range's floor and ceiling, per the gate's 2026-09-18
+amendment.
+
+#### Instrument
+
+`web/app.js` records its own marks with `performance.now()` and prints them to
+the console and to the page. A stopwatch cannot separate the four, and an
+impression — *"fast enough not to bother me"*, which is what the first play
+session produced — is not a measurement and is not recorded as one.
+
+Four marks per load:
+
+| mark | from page load to |
+|---|---|
+| `chrome` | the header and panels painted |
+| `runtime` | Pyodide initialised |
+| `engine` | `ui.session` imported, board drawn |
+| `playable` | the opening hand rendered and clickable |
+
+Plus, on demand, the 3×3 opening solve, timed around the one `SolverAgent` call.
+
+#### Configuration
+
+Served over plain HTTP from the repository, not from GitHub Pages — the CDN is
+the same either way and the page's own bytes are 60 KB against the runtime's
+14 MB, so the host is not the variable. **Cold cache** means a hard reload with
+the cache disabled; **warm** means a normal reload. At least two browsers, at
+least one phone, **5 loads per cell**, all reported — no cell is averaged away
+and no load is dropped for looking wrong.
+
+The four marks are cumulative from navigation start, so they are reported as
+deltas *and* totals; a reader who only sees deltas cannot tell a slow runtime
+from a slow import.
+
+#### Registered predictions
+
+Written before the run, so they can be wrong:
+
+1. **Warm-cache `playable` under 3 s.** Node reached the engine in 1.9 s plus
+   0.13 s, and a warm browser cache should not be far off.
+2. **Cold cache is dominated by transfer, not compute** — the runtime is 14 MB
+   against 60 KB of FLIPHEX, so cold time should track bandwidth and barely move
+   with device speed.
+3. **The page's own bytes are under 1% of the cold transfer.**
+4. **The 3×3 browser solve lands within 1.5× of Node's 7.5 s**, since EXP-018
+   found the interpreter cost flat at 2.84–3.43× and V8 is V8.
+
+#### Falsifier
+
+If cold and warm differ by less than 2×, the cache distinction this protocol is
+built on is not real, the numbers do not mean what the rules above assume, and
+**the rules are not applied** — the protocol is rewritten instead. A measurement
+that cannot tell its own two conditions apart decides nothing.
+
+#### Amendment, 2026-09-21 — rule 3 is moot, and one observation is not the run
+
+**The third rule no longer decides anything.** adr-013's amendment of the same
+day withdraws every agent above the heuristic from the *deployed* page by
+author's decision, so whether the 3×3 browser solve clears 10 s no longer selects
+anything. Recorded as **moot**, the status EXP-004 and EXP-005 carry, rather than
+repointed at a decision it was not registered against. The solve may still be
+timed with `window.fliphexBench(3, 3)`; the number is descriptive now.
+
+Rules 1 and 2 stand unchanged — the split render and the progress indicator are
+still open, and both are about the page everyone loads.
+
+**One load reported `ready in 2.12s`.** Cache state unrecorded, one browser, one
+device, `n = 1`. It is **not** EXP-019 data and is not entered in the table. It
+is noted because it is suggestive in a direction that matters — 2.12 s is above
+rule 1's 1 s threshold, which would fire the split render — and precisely
+because it is suggestive it must not be acted on. Five loads per cell, cold and
+warm, or nothing.
+
+#### Amendment, 2026-09-21 — the ~235 s boot stall is real, and the measurement has to survive it
+
+**Seen twice now, from two unrelated harnesses, at the same figure.** Sampling
+Pyodide's boot for EXP-018 produced 1.91 s, 234 s and 1.96 s — the middle one
+was recorded as an outlier and excluded from anything. Building `web/test/` then
+reproduced it: over fourteen runs of the page suite, **three stalled at about
+235 s while the rest booted in four**, roughly one load in five.
+
+Two independent sightings of the same duration make it a property of this
+machine rather than a fluke, and it matters here because EXP-019 measures
+exactly this quantity. Three consequences, all adopted:
+
+1. **A stalled load is recorded, never dropped.** The protocol already says no
+   load is discarded for looking wrong. A 235 s `playable` is data about the
+   environment the page runs in, and a table that quietly omits it reports a
+   page that does not exist.
+2. **It is reported as its own row, not averaged in.** A mean over four 4 s
+   loads and one 235 s load describes nothing. The cell shows every value.
+3. **Rules 1 and 2 are read against the *typical* load, with the stall rate
+   stated beside them.** "Warm time-to-playable exceeds 1 s" is a question about
+   what a visitor normally waits, and "one load in five stalls for four minutes"
+   is a separate and more serious finding that no threshold here was written to
+   catch.
+
+**The cause is not established.** WSL2, the page cache, memory pressure and the
+14 MB wasm download are all candidates and none has been tested. It has never
+been seen in a real browser, because no real browser has run this page yet.
+
+`web/test/page.test.mjs` waits 300 s and, on expiry, exits **2** with
+*INCONCLUSIVE* rather than 1 with a failure: no check ran, so reporting a page
+defect would be a claim the run cannot support.
+
+#### What this does not set out to establish
+
+Not that the page is pleasant to use. That is the play-testing the author is
+doing separately, and it produces different evidence which must not be pooled
+with these numbers.
+
+Not an average across devices. Five loads on one phone is a description of that
+phone. The table reports cells, not a headline.
+
+#### Result, 2026-09-20 — Chrome 153 on Windows x64, 5 cold + 5 warm
+
+| # | cache | chrome | runtime | engine | playable | **total** | transferred |
+|--:|---|--:|--:|--:|--:|--:|--:|
+| 1 | cold | 122 | 4,047 | 297 | 9 | **4,474** | 5.78 MB |
+| 2 | cold | 133 | 3,742 | 328 | 15 | **4,218** | 5.78 MB |
+| 3 | cold | 111 | 3,822 | 312 | 9 | **4,254** | 5.78 MB |
+| 4 | cold | 129 | 3,925 | 319 | 10 | **4,382** | 5.78 MB |
+| 5 | cold | 125 | 3,881 | 279 | 9 | **4,293** | 5.78 MB |
+| 6 | warm | 103 | 3,562 | 287 | 9 | **3,960** | 300 B |
+| 7 | warm | 136 | 3,440 | 341 | 8 | **3,925** | 300 B |
+| 8 | warm | 128 | 3,458 | 301 | 9 | **3,895** | 300 B |
+| 9 | warm | 100 | 3,735 | 367 | 9 | **4,211** | 300 B |
+| 10 | warm | 109 | 3,447 | 278 | 8 | **3,842** | 300 B |
+
+Every load is listed. None is dropped and no cell is averaged into another, per
+the protocol. Milliseconds are deltas; **total** is time from navigation start.
+
+#### The falsifier fired, and its stated reason is not what happened
+
+Cold median **4,293 ms**, warm **3,925 ms**: a ratio of **1.09×** against the
+registered floor of 2×. The falsifier reads *"the rules are not applied — the
+protocol is rewritten instead"*, and that is honoured below.
+
+But the reason it gives is wrong, and saying so is the point of writing it down
+in advance. It argued that a run which cannot tell its two conditions apart
+decides nothing. **This run separates them cleanly**: 5,775,367 bytes
+transferred cold against 300 warm, a factor of 19,000, measured rather than
+remembered. What collapsed is not the distinction — it is the distinction's
+*relevance to the quantity*. The falsifier used a time ratio as a proxy for
+condition separation, and the proxy was the wrong instrument for the risk it
+was guarding against.
+
+**That is the entry's most useful line.** A pre-registered falsifier is
+supposed to be able to fire; this one fired for a reason its author had not
+imagined, which is what makes it worth more than a threshold nobody tested.
+
+#### Why the conditions do not matter: boot is compute-bound
+
+The `runtime` step costs a median **3,881 ms** cold and **3,458 ms** warm. The
+difference, **423 ms**, is the download — 5.78 MB at an implied 13.7 MB/s. So
+**about 10% of a cold boot is transfer and 90% is WebAssembly compilation and
+Python start**, which no cache the page controls will shorten.
+
+This **refutes registered prediction 2** outright — *"cold is dominated by
+transfer, not compute"* — and it refutes it in the direction that matters,
+because rule 2 and the byte-counting indicator were both designed around a
+transfer bottleneck that does not exist.
+
+#### The registered predictions, scored
+
+1. **Warm `playable` under 3 s — wrong.** All five warm loads land at
+   3,842–4,211 ms. The Node figure it was extrapolated from (1.9 s + 0.13 s)
+   did not transfer, and extrapolating across that boundary is the error this
+   project has now made three times.
+2. **Cold dominated by transfer — wrong**, as above. 10%, not most.
+3. **The page's own bytes under 1% of the cold transfer — wrong.** 210,963
+   bytes of 5,775,367 is **3.7%**. Two mistakes compound here: the runtime was
+   called 14 MB from its size on disk, when jsdelivr serves it compressed at
+   5.78 MB, and `python -m http.server` gzips nothing, so this project's own
+   four files went over raw. On a host that compresses, ours would be ~1%.
+4. **The 3×3 browser solve within 1.5× of Node's 7.5 s — unrun.** Made moot for
+   deciding anything by the 2026-09-21 amendment; still unmeasured as a
+   description.
+
+Three of four wrong. The one that survives was never tested.
+
+#### What the rules do, given the falsifier
+
+**Rule 2 — no byte-counting indicator, and it is not a near miss.** Cold
+time-to-playable is 4.3 s against a 10 s limit, and the transfer it was meant
+to narrate is 423 ms of it. The rule does not fire on any reading.
+
+**Rule 1 — the split render is built. This is a judgement, and it is marked as
+one.** Rule 1's only input was ever the *warm* number, which this run measures
+well: five loads, 3,842–4,211 ms, a 9% spread, four times the 1 s limit. The
+cold/warm collapse invalidates the comparison between cells; it does not touch
+a measurement taken inside one. So the rule is decidable on its own terms.
+
+**But that reading was arrived at after seeing the data**, which is exactly the
+move a pre-registration exists to prevent, and it is recorded as such rather
+than presented as the plan working. A reader who thinks the falsifier should
+have stopped rule 1 too is reading the text as written; the text was written
+badly, and the repair is this paragraph rather than a quiet reinterpretation.
+
+**The split render is also worth less than it looked.** It cannot make the page
+*playable* sooner — Python must finish either way — so it buys a visible board
+during 3.9 s that is currently blank. That is the standard remedy for a wait,
+not a speed-up, and it must not be described as one.
+
+#### Closed 2026-09-21 as partial, by decision — the remaining cells decide nothing
+
+**The phone cell and the second browser are dropped, and the entry closes
+incomplete rather than pending.** Gate 1 asks what decision turns on a quantity.
+Asked again now that the desktop pair is in, the answer for the missing cells is
+**nothing**, and running them because the protocol named them would be the habit
+the gate exists to break.
+
+Rule by rule:
+
+- **Rule 1 is spent.** The split render was decided on the warm desktop number
+  and is built. A phone cannot un-build it.
+- **Rule 2 cannot fire usefully any more.** It asked for a progress indicator if
+  cold exceeded 10 s. A phone at EXP-018's ~3× would land near 13 s and cross
+  it — but the split render already draws the board in ~100 ms and shows a
+  spinner and a status line, which *is* the remedy the 10 s limit prescribes.
+  The rule's conclusion is already in place whatever the number says.
+- **Rule 3 was made moot on 2026-09-21** by the decision to publish no agent
+  above the heuristic.
+
+So every rule this entry was registered to decide is decided or dead. What the
+missing cells would add is a sentence for the writeup, and one is available
+without them: see below.
+
+**An instrument problem would have blocked it anyway, and is recorded because it
+is the kind of thing a later reader will hit.** The device is an iPhone and the
+host is Windows. `chrome://inspect` port forwarding is Android-only, and iOS
+Safari's Web Inspector requires macOS, so there is **no supported path to a
+console on this pair**. The page's badge shows `ready in Xs` on screen, so a
+coarse figure was readable; `fliphexReport()` was not. A cell collected by
+reading a badge is not the cell the protocol describes.
+
+**What the phone did establish, qualitatively and recorded as such.** The page
+loads, fits the screen and plays. The author reports it *"works and is well
+framed"* but is **harder to play than on the desktop**. That is a judgement about
+the interface, not a timing, and it belongs with the play-testing evidence rather
+than in the table above — the entry already says the two must not be pooled.
+
+**The honest shape of this entry, for anyone reading it later.** One cell pair,
+Chrome 153 on Windows. It fired its own falsifier, refuted three of its four
+predictions, decided the one piece of work that was still open, and was then
+closed by the author before completing its own protocol because completing it
+would have decided nothing. The incompleteness is the finding's frame, not a
+footnote to it.
+
+#### Not established, and openly incomplete
+
+**One browser, one machine.** Chrome 153 on Windows x64. The protocol asks for
+a second browser and a phone; both are unrun, so this is **one cell pair, not
+the table**. A phone is the interesting case precisely because boot is now known
+to be compute-bound, and phone CPUs are where that bites.
+
+**The ~235 s stall did not appear.** Ten browser loads, zero stalls, against
+roughly one in five under Node on WSL2. That is evidence the stall belongs to
+the Node/WSL2 path rather than to browsers, and it is not proof: ten loads
+cannot rule out a one-in-twenty event with any confidence.
+
+**No cause is established for the 3.4 s runtime step.** It was not profiled, and
+whether it is wasm compilation, stdlib unpacking or interpreter start is
+unknown. Anything that tried to shorten it would be guessing.

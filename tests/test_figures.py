@@ -258,3 +258,39 @@ def test_git_is_available_so_the_tracking_check_is_real():
         check=False,
     )
     assert result.returncode == 0, "not a git work tree; tracking checks are void"
+
+
+# -- the one binary this repository does track ---------------------------------
+
+
+def test_the_readme_demo_is_tracked_because_nothing_here_can_regenerate_it():
+    """The GIF is tracked and the figures are not, under the same rule.
+
+    ``.gitignore`` states it: *track the per-item record when regenerating it
+    needs something the repository does not have.* A canonical figure needs
+    ``python -m figures.build`` and a few seconds, so it is generated and
+    ignored. A screen recording of somebody playing a game in a browser is not
+    reproducible from anything in this tree at all — no seed, no script and no
+    instrument produces it — so it is committed.
+
+    The two land on opposite sides of one rule, each for the right reason, which
+    is what this test exists to keep true.
+    """
+    demo = ROOT / "docs" / "media" / "fliphex-demo.gif"
+    assert demo.exists(), "the README's demo is missing"
+    assert tracked("docs/media/fliphex-demo.gif"), "the demo must survive a clone"
+
+    readme = (ROOT / "README.md").read_text()
+    assert "docs/media/fliphex-demo.gif" in readme, "the README does not show it"
+
+
+def test_the_demo_stays_small_enough_to_belong_in_a_clone():
+    """A budget, because a tracked binary can only grow.
+
+    Every clone pays for this file forever and git cannot forget it. 4 MB is
+    roughly twice the current size: enough room to re-record the game without a
+    conversation, not enough to drop in an untouched screen capture. The command
+    that produced it is in ``notes/phase7-release-log.md``.
+    """
+    size = (ROOT / "docs" / "media" / "fliphex-demo.gif").stat().st_size
+    assert size < 4 * 1024 * 1024, f"{size / 1048576:.1f} MB — re-encode it"

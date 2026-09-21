@@ -2,30 +2,55 @@
 
 Run from the repo root::
 
-    python -m ui.cli                     # two humans, hotseat (default)
-    python -m ui.cli --mode human-ai     # you (purple) vs the heuristic
-    python -m ui.cli --mode ai-ai --seed 1
+    python -m ui.cli                              # two humans, hotseat
+    python -m ui.cli --green heuristic            # you (purple) vs the heuristic
+    python -m ui.cli --green solver --variant 3x3 # vs perfect play
+    python -m ui.cli --green az                   # vs the trained champion
+    python -m ui.cli --purple az --green solver   # watch two agents
 
 Built for rule validation: every move is explained (which arrows fired and what
 flipped), you can preview all rotations before committing, and ``undo`` takes a
 move back. Moves may be typed directly as ``CELL:ARCHETYPE:ROTATION`` (e.g.
 ``C3:P1:0``) or chosen step by step. Type ``help`` at the prompt.
+
+Seats, not modes
+----------------
+Each colour is named independently — ``--purple`` and ``--green``, from
+:data:`ui.seats.SEAT_KINDS` — rather than picked from a fixed list of
+matchups. The old ``--mode`` spellings still work and are mapped onto seats.
+
+Reduced boards get reduced decks
+--------------------------------
+``--variant`` goes through :class:`~fliphex.variant.Variant`, so a 3x3 is
+played with the 5 + 4 hands adr-009 and adr-011 define. Building the opening
+from the board's cell count alone would deal the full 13 + 12 deck onto nine
+cells, which is a different game and not one the solved artefacts describe.
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from agents.base import Agent
-from agents.heuristic_agent import HeuristicAgent
-from agents.random_agent import RandomAgent
+from agents.solver_agent import SolverAgent
 from fliphex.board import OFF_BOARD, Board
 from fliphex.moves import Move, apply_move, legal_moves
 from fliphex.notation import decode_move
 from fliphex.piece import DIRECTION_NAMES, N_SLOTS
 from fliphex.rules import winner
 from fliphex.state import TILES, Colour, GameState, other, tiles_in
+from fliphex.variant import Arm, Variant
+from ui.seats import (
+    DEFAULT_RUN_ROOT,
+    DEFAULT_SIMULATIONS,
+    DEFAULT_SWEEP_ROOT,
+    SEAT_KINDS,
+    ChampionUnavailableError,
+    build_seat,
+    describe_seat,
+)
 
 _MARK = {Colour.EMPTY: "·", Colour.PURPLE: "P", Colour.GREEN: "G"}
 _ANSI = {Colour.PURPLE: "\033[35m", Colour.GREEN: "\033[32m", Colour.EMPTY: "\033[2m"}
@@ -287,20 +312,61 @@ def _prompt_human(board: Board, state: GameState, color: bool) -> Move | str:
 # -- game loop -----------------------------------------------------------------
 
 
+def header(variant: Variant, purple: Agent | None, green: Agent | None) -> str:
+    """Name the board, the decks and who is sitting where.
+
+    The deck is printed because adr-004 R3 requires it of every artefact: a
+    bare "5x3 game" is ambiguous, since the deck a reduced board is played with
+    is a modeling choice rather than a consequence of its size.
+    """
+    first_deck, second_deck = variant.deck_names()
+    larger = "PURPLE" if variant.first == Colour.PURPLE else "GREEN"
+    return "\n".join(
+        [
+            f"  board    {variant.n_cols}x{variant.n_rows} "
+            f"({variant.n_cells} cells), arm {variant.arm.value}",
+            f"  PURPLE   {describe_seat(purple)}",
+            f"  GREEN    {describe_seat(green)}",
+            f"  {larger} moves first and holds {len(first_deck)} tiles: "
+            f"{', '.join(first_deck)}",
+            f"  the other holds {len(second_deck)}: {', '.join(second_deck)}",
+        ]
+    )
+
+
+def _report_solver(colour: Colour, agent: Agent | None) -> None:
+    """Print a solver seat's proved rate, which no result may be quoted without.
+
+    A solver that fell back to its heuristic for most of a game played mostly
+    heuristic moves, and the win says correspondingly little. EXP-017 records
+    the same number for the same reason.
+    """
+    if not isinstance(agent, SolverAgent):
+        return
+    stats = agent.stats()
+    print(
+        f"  {colour.name} solver: {stats['proved']}/{stats['moves']} moves proved "
+        f"({stats['proved_rate']:.0%}), {stats['delegated_unattempted']} not "
+        f"attempted, {stats['delegated_over_budget']} over budget"
+    )
+
+
 def play(
-    board: Board,
+    variant: Variant,
     purple: Agent | None,
     green: Agent | None,
-    first: Colour = Colour.PURPLE,
     color: bool = False,
 ) -> Colour:
-    """Run one game. A ``None`` agent means a human plays that colour.
+    """Run one game on ``variant``. A ``None`` agent means a human plays it.
 
     Returns the winning colour.
     """
+    board = variant.board()
     agents = {Colour.PURPLE: purple, Colour.GREEN: green}
-    stack = [GameState.initial(board.n_cells, first)]
+    stack = [variant.initial_state()]
 
+    print(header(variant, purple, green))
+    print()
     print(render_board(board, stack[-1], color))
     while not stack[-1].is_terminal():
         state = stack[-1]
@@ -330,50 +396,147 @@ def play(
 
     win = winner(stack[-1])
     print(f"== {win.name} wins ==")
+    _report_solver(Colour.PURPLE, purple)
+    _report_solver(Colour.GREEN, green)
     return win
 
 
-def _make_agent(kind: str, seed: int | None) -> Agent | None:
-    if kind == "human":
-        return None
-    if kind == "heuristic":
-        return HeuristicAgent(seed=seed)
-    if kind == "random":
-        return RandomAgent(seed=seed)
-    raise ValueError(f"unknown agent: {kind}")
+#: The pre-seat spellings, kept working. Each maps to a ``(purple, green)``
+#: pair, with ``None`` meaning "whatever ``--ai`` says".
+_LEGACY_MODES: dict[str, tuple[str | None, str | None]] = {
+    "human-human": ("human", "human"),
+    "human-ai": ("human", None),
+    "ai-ai": (None, None),
+}
+
+
+def resolve_kinds(
+    purple: str | None, green: str | None, mode: str | None, ai: str
+) -> dict[Colour, str]:
+    """Decide who plays each colour from the flags given.
+
+    Explicit ``--purple`` / ``--green`` always win. A legacy ``--mode`` fills
+    the seats it names, and a ``None`` inside it means "the agent ``--ai``
+    selects". With nothing given at all the game is hotseat.
+
+    Separate from :func:`main` because it is the one piece of argument handling
+    worth testing without starting a game — and the piece another interface
+    would reuse rather than re-derive.
+    """
+    legacy = _LEGACY_MODES.get(mode or "", ("human", "human"))
+    return {
+        Colour.PURPLE: purple or legacy[0] or ai,
+        Colour.GREEN: green or legacy[1] or ai,
+    }
+
+
+def _variant_from(spec: str, arm: str, first: str) -> Variant:
+    """Parse ``5x3`` into a :class:`~fliphex.variant.Variant`.
+
+    ``Variant`` enforces adr-011's odd cell count and adr-009's anchors, so a
+    bad size is refused here with its own explanation rather than producing a
+    board that cannot be scored.
+    """
+    cols, _, rows = spec.lower().partition("x")
+    try:
+        n_cols, n_rows = int(cols), int(rows)
+    except ValueError:
+        raise SystemExit(
+            f"  ✗ --variant wants COLSxROWS, e.g. 5x3 — got {spec!r}"
+        ) from None
+    try:
+        return Variant(
+            n_cols,
+            n_rows,
+            Arm(arm),
+            Colour.PURPLE if first == "purple" else Colour.GREEN,
+        )
+    except ValueError as exc:
+        raise SystemExit(f"  ✗ {exc}") from None
 
 
 def main(argv: list[str] | None = None) -> None:
     """Parse arguments and run a game."""
     parser = argparse.ArgumentParser(description="Play or watch FLIPHEX.")
+    parser.add_argument("--purple", choices=SEAT_KINDS, help="who plays purple")
+    parser.add_argument("--green", choices=SEAT_KINDS, help="who plays green")
     parser.add_argument(
-        "--mode",
-        choices=["human-human", "human-ai", "ai-ai"],
-        default="human-human",
-        help="human-human is hotseat (default); human-ai puts you as purple",
+        "--variant",
+        default="5x5",
+        help="board as COLSxROWS (default 5x5). Reduced boards use reduced decks",
+    )
+    parser.add_argument(
+        "--arm",
+        choices=[a.value for a in Arm],
+        default=Arm.H1.value,
+        help="h1 gives player one the joker; h2 swaps it for the next archetype",
     )
     parser.add_argument(
         "--first",
         choices=["purple", "green"],
         default="purple",
-        help="which colour moves first and holds the joker",
+        help="which colour moves first and holds the larger hand",
     )
-    parser.add_argument("--ai", choices=["heuristic", "random"], default="heuristic")
+    parser.add_argument(
+        "--mode",
+        choices=sorted(_LEGACY_MODES),
+        help="the pre-seat spelling; --purple/--green supersede it",
+    )
+    parser.add_argument("--ai", choices=SEAT_KINDS, default="heuristic")
+    parser.add_argument(
+        "--az-run",
+        type=Path,
+        default=DEFAULT_RUN_ROOT,
+        help="training run directory holding the champion, for the az seat",
+    )
+    parser.add_argument(
+        "--simulations",
+        type=int,
+        default=DEFAULT_SIMULATIONS,
+        help="PUCT simulations per move for the az and uct seats",
+    )
+    parser.add_argument(
+        "--solver-nodes",
+        type=int,
+        default=None,
+        help="override the solver's node budget (default is per board size)",
+    )
+    parser.add_argument(
+        "--sweep",
+        nargs="?",
+        const=str(DEFAULT_SWEEP_ROOT),
+        default=None,
+        metavar="DIR",
+        help="play the solver seat from a completed retrograde sweep instead of "
+        "searching: perfect from move one, at ~3 GB resident. Falls back to "
+        "search on a board with no sweep, and the header says which it used",
+    )
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--no-color", action="store_true", help="disable ANSI colour")
     args = parser.parse_args(argv)
 
-    if args.mode == "human-human":
-        purple = green = None
-    elif args.mode == "ai-ai":
-        purple = _make_agent(args.ai, args.seed)
-        green = _make_agent(args.ai, None if args.seed is None else args.seed + 1)
-    else:  # human-ai
-        purple, green = None, _make_agent(args.ai, args.seed)
+    kinds = resolve_kinds(args.purple, args.green, args.mode, args.ai)
+    variant = _variant_from(args.variant, args.arm, args.first)
+    seats: dict[Colour, Agent | None] = {}
+    for offset, (colour, kind) in enumerate(kinds.items()):
+        # Distinct seeds per seat: one seed shared by two stochastic agents
+        # replays the same stream on both sides of the board.
+        seat_seed = None if args.seed is None else args.seed + offset
+        try:
+            seats[colour] = build_seat(
+                kind,
+                variant=variant,
+                seed=seat_seed,
+                run_root=args.az_run,
+                simulations=args.simulations,
+                max_nodes=args.solver_nodes,
+                sweep_root=Path(args.sweep) if args.sweep else None,
+            )
+        except ChampionUnavailableError as exc:
+            raise SystemExit(f"  ✗ {colour.name} seat: {exc}") from None
 
-    first = Colour.PURPLE if args.first == "purple" else Colour.GREEN
     color = not args.no_color and sys.stdout.isatty()
-    play(Board(), purple, green, first, color)
+    play(variant, seats[Colour.PURPLE], seats[Colour.GREEN], color)
 
 
 if __name__ == "__main__":

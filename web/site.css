@@ -1,0 +1,262 @@
+/* The portfolio's chrome, so this page is part of a site rather than next to one.
+ *
+ * WHAT THIS IS
+ * ------------
+ * `theme.css` is generated from `ui/theme.py` and carries the *game's* identity
+ * — the wood, the purple, the green, the tokens the pygame window draws from.
+ * `style.css` is the game's own interface built on those tokens. This file is
+ * neither. It is the frame: the site header, the navigation, the footer and the
+ * page width that brunoramosmartins.github.io gives every one of its pages.
+ *
+ * The rule, and it is the only one that matters here: **the frame matches the
+ * building, the canvas does not.** A museum hangs a painting in a frame chosen
+ * to suit the room; it does not repaint the painting. Purple and green are the
+ * physical tiles this project is a counterpart of, so they answer to
+ * `ui/theme.py` and to nothing else. Header, nav, footer, link colour, page
+ * width and type family are chrome, and chrome belongs to the site.
+ *
+ * THIS IS A COPY, AND THAT IS A DELIBERATE COST
+ * ---------------------------------------------
+ * The values below are the portfolio's published design tokens, transcribed
+ * from its `docs/design.md` (v0.2) and `assets/css/base.css`. This repository
+ * cannot import them: they live in a different repository, and there is no
+ * build step that spans the two. Linking them by absolute path would work once
+ * deployed and 404 on `python3 -m http.server`, leaving the local page with
+ * unstyled chrome — and a page that only looks right in one of its two homes is
+ * worse than a copy that is labelled as one.
+ *
+ * So it is labelled. `tests/test_site_chrome.py` pins every value here against
+ * the numbers recorded in this comment, which does not prevent the portfolio
+ * from moving — nothing can — but does mean the copy cannot be edited casually
+ * and then forgotten. **Review trigger:** if the portfolio's design system gets
+ * a version above v0.2, re-read its `docs/design.md` and update both this file
+ * and that test in the same commit.
+ *
+ * DARK MODE
+ * ---------
+ * The portfolio has none; this page does, because `ui/theme.py` does. So the
+ * chrome tokens get dark values derived from the game's own dark palette rather
+ * than from the portfolio, which has nothing to say about it. In light mode —
+ * which is what a visitor following a link will almost certainly be in — the
+ * two match.
+ */
+
+:root {
+  /* Portfolio design system v0.2 — colours */
+  --site-bg: #ffffff;
+  --site-border: #e2dfd9;
+  --site-text: #1c1c1c;
+  --site-text-secondary: #5c5c5c;
+  --site-accent: #1d3557;
+  --site-accent-hover: #457b9d;
+
+  /* Portfolio design system v0.2 — metrics */
+  --site-header-height: 64px;
+  --site-container-wide: 1100px;
+  --site-gutter: 1.5rem;
+  --site-nav-gap: 2rem;
+  --site-footer-pad: 3rem;
+
+  /* Portfolio design system v0.2 — type. The serif and mono are what the site
+     loads from Google Fonts; the sans is `ui/theme.py`'s stack and stays on
+     everything the game itself draws. All three are IBM Plex, which is luck
+     rather than planning and is the reason this page needed no compromise. */
+  --site-serif: "IBM Plex Serif", Georgia, serif;
+  --site-mono: "IBM Plex Mono", "Courier New", monospace;
+}
+
+:root:not([data-theme="light"]) {
+  @media (prefers-color-scheme: dark) {
+    --site-bg: var(--panel);
+    --site-border: var(--line);
+    --site-text: var(--ink);
+    --site-text-secondary: var(--ink-soft);
+    /* #1d3557 is unreadable on a dark ground. Lifted to the same hue at the
+       lightness the game's own soft tokens sit at. */
+    --site-accent: #7fa8cf;
+    --site-accent-hover: #a3c4e2;
+  }
+}
+
+:root[data-theme="dark"] {
+  --site-bg: var(--panel);
+  --site-border: var(--line);
+  --site-text: var(--ink);
+  --site-text-secondary: var(--ink-soft);
+  --site-accent: #7fa8cf;
+  --site-accent-hover: #a3c4e2;
+}
+
+/* The fixed header takes the top 64px out of the page, exactly as it does on
+   every other page of the site. */
+body { padding-top: var(--site-header-height); }
+
+.site-container {
+  width: 100%;
+  max-width: var(--site-container-wide);
+  margin: 0 auto;
+  padding: 0 var(--site-gutter);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--site-gutter);
+}
+
+/* -- skip link -------------------------------------------------------------- */
+
+.skip-link {
+  position: absolute;
+  top: -3rem;
+  left: var(--site-gutter);
+  z-index: 200;
+  padding: .5rem .75rem;
+  background: var(--site-bg);
+  color: var(--site-accent);
+  border: 1px solid var(--site-border);
+  font-family: var(--site-mono);
+  font-size: .75rem;
+  text-decoration: none;
+  transition: top 150ms ease;
+}
+
+.skip-link:focus { top: .5rem; }
+
+/* -- header ----------------------------------------------------------------- */
+
+.site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: var(--site-header-height);
+  display: flex;
+  align-items: center;
+  background: var(--site-bg);
+  border-bottom: 1px solid var(--site-border);
+}
+
+.site-logo {
+  font-family: var(--site-serif);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--site-text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--site-nav-gap);
+}
+
+.site-nav a {
+  font-family: var(--site-mono);
+  font-size: .75rem;
+  font-weight: 500;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--site-text-secondary);
+  padding-bottom: 2px;
+  border-bottom: 1px solid transparent;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.site-nav a:hover { color: var(--site-text); border-bottom-color: var(--site-border); }
+.site-nav a.active { color: var(--site-accent); border-bottom-color: var(--site-accent); }
+
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  padding: .5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.nav-toggle span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--site-text);
+  transition: transform 250ms ease, opacity 250ms ease;
+}
+
+.nav-toggle.is-open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.nav-toggle.is-open span:nth-child(2) { opacity: 0; }
+.nav-toggle.is-open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* -- footer ----------------------------------------------------------------- */
+
+/* One footer, not two. The game's engine badge and origin note are functional
+   and stay; the site's copyright and links join them on the same row, under the
+   site's border treatment. A second footer stacked below the first is precisely
+   the lean-to this file exists to avoid. */
+.foot {
+  max-width: var(--site-container-wide);
+  margin: 2rem auto 0;
+  padding: var(--site-footer-pad) var(--site-gutter);
+  justify-content: space-between;
+  border-top: 1px solid var(--site-border);
+}
+
+.foot .engine-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.footer-links { display: flex; gap: var(--site-gutter); }
+
+.footer-links a,
+.footer-copy {
+  font-family: var(--site-mono);
+  font-size: .75rem;
+  letter-spacing: .04em;
+}
+
+.footer-copy { color: var(--site-text-secondary); }
+.footer-links a { color: var(--site-accent); text-decoration: none; }
+.footer-links a:hover { color: var(--site-accent-hover); text-decoration: underline; }
+
+/* The game page is 1120px wide and the site is 1100. Twenty pixels is not a
+   design decision, it is two files that never met. */
+main { max-width: var(--site-container-wide); }
+
+/* -- the one breakpoint the site has ---------------------------------------- */
+
+@media (max-width: 768px) {
+  .nav-toggle { display: flex; }
+
+  .site-nav {
+    display: none;
+    position: fixed;
+    top: var(--site-header-height);
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    padding: .5rem 0;
+    background: var(--site-bg);
+    border-bottom: 1px solid var(--site-border);
+  }
+
+  .site-nav.is-open { display: flex; }
+
+  .site-nav a {
+    width: 100%;
+    padding: 1rem var(--site-gutter);
+    border-bottom: none;
+    font-size: .875rem;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .site-nav a.active {
+    border-left: 2px solid var(--site-accent);
+    padding-left: calc(var(--site-gutter) - 2px);
+  }
+
+  .foot { flex-direction: column; align-items: flex-start; }
+}
